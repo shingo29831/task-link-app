@@ -3,188 +3,87 @@ import { useAppData } from './hooks/useAppData';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
-import type { AppData, Task } from './types';
+import type { Task, AppData } from './types';
 import { mergeAppData } from './utils/merge';
 
-type TaskWithChildren = Task & { children: TaskWithChildren[] };
+type TaskNode = Task & { children: TaskNode[] };
 
 function App() {
   const { data, setData, getShareUrl } = useAppData();
-  const [parentForNewTask, setParentForNewTask] = useState<{id: string, name: string} | undefined>(undefined);
+  const [parent, setParent] = useState<{id: string, name: string} | null>(null);
 
-  if (!data) return <div style={{ padding: '20px' }}>Loading...</div>;
+  if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
-  // --- Logic for Auto-Status Calculation ---
-
-  const recalculateStatuses = (tasks: Task[]): Task[] => {
-    // ステータスを書き換えるため、一旦コピーを作る
-    const newTasks = [...tasks];
+  const recalculate = (tasks: Task[]): Task[] => {
+    const next = [...tasks];
     let changed = true;
-
-    // 階層が深い場合があるため、変更がなくなるまで繰り返す（ボトムアップ計算）
     while (changed) {
       changed = false;
-      for (let i = 0; i < newTasks.length; i++) {
-        const task = newTasks[i];
-        const children = newTasks.filter(t => t.parentId === task.id);
-        
+      for (let i = 0; i < next.length; i++) {
+        const children = next.filter(t => t.parentId === next[i].id);
         if (children.length > 0) {
-          let nextStatus: 0 | 1 | 2 = 0;
-
-          if (children.every(c => c.status === 2)) {
-            // 全て完了なら完了 (2)
-            nextStatus = 2;
-          } else if (children.every(c => c.status === 0)) {
-            // 全て未着手なら未着手 (0)
-            nextStatus = 0;
-          } else {
-            // それ以外（一つでも進行中がある、または未着手と完了が混ざっている）なら進行中 (1)
-            nextStatus = 1;
-          }
-
-          if (task.status !== nextStatus) {
-            newTasks[i] = { ...task, status: nextStatus, lastUpdated: Date.now() };
-            changed = true;
-          }
+          let s: 0|1|2 = children.every(c => c.status === 2) ? 2 : children.every(c => c.status === 0) ? 0 : 1;
+          if (next[i].status !== s) { next[i] = { ...next[i], status: s, lastUpdated: Date.now() }; changed = true; }
         }
       }
     }
-    return newTasks;
+    return next;
   };
 
-  const updateAndSave = (newTasks: Task[]) => {
-    const finalTasks = recalculateStatuses(newTasks);
-    setData({
-      ...data,
-      tasks: finalTasks,
-      lastSynced: Date.now()
-    });
+  const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
+
+  const addTask = (name: string, offset?: number) => {
+    // ★ 36進数インクリメントID生成
+    const maxIdNum = data.tasks.reduce((max, t) => Math.max(max, parseInt(t.id, 36) || 0), 0);
+    const newId = (maxIdNum + 1).toString(36);
+
+    save([...data.tasks, { id: newId, name, status: 0, deadlineOffset: offset, lastUpdated: Date.now(), parentId: parent?.id }]);
+    setParent(null);
   };
 
-  // --- Actions ---
-
-  const addTask = (name: string, deadlineOffset?: number) => {
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      name,
-      status: 0,
-      deadlineOffset,
-      lastUpdated: Date.now(),
-      parentId: parentForNewTask?.id,
-    };
-    updateAndSave([...data.tasks, newTask]);
-    setParentForNewTask(undefined);
-  };
-
-  const updateTaskStatus = (taskId: string, status: 0 | 1 | 2) => {
-    const newTasks = data.tasks.map(t => 
-      t.id === taskId ? { ...t, status, lastUpdated: Date.now() } : t
-    );
-    updateAndSave(newTasks);
-  };
-
-  const deleteTask = (taskId: string) => {
-    if (!confirm('このタスクを削除しますか？')) return;
-    const newTasks = data.tasks.filter(t => t.id !== taskId);
-    updateAndSave(newTasks);
-  };
-
-  // --- Helpers & IO ---
-
-  const buildTaskTree = (tasks: Task[]): TaskWithChildren[] => {
-    const taskMap = new Map<string, TaskWithChildren>();
-    tasks.forEach(t => taskMap.set(t.id, { ...t, children: [] }));
-    const rootTasks: TaskWithChildren[] = [];
+  const buildTree = (tasks: Task[]): TaskNode[] => {
+    const map = new Map<string, TaskNode>();
+    tasks.forEach(t => map.set(t.id, { ...t, children: [] }));
+    const roots: TaskNode[] = [];
     tasks.forEach(t => {
-      const node = taskMap.get(t.id)!;
-      if (t.parentId && taskMap.has(t.parentId)) {
-        taskMap.get(t.parentId)!.children.push(node);
-      } else {
-        rootTasks.push(node);
-      }
+      const node = map.get(t.id)!;
+      if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
+      else roots.push(node);
     });
-    return rootTasks;
+    return roots;
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(getShareUrl()).then(() => alert('リンクをコピーしました！'));
-  };
-
-  const handleExport = () => {
-    const jsonString = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `task-link.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target?.result as string) as AppData;
-        const merged = mergeAppData(data, importedData);
-        updateAndSave(merged.tasks);
-        alert('データを読み込みました');
-      } catch (err) {
-        alert('読み込み失敗');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // --- Render ---
-
-  const renderTree = (nodes: TaskWithChildren[], depth: number = 0) => {
-    return nodes.map(node => (
-      <React.Fragment key={node.id}>
-        <TaskItem 
-          task={node} 
-          projectStartDate={data.projectStartDate}
-          depth={depth}
-          hasChildren={node.children.length > 0} // ★子タスクの有無を渡す
-          onStatusChange={(status) => updateTaskStatus(node.id, status)}
-          onDelete={() => deleteTask(node.id)}
-          onAddSubTask={() => setParentForNewTask({ id: node.id, name: node.name })}
-        />
-        {renderTree(node.children, depth + 1)}
-      </React.Fragment>
-    ));
-  };
-
-  const startDateStr = new Date(data.projectStartDate).toLocaleDateString();
-  const taskTree = buildTaskTree(data.tasks);
+  const renderNodes = (nodes: TaskNode[], depth = 0) => nodes.map(n => (
+    <React.Fragment key={n.id}>
+      <TaskItem 
+        task={n} projectStartDate={data.projectStartDate} depth={depth} hasChildren={n.children.length > 0}
+        onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
+        onDelete={() => confirm('削除しますか？') && save(data.tasks.filter(t => t.id !== n.id))}
+        onAddSubTask={() => setParent({ id: n.id, name: n.name })}
+      />
+      {renderNodes(n.children, depth + 1)}
+    </React.Fragment>
+  ));
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <header style={{ marginBottom: '30px', textAlign: 'center' }}>
-        <h1 style={{ margin: '0 0 10px 0' }}>TaskLink</h1>
-        <p style={{ color: '#888', fontSize: '0.9em' }}>Start: {startDateStr}</p>
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '40px 20px' }}>
+      <header style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <h1>TaskLink</h1>
+        <p style={{ color: '#888', fontSize: '0.8em' }}>開始日: {new Date(data.projectStartDate).toLocaleDateString()}</p>
       </header>
-
       <ProjectControls 
-        onCopyLink={handleCopyLink}
-        onExport={handleExport}
-        onImport={handleImport}
-        onResetDate={() => updateAndSave(data.tasks)} // 簡易的な開始日リセット（適宜調整）
+        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
+        onExport={() => {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = 'tasklink.json'; a.click();
+        }}
+        onImport={(f) => {
+          const r = new FileReader(); r.onload = (e) => save(mergeAppData(data, JSON.parse(e.target?.result as string)).tasks); r.readAsText(f);
+        }}
+        onResetDate={() => confirm('今日を開始日にしますか？') && setData({ ...data, projectStartDate: Date.now() })}
       />
-
-      <div style={{ marginBottom: '20px' }}>
-        {parentForNewTask && (
-          <div style={{ fontSize: '0.9em', color: '#646cff', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>親タスク: <b>{parentForNewTask.name}</b> に追加中</span>
-            <button onClick={() => setParentForNewTask(undefined)} style={{ fontSize: '0.8em', padding: '2px 6px', background: '#333', color: '#fff' }}>キャンセル</button>
-          </div>
-        )}
-        <TaskInput onAdd={addTask} />
-      </div>
-
-      <div style={{ marginTop: '20px' }}>
-        {data.tasks.length === 0 ? <p style={{ textAlign: 'center', color: '#666' }}>タスクがありません</p> : renderTree(taskTree)}
-      </div>
+      {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)}>取消</button></div>}
+      <TaskInput onAdd={addTask} />
+      <div style={{ marginTop: '30px' }}>{renderNodes(buildTree(data.tasks))}</div>
     </div>
   );
 }
