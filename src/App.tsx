@@ -10,12 +10,12 @@ import { getIntermediateJson, compressData } from './utils/compression';
 type TaskNode = Task & { children: TaskNode[] };
 
 function App() {
-  // 1. フック呼び出しをコンポーネントの最上部にまとめる（エラー修正）
+  // 1. フック呼び出し（最上部）
   const { data, setData, getShareUrl } = useAppData();
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
 
-  // 2. メモ化も早期リターンの前に行う
+  // 2. メモ化
   const debugInfo = useMemo(() => {
     if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0, ratio: "0" };
     const before = getIntermediateJson(data);
@@ -29,7 +29,7 @@ function App() {
     };
   }, [data]);
 
-  // 3. データがない場合の早期リターン（ここより下でフックは呼べない）
+  // 3. データ待ちリターン
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
   // --- Logic ---
@@ -43,10 +43,7 @@ function App() {
         const children = next.filter(t => t.parentId === next[i].id);
         if (children.length > 0) {
           const s: 0|1|2 = children.every(c => c.status === 2) ? 2 : children.every(c => c.status === 0) ? 0 : 1;
-          if (next[i].status !== s) {
-            next[i] = { ...next[i], status: s, lastUpdated: Date.now() };
-            changed = true;
-          }
+          if (next[i].status !== s) { next[i] = { ...next[i], status: s, lastUpdated: Date.now() }; changed = true; }
         }
       }
     }
@@ -56,10 +53,9 @@ function App() {
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
   const addTask = (name: string, offset?: number) => {
-    // 36進数インクリメントID生成
     const maxIdNum = data.tasks.reduce((max, t) => Math.max(max, parseInt(t.id, 36) || 0), 0);
     const newId = (maxIdNum + 1).toString(36);
-    save([...data.tasks, { id: newId, name, status: 0, deadlineOffset: offset, lastUpdated: Date.now(), parentId: parent?.id }]);
+    save([...data.tasks, { id: newId, name, status: 0, deadlineOffset: offset || undefined, lastUpdated: Date.now(), parentId: parent?.id }]);
     setParent(null);
   };
 
@@ -111,9 +107,9 @@ function App() {
 
       <div style={{ marginBottom: '20px' }}>
         {parent && (
-          <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>親タスク: <b>[{parent.id}] {parent.name}</b> に追加中</span>
-            <button onClick={() => setParent(null)} style={{ fontSize: '0.8em', padding: '2px 6px', background: '#333', color: '#fff' }}>取消</button>
+          <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>
+            子タスク追加中: [{parent.id}] {parent.name} 
+            <button onClick={() => setParent(null)} style={{ padding: '2px 6px', marginLeft: '10px' }}>取消</button>
           </div>
         )}
         <TaskInput onAdd={addTask} />
@@ -126,17 +122,19 @@ function App() {
       {/* --- DEBUG SECTION --- */}
       <div style={{ marginTop: '60px', borderTop: '1px dashed #444', paddingTop: '20px' }}>
         <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
-          {showDebug ? 'デバッグを隠す' : 'デバッグ（配置順圧縮情報）を表示'}
+          {showDebug ? 'デバッグを隠す' : 'デバッグ（超軽量圧縮情報）を表示'}
         </button>
         {showDebug && (
           <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
-            <p style={{ marginBottom: '5px' }}><b>1. 配置順 JSON (キーなし / {debugInfo.beforeLen} 文字):</b></p>
-            <code style={{ wordBreak: 'break-all', color: '#888' }}>{debugInfo.before}</code>
+            <p><b>1. 配置順 JSON (0埋め / 不可視文字エスケープ表示):</b></p>
+            <code style={{ wordBreak: 'break-all', color: '#888' }}>
+              {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
+            </code>
             
-            <p style={{ marginTop: '20px', marginBottom: '5px' }}><b>2. LZ 圧縮後 (URL エンコード済み / {debugInfo.afterLen} 文字):</b></p>
+            <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後 ({debugInfo.afterLen} 文字):</b></p>
             <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
             
-            <p style={{ marginTop: '15px' }}>圧縮率: <b>{debugInfo.ratio}%</b></p>
+            <p style={{ marginTop: '15px' }}>圧縮率: <b>{debugInfo.ratio}%</b> (nullを0に置換済み)</p>
           </div>
         )}
       </div>

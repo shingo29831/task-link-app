@@ -22,11 +22,10 @@ const postProcess = (str: string): string => {
 };
 
 /**
- * 配置順の定義 (Tuple Structure)
- * Task: [0:id, 1:name, 2:status, 3:deadlineOffset, 4:lastUpdated, 5:parentId]
- * App:  [0:projectStartDate, 1:tasksArray, 2:lastSynced]
+ * 配置順 (Tuple) の定義
+ * [0:id, 1:name, 2:status, 3:deadlineOffset(0=無), 4:lastUpdated, 5:parentId(0=無)]
  */
-type CompressedTask = [string, string, number, number | null, number, string | null];
+type CompressedTask = [string, string, number, number, number, string | number];
 type CompressedAppData = [number, CompressedTask[], number];
 
 const createCompressedArray = (data: AppData): CompressedAppData => [
@@ -35,9 +34,9 @@ const createCompressedArray = (data: AppData): CompressedAppData => [
     t.id,
     preProcess(t.name),
     t.status,
-    t.deadlineOffset ?? null,
+    t.deadlineOffset ?? 0, // ★ 0を未指定として扱う
     t.lastUpdated,
-    t.parentId ?? null
+    t.parentId ?? 0        // ★ 0を未指定として扱う
   ]),
   data.lastSynced
 ];
@@ -61,9 +60,9 @@ export const decompressData = (compressed: string): AppData | null => {
         id: t[0],
         name: postProcess(t[1]),
         status: t[2] as 0 | 1 | 2,
-        deadlineOffset: t[3] ?? undefined,
+        deadlineOffset: t[3] === 0 ? undefined : t[3], // ★ 0を戻す
         lastUpdated: t[4],
-        parentId: t[5] ?? undefined
+        parentId: (t[5] === 0 || t[5] === "0") ? undefined : (t[5] as string) // ★ 0を戻す
       })),
       lastSynced: arr[2]
     };
