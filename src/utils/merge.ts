@@ -1,4 +1,4 @@
-import { AppData, Task } from '../types';
+import type { AppData, Task } from '../types';
 
 export const mergeAppData = (local: AppData, incoming: AppData): AppData => {
   // プロジェクト開始日は新しい方を採用（要件に合わせて調整）

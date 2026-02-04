@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppData } from '../types';
+import type { AppData } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 import { mergeAppData } from '../utils/merge';
 
