@@ -9,14 +9,6 @@ const USER_DICTIONARY: Record<string, string> = {
 const HIRAGANA_START = 0x3041;
 const MAPPING_START = 0x0080;
 
-interface CompressedTask {
-  i: string; n: string; s: number; d?: number; l: number; p?: string;
-}
-
-interface CompressedAppData {
-  s: number; t: CompressedTask[]; l: number;
-}
-
 const preProcess = (str: string): string => {
   let res = str;
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(k).join(v));
@@ -29,22 +21,51 @@ const postProcess = (str: string): string => {
   return res;
 };
 
+/**
+ * 配置順の定義 (Tuple Structure)
+ * Task: [0:id, 1:name, 2:status, 3:deadlineOffset, 4:lastUpdated, 5:parentId]
+ * App:  [0:projectStartDate, 1:tasksArray, 2:lastSynced]
+ */
+type CompressedTask = [string, string, number, number | null, number, string | null];
+type CompressedAppData = [number, CompressedTask[], number];
+
+const createCompressedArray = (data: AppData): CompressedAppData => [
+  data.projectStartDate,
+  data.tasks.map(t => [
+    t.id,
+    preProcess(t.name),
+    t.status,
+    t.deadlineOffset ?? null,
+    t.lastUpdated,
+    t.parentId ?? null
+  ]),
+  data.lastSynced
+];
+
+export const getIntermediateJson = (data: AppData): string => {
+  return JSON.stringify(createCompressedArray(data));
+};
+
 export const compressData = (data: AppData): string => {
-  const obj: CompressedAppData = {
-    s: data.projectStartDate, l: data.lastSynced,
-    t: data.tasks.map(t => ({ i: t.id, n: preProcess(t.name), s: t.status, d: t.deadlineOffset, l: t.lastUpdated, p: t.parentId }))
-  };
-  return LZString.compressToEncodedURIComponent(JSON.stringify(obj));
+  return LZString.compressToEncodedURIComponent(getIntermediateJson(data));
 };
 
 export const decompressData = (compressed: string): AppData | null => {
   try {
     const json = LZString.decompressFromEncodedURIComponent(compressed);
     if (!json) return null;
-    const obj = JSON.parse(json) as CompressedAppData;
+    const arr = JSON.parse(json) as CompressedAppData;
     return {
-      projectStartDate: obj.s, lastSynced: obj.l,
-      tasks: obj.t.map(t => ({ id: t.i, name: postProcess(t.n), status: t.s as 0|1|2, deadlineOffset: t.d, lastUpdated: t.l, parentId: t.p }))
+      projectStartDate: arr[0],
+      tasks: arr[1].map(t => ({
+        id: t[0],
+        name: postProcess(t[1]),
+        status: t[2] as 0 | 1 | 2,
+        deadlineOffset: t[3] ?? undefined,
+        lastUpdated: t[4],
+        parentId: t[5] ?? undefined
+      })),
+      lastSynced: arr[2]
     };
   } catch { return null; }
 };
