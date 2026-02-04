@@ -102,11 +102,11 @@ function App() {
 
       <div style={{ marginTop: '60px', borderTop: '1px dashed #444', paddingTop: '20px' }}>
         <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
-          {showDebug ? 'デバッグを隠す' : 'デバッグ（分単位・2020基準）を表示'}
+          {showDebug ? 'デバッグを隠す' : 'デバッグ（0削除・極限圧縮）を表示'}
         </button>
         {showDebug && (
           <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
-            <p><b>1. 圧縮直前データ (分単位 / 基準2020 / 不可視文字エスケープ):</b></p>
+            <p><b>1. 圧縮直前データ (0を空文字化 / 記号削除 / 分単位 / 不可視文字エスケープ):</b></p>
             <code style={{ wordBreak: 'break-all', color: '#888' }}>
               {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
             </code>
