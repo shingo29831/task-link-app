@@ -15,15 +15,10 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
 
   const debugInfo = useMemo(() => {
-    if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0, ratio: "0" };
+    if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
     const before = getIntermediateJson(data);
     const after = compressData(data);
-    return {
-      before, after, 
-      beforeLen: before.length, 
-      afterLen: after.length,
-      ratio: before.length > 0 ? ((after.length / before.length) * 100).toFixed(1) : "0"
-    };
+    return { before, after, beforeLen: before.length, afterLen: after.length };
   }, [data]);
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
@@ -97,7 +92,7 @@ function App() {
       />
 
       <div style={{ marginBottom: '20px' }}>
-        {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)}>取消</button></div>}
+        {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
         <TaskInput onAdd={addTask} />
       </div>
 
@@ -107,16 +102,17 @@ function App() {
 
       <div style={{ marginTop: '60px', borderTop: '1px dashed #444', paddingTop: '20px' }}>
         <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
-          {showDebug ? 'デバッグを隠す' : 'デバッグ（超・高密度情報）を表示'}
+          {showDebug ? 'デバッグを隠す' : 'デバッグ（分単位・2020基準）を表示'}
         </button>
         {showDebug && (
           <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
-            <p><b>1. クォート＆カンマ削除済み 生データ (不可視文字エスケープ):</b></p>
+            <p><b>1. 圧縮直前データ (分単位 / 基準2020 / 不可視文字エスケープ):</b></p>
             <code style={{ wordBreak: 'break-all', color: '#888' }}>
               {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
             </code>
             <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後 (URL エンコード済み):</b></p>
             <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
+            <p style={{ marginTop: '10px' }}>圧縮前文字数: {debugInfo.beforeLen} / 圧縮後文字数: {debugInfo.afterLen}</p>
           </div>
         )}
       </div>

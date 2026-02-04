@@ -1,6 +1,9 @@
 import LZString from 'lz-string';
 import type { AppData } from '../types';
 
+// 2020-01-01 00:00:00 UTC を基準点 (0分) とする
+const EPOCH_2020_MIN = 26297280; // 1577836800000 / 60000
+
 const USER_DICTIONARY: Record<string, string> = {
   "確認": "①", "完了": "②", "修正": "③", "【重要】": "④",
   "ミーティング": "⑤", "リリース": "⑥", "バグ": "⑦", "タスク": "⑧"
@@ -11,7 +14,6 @@ const MAPPING_START = 0x0080;
 
 const preProcess = (str: string): string => {
   let res = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-  // 区切り文字として使う記号（[ ] ,）がタスク名にあると復元できないため全角に置換
   res = res.replace(/\[/g, '［').replace(/\]/g, '］').replace(/,/g, '，');
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(k).join(v));
   return res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
@@ -20,24 +22,22 @@ const preProcess = (str: string): string => {
 const postProcess = (str: string): string => {
   let res = str.replace(/[\u0080-\u00FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - MAPPING_START + HIRAGANA_START));
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(v).join(k));
-  // 全角に逃がしていた記号を半角に戻す
   res = res.replace(/［/g, '[').replace(/］/g, ']').replace(/，/g, ',');
   return res;
 };
 
-// デバッグ・圧縮用：ブラケット、カンマ、クォートを徹底的に削った文字列を生成
+// 圧縮用：開始分[名前,状態,期限,更新分,親[...
 export const getIntermediateJson = (data: AppData): string => {
-  const start = data.projectStartDate.toString();
-  const end = data.lastSynced.toString();
+  const start = Math.floor(data.projectStartDate / 60000 - EPOCH_2020_MIN).toString(36);
+  const end = Math.floor(data.lastSynced / 60000 - EPOCH_2020_MIN).toString(36);
   
-  // JSON.stringifyを使わず、nameの引用符を除去したカスタム配列形式で結合
-  const tasks = data.tasks.map(t => {
-    if (t.isDeleted) return "[]";
-    // 形式: [名前,状態,期限Offset,最終更新,親ID]
-    return `[${preProcess(t.name)},${t.status},${t.deadlineOffset ?? 0},${t.lastUpdated},${t.parentId ?? 0}]`;
-  }).join(''); // タスク間のカンマも消去
+  const tasksStr = data.tasks.map(t => {
+    if (t.isDeleted) return "[";
+    const updated = Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN).toString(36);
+    return `[${preProcess(t.name)},${t.status},${t.deadlineOffset ?? 0},${updated},${t.parentId ?? 0}`;
+  }).join('');
 
-  return `${start}${tasks}${end}`;
+  return `${start}${tasksStr}]${end}`;
 };
 
 export const compressData = (data: AppData): string => {
@@ -49,43 +49,39 @@ export const decompressData = (compressed: string): AppData | null => {
     const raw = LZString.decompressFromEncodedURIComponent(compressed);
     if (!raw) return null;
 
-    // 数値[...][...]数値 の形式から分割
     const firstIdx = raw.indexOf('[');
     const lastIdx = raw.lastIndexOf(']');
 
     if (firstIdx === -1) {
-      const ts = raw.match(/\d{13}/g);
-      return { projectStartDate: Number(ts?.[0]), tasks: [], lastSynced: Number(ts?.[1]) };
+      const parts = raw.split(']');
+      return {
+        projectStartDate: (parseInt(parts[0], 36) + EPOCH_2020_MIN) * 60000,
+        tasks: [],
+        lastSynced: (parseInt(parts[1], 36) + EPOCH_2020_MIN) * 60000
+      };
     }
 
-    const startDate = Number(raw.substring(0, firstIdx));
-    const lastSynced = Number(raw.substring(lastIdx + 1));
-    const tasksBody = raw.substring(firstIdx, lastIdx + 1);
-
-    // [ ] のペアを抽出
-    const taskStrings = tasksBody.match(/\[.*?\]/g) || [];
+    const startDate = (parseInt(raw.substring(0, firstIdx), 36) + EPOCH_2020_MIN) * 60000;
+    const lastSynced = (parseInt(raw.substring(lastIdx + 1), 36) + EPOCH_2020_MIN) * 60000;
+    const tasksBody = raw.substring(firstIdx, lastIdx);
+    const taskStrings = tasksBody.split('[').slice(1);
 
     return {
       projectStartDate: startDate,
       tasks: taskStrings.map((tStr, index) => {
         const id = (index + 1).toString(36);
-        if (tStr === "[]") return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
-        
-        // [ ] を削ってカンマで分割
-        const parts = tStr.slice(1, -1).split(',');
+        if (tStr === "") return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
+        const parts = tStr.split(',');
         return {
           id,
           name: postProcess(parts[0]),
           status: Number(parts[1]) as 0 | 1 | 2,
           deadlineOffset: Number(parts[2]) === 0 ? undefined : Number(parts[2]),
-          lastUpdated: Number(parts[3]),
+          lastUpdated: (parseInt(parts[3], 36) + EPOCH_2020_MIN) * 60000,
           parentId: parts[4] === "0" ? undefined : parts[4]
         };
       }),
       lastSynced: lastSynced
     };
-  } catch (e) {
-    console.error("Decompress failed", e);
-    return null;
-  }
+  } catch { return null; }
 };
