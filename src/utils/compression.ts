@@ -11,10 +11,21 @@ const MAPPING_START = 0x0080;
 
 const preProcess = (str: string): string => {
   let res = str;
+
+  // ★ 追加: 全角アルファベットを半角に変換
+  // Unicodeの 0xFF21-0xFF3A (A-Z), 0xFF41-0xFF5A (a-z) を対象
+  res = res.replace(/[Ａ-Ｚａ-ｚ]/g, (s) => {
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+
+  // ユーザー辞書適用
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(k).join(v));
+
+  // ひらがなシフト
   return res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
 };
 
+// postProcess は変更なし（半角に変換したものは半角のまま復元されます）
 const postProcess = (str: string): string => {
   let res = str.replace(/[\u0080-\u00FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - MAPPING_START + HIRAGANA_START));
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(v).join(k));
