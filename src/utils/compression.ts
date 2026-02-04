@@ -10,55 +10,37 @@ const HIRAGANA_START = 0x3041;
 const MAPPING_START = 0x0080;
 
 const preProcess = (str: string): string => {
-  let res = str;
-
-  // ★ 追加: 全角アルファベットを半角に変換
-  // Unicodeの 0xFF21-0xFF3A (A-Z), 0xFF41-0xFF5A (a-z) を対象
-  res = res.replace(/[Ａ-Ｚａ-ｚ]/g, (s) => {
-    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-  });
-
-  // ユーザー辞書適用
+  let res = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(k).join(v));
-
-  // ひらがなシフト
   return res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
 };
 
-// postProcess は変更なし（半角に変換したものは半角のまま復元されます）
 const postProcess = (str: string): string => {
   let res = str.replace(/[\u0080-\u00FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - MAPPING_START + HIRAGANA_START));
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => res = res.split(v).join(k));
   return res;
 };
 
-/**
- * 配置順 (Tuple) の定義
- * [0:id, 1:name, 2:status, 3:deadlineOffset(0=無), 4:lastUpdated, 5:parentId(0=無)]
- */
-type CompressedTask = [string, string, number, number, number, string | number];
+// 配置順: [0:name, 1:status, 2:deadlineOffset, 3:lastUpdated, 4:parentId]
+// 削除済みは []
+type CompressedTask = [string, number, number, number, string | number] | [];
 type CompressedAppData = [number, CompressedTask[], number];
 
 const createCompressedArray = (data: AppData): CompressedAppData => [
   data.projectStartDate,
-  data.tasks.map(t => [
-    t.id,
+  data.tasks.map(t => t.isDeleted ? [] : [ // ★ 削除済みは空配列
     preProcess(t.name),
     t.status,
-    t.deadlineOffset ?? 0, // ★ 0を未指定として扱う
+    t.deadlineOffset ?? 0,
     t.lastUpdated,
-    t.parentId ?? 0        // ★ 0を未指定として扱う
+    t.parentId ?? 0
   ]),
   data.lastSynced
 ];
 
-export const getIntermediateJson = (data: AppData): string => {
-  return JSON.stringify(createCompressedArray(data));
-};
+export const getIntermediateJson = (data: AppData): string => JSON.stringify(createCompressedArray(data));
 
-export const compressData = (data: AppData): string => {
-  return LZString.compressToEncodedURIComponent(getIntermediateJson(data));
-};
+export const compressData = (data: AppData): string => LZString.compressToEncodedURIComponent(getIntermediateJson(data));
 
 export const decompressData = (compressed: string): AppData | null => {
   try {
@@ -67,14 +49,21 @@ export const decompressData = (compressed: string): AppData | null => {
     const arr = JSON.parse(json) as CompressedAppData;
     return {
       projectStartDate: arr[0],
-      tasks: arr[1].map(t => ({
-        id: t[0],
-        name: postProcess(t[1]),
-        status: t[2] as 0 | 1 | 2,
-        deadlineOffset: t[3] === 0 ? undefined : t[3], // ★ 0を戻す
-        lastUpdated: t[4],
-        parentId: (t[5] === 0 || t[5] === "0") ? undefined : (t[5] as string) // ★ 0を戻す
-      })),
+      tasks: arr[1].map((t, index) => {
+        const id = (index + 1).toString(36); // ★ 並び順からIDを復元
+        if (Array.isArray(t) && t.length === 0) {
+          return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
+        }
+        const task = t as any[];
+        return {
+          id,
+          name: postProcess(task[0]),
+          status: task[1] as 0|1|2,
+          deadlineOffset: task[2] === 0 ? undefined : task[2],
+          lastUpdated: task[3],
+          parentId: (task[4] === 0 || task[4] === "0") ? undefined : String(task[4])
+        };
+      }),
       lastSynced: arr[2]
     };
   } catch { return null; }
