@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppData } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 import { mergeAppData } from '../utils/merge';
@@ -7,9 +7,14 @@ const STORAGE_KEY = 'progress_app_v1';
 
 export const useAppData = () => {
   const [data, setData] = useState<AppData | null>(null);
+  const isLoaded = useRef(false); // ロード済みかどうかのフラグ
 
   // 初期化：LocalStorage読み込み & URLパラメータのマージ
   useEffect(() => {
+    // すでにロード済みなら何もしない（StrictMode対策）
+    if (isLoaded.current) return;
+    isLoaded.current = true;
+
     const load = () => {
       // 1. ローカル読み込み
       const localJson = localStorage.getItem(STORAGE_KEY);

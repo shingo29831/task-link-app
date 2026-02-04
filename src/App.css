@@ -1,8 +1,7 @@
 #root {
-  max-width: 1280px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  text-align: left; /* 左寄せに戻す（コンテナ自体は中央に来る） */
 }
 
 .logo {
