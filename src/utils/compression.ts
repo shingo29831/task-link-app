@@ -1,7 +1,6 @@
 import LZString from 'lz-string';
 import type { AppData } from '../types';
 
-// 2020-01-01 00:00:00 UTC を基準点 (0分) とする
 const EPOCH_2020_MIN = 26297280;
 
 const USER_DICTIONARY: Record<string, string> = {
@@ -32,15 +31,11 @@ export const getIntermediateJson = (data: AppData): string => {
   
   const tasksStr = data.tasks.map(t => {
     if (t.isDeleted) return "[";
-    
-    // ★ 0 の場合は空文字列にする最適化
-    const name = preProcess(t.name);
     const status = t.status === 0 ? "" : t.status;
     const deadline = (t.deadlineOffset === 0 || t.deadlineOffset === undefined) ? "" : t.deadlineOffset;
     const updated = Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN).toString(36);
     const parent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;
-    
-    return `[${name},${status},${deadline},${updated},${parent}`;
+    return `[${preProcess(t.name)},${status},${deadline},${updated},${parent}`;
   }).join('');
 
   return `${start}${tasksStr}]${end}`;
@@ -54,36 +49,26 @@ export const decompressData = (compressed: string): AppData | null => {
   try {
     const raw = LZString.decompressFromEncodedURIComponent(compressed);
     if (!raw) return null;
-
     const firstIdx = raw.indexOf('[');
     const lastIdx = raw.lastIndexOf(']');
-
     if (firstIdx === -1) {
-      const sepIdx = raw.indexOf(']');
-      return {
-        projectStartDate: (parseInt(raw.substring(0, sepIdx), 36) + EPOCH_2020_MIN) * 60000,
-        tasks: [],
-        lastSynced: (parseInt(raw.substring(sepIdx + 1), 36) + EPOCH_2020_MIN) * 60000
-      };
+      const parts = raw.split(']');
+      return { projectStartDate: (parseInt(parts[0], 36) + EPOCH_2020_MIN) * 60000, tasks: [], lastSynced: (parseInt(parts[1], 36) + EPOCH_2020_MIN) * 60000 };
     }
-
     const startDate = (parseInt(raw.substring(0, firstIdx), 36) + EPOCH_2020_MIN) * 60000;
     const lastSynced = (parseInt(raw.substring(lastIdx + 1), 36) + EPOCH_2020_MIN) * 60000;
     const tasksBody = raw.substring(firstIdx, lastIdx);
     const taskStrings = tasksBody.split('[').slice(1);
-
     return {
       projectStartDate: startDate,
       tasks: taskStrings.map((tStr, index) => {
         const id = (index + 1).toString(36);
         if (tStr === "") return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
-        
         const parts = tStr.split(',');
         return {
           id,
           name: postProcess(parts[0]),
-          // ★ 空文字列を 0 または undefined に復元
-          status: (parts[1] === "" ? 0 : Number(parts[1])) as 0 | 1 | 2,
+          status: (parts[1] === "" ? 0 : Number(parts[1])) as 0|1|2|3,
           deadlineOffset: parts[2] === "" ? undefined : Number(parts[2]),
           lastUpdated: (parseInt(parts[3], 36) + EPOCH_2020_MIN) * 60000,
           parentId: parts[4] === "" ? undefined : parts[4]
@@ -91,7 +76,5 @@ export const decompressData = (compressed: string): AppData | null => {
       }),
       lastSynced: lastSynced
     };
-  } catch (e) {
-    return null;
-  }
+  } catch { return null; }
 };

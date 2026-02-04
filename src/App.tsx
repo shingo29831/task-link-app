@@ -32,7 +32,12 @@ function App() {
         if (next[i].isDeleted) continue;
         const children = next.filter(t => !t.isDeleted && t.parentId === next[i].id);
         if (children.length > 0) {
-          const s: 0|1|2 = children.every(c => c.status === 2) ? 2 : children.every(c => c.status === 0) ? 0 : 1;
+          // 子の状態に基づきステータスを決定
+          const s: 0|1|2|3 = 
+            children.every(c => c.status === 2) ? 2 : 
+            children.every(c => c.status === 0) ? 0 : 
+            children.every(c => c.status === 3) ? 3 : 1;
+          
           if (next[i].status !== s) { next[i] = { ...next[i], status: s, lastUpdated: Date.now() }; changed = true; }
         }
       }
@@ -102,17 +107,16 @@ function App() {
 
       <div style={{ marginTop: '60px', borderTop: '1px dashed #444', paddingTop: '20px' }}>
         <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
-          {showDebug ? 'デバッグを隠す' : 'デバッグ（0削除・極限圧縮）を表示'}
+          {showDebug ? 'デバッグを隠す' : 'デバッグ（休止追加・極限圧縮）を表示'}
         </button>
         {showDebug && (
           <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
-            <p><b>1. 圧縮直前データ (0を空文字化 / 記号削除 / 分単位 / 不可視文字エスケープ):</b></p>
+            <p><b>1. 圧縮直前データ (不可視文字エスケープ):</b></p>
             <code style={{ wordBreak: 'break-all', color: '#888' }}>
               {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
             </code>
-            <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後 (URL エンコード済み):</b></p>
+            <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後:</b></p>
             <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
-            <p style={{ marginTop: '10px' }}>圧縮前文字数: {debugInfo.beforeLen} / 圧縮後文字数: {debugInfo.afterLen}</p>
           </div>
         )}
       </div>
