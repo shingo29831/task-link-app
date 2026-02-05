@@ -14,6 +14,7 @@ function App() {
   const { data, setData, getShareUrl } = useAppData();
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   const debugInfo = useMemo(() => {
     if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
@@ -21,6 +22,23 @@ function App() {
     const after = compressData(data);
     return { before, after, beforeLen: before.length, afterLen: after.length };
   }, [data]);
+
+  // カレンダーに表示する「期間（枠）」だけ計算
+  const calendarDays = useMemo(() => {
+    if (!data) return [];
+    const days: Date[] = [];
+    const start = new Date(data.projectStartDate);
+    
+    // 60日分を表示
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [data?.projectStartDate]);
+
+  // Note: calendarTasks の変換ロジックは削除しました
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -33,7 +51,6 @@ function App() {
         if (next[i].isDeleted) continue;
         const children = next.filter(t => !t.isDeleted && t.parentId === next[i].id);
         if (children.length > 0) {
-          // 子の状態に基づきステータスを決定
           const s: 0|1|2|3 = 
             children.every(c => c.status === 2) ? 2 : 
             children.every(c => c.status === 0) ? 0 : 
@@ -67,7 +84,6 @@ function App() {
     return roots;
   };
 
-  // 文字列の長さを計算（半角=1, 全角=2）
   const getStrLen = (str: string) => {
     let len = 0;
     for (let i = 0; i < str.length; i++) {
@@ -76,15 +92,12 @@ function App() {
     return len;
   };
 
-  // カラムの最大幅を計算
-  // インデント + (タスク名の長さ min 20文字) + 固定要素幅
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 220; // ステータスボタン(92) + ID(30) + 操作ボタン(60) + 余白など
+    const BASE_WIDTH = 220;
     const INDENT_WIDTH = 24;
-    const CHAR_WIDTH_PX = 12; // 1文字あたりの概算幅(px)
+    const CHAR_WIDTH_PX = 12;
 
     const len = getStrLen(node.name);
-    // 20文字（半角）までは幅を広げ、それ以降は折り返す
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
     
     let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth;
@@ -97,7 +110,6 @@ function App() {
     return max;
   };
 
-  // カラム内の子タスクを再帰的に表示する関数
   const renderColumnChildren = (nodes: TaskNode[], depth = 0) => nodes.map(n => (
     <React.Fragment key={n.id}>
       <TaskItem 
@@ -114,22 +126,55 @@ function App() {
   ));
 
   return (
-    <div style={{ maxWidth: '100%', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'row', gap: '20px', height: '100vh', boxSizing: 'border-box' }}>
+    <div style={{ 
+      maxWidth: '100%', 
+      margin: '0 auto', 
+      padding: '20px', 
+      display: 'flex', 
+      flexDirection: 'row', 
+      gap: showSidebar ? '20px' : '0', 
+      height: '100vh', 
+      boxSizing: 'border-box',
+      overflow: 'hidden'
+    }}>
       
-      {/* 左カラム：カレンダー (固定幅) */}
-      <div style={{ flex: '0 0 320px', display: 'flex', flexDirection: 'column' }}>
-        <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px' }}>期限カレンダー</h2>
+      {/* 左カラム：カレンダー */}
+      <div style={{ 
+        flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'flex 0.3s ease, opacity 0.3s ease',
+        opacity: showSidebar ? 1 : 0,
+        pointerEvents: showSidebar ? 'auto' : 'none',
+        minWidth: showSidebar ? '300px' : '0'
+      }}>
+        <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-            <TaskCalendar projectStartDate={data.projectStartDate} tasks={data.tasks} />
+            {/* 変更: projectStartDate と 生のtasks を渡す */}
+            <TaskCalendar 
+              calendarDays={calendarDays} 
+              tasks={data.tasks} 
+              projectStartDate={data.projectStartDate}
+            />
         </div>
       </div>
 
-      {/* 右カラム：メインコンテンツ (可変幅) */}
+      {/* 右カラム：メインコンテンツ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <div>
-                <h1 style={{ margin: 0, fontSize: '1.5em' }}>TaskLink</h1>
-                <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <button 
+                  onClick={() => setShowSidebar(!showSidebar)} 
+                  style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }}
+                  title={showSidebar ? "カレンダーを隠す" : "カレンダーを表示"}
+                >
+                  📅
+                </button>
+                <div>
+                    <h1 style={{ margin: 0, fontSize: '1.5em' }}>TaskLink</h1>
+                    <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
+                </div>
             </div>
             <ProjectControls 
                 onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
@@ -149,7 +194,7 @@ function App() {
           <TaskInput onAdd={addTask} projectStartDate={data.projectStartDate} />
         </div>
 
-        {/* カンバンボードエリア (横スクロール) */}
+        {/* カンバンボードエリア */}
         <div style={{ 
             flex: 1, 
             overflowX: 'auto', 
@@ -178,9 +223,8 @@ function App() {
                       padding: '10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      maxHeight: '100%', // 縦スクロール用
+                      maxHeight: '100%',
                   }}>
-                      {/* 親タスクヘッダー */}
                       <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
                           <TaskItem 
                               task={root} 
@@ -192,7 +236,6 @@ function App() {
                               onAddSubTask={() => setParent({ id: root.id, name: root.name })}
                           />
                       </div>
-                      {/* 子タスクリスト (スクロール可能に) */}
                       <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px' }}>
                           {renderColumnChildren(root.children, 0)}
                       </div>
