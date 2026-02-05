@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AppData } from '../types';
 import { compressData, decompressData } from '../utils/compression';
-import { mergeAppData } from '../utils/merge';
 
 const STORAGE_KEY = 'progress_app_v2';
 const DEFAULT_START = 1577836800000; // 2020-01-01

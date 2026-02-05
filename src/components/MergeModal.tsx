@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import type { AppData, Task } from '../types';
-import { generateNewId } from '../utils/merge';
 
 interface Props {
   localData: AppData;
