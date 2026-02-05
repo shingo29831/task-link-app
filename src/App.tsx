@@ -77,6 +77,35 @@ function App() {
     setParent(null);
   };
 
+  // タスク名変更ハンドラ
+  const handleRenameTask = (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    const normalizedName = newName.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+    const newTasks = data.tasks.map(t => 
+      t.id === id ? { ...t, name: normalizedName, lastUpdated: Date.now() } : t
+    );
+    save(newTasks);
+  };
+
+  // タスク期限変更ハンドラ
+  const handleUpdateDeadline = (id: string, dateStr: string) => {
+    let offset: number | undefined;
+    if (dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const targetDate = new Date(y, m - 1, d);
+      offset = differenceInCalendarDays(targetDate, data.projectStartDate);
+    } else {
+      offset = undefined;
+    }
+
+    const newTasks = data.tasks.map(t => 
+      t.id === id ? { ...t, deadlineOffset: offset, lastUpdated: Date.now() } : t
+    );
+    save(newTasks);
+  };
+
   // 統合されたタスク追加ハンドラ
   const handleAddTask = (targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
@@ -154,6 +183,8 @@ function App() {
         onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
         onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === n.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
         onAddSubTask={() => onTaskItemAddClick(n)}
+        onRename={(newName) => handleRenameTask(n.id, newName)}
+        onDeadlineChange={(dateStr) => handleUpdateDeadline(n.id, dateStr)}
       />
       {renderColumnChildren(n.children, depth + 1)}
     </React.Fragment>
@@ -302,6 +333,8 @@ function App() {
                               onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
                               onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === root.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
                               onAddSubTask={() => onTaskItemAddClick(root)}
+                              onRename={(newName) => handleRenameTask(root.id, newName)}
+                              onDeadlineChange={(dateStr) => handleUpdateDeadline(root.id, dateStr)}
                           />
                       </div>
                       <div style={{ paddingLeft: '4px' }}> {/* 修正: overflowY: 'auto', flex: 1 を削除 */}

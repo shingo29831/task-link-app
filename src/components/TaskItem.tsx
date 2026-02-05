@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { format, addDays } from 'date-fns';
 import type { Task } from '../types';
 
 interface Props {
@@ -9,15 +10,26 @@ interface Props {
   onStatusChange: (s: 0 | 1 | 2 | 3) => void;
   onDelete: () => void;
   onAddSubTask: () => void;
+  onRename: (newName: string) => void;
+  onDeadlineChange: (dateStr: string) => void;
 }
 
-export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasChildren, onStatusChange, onDelete, onAddSubTask }) => {
+export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasChildren, onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
+  const [editName, setEditName] = useState(task.name);
+  const [isHovered, setIsHovered] = useState(false);
+
   const config = { 
     0: { l: '未着手', c: '#888' }, 
     1: { l: '進行中', c: '#007bff' }, 
     2: { l: '完了', c: '#28a745' },
-    3: { l: '休止', c: '#6f42c1' } // 紫色に変更
+    3: { l: '休止', c: '#6f42c1' } 
   }[task.status] as any;
+
+  const currentDeadlineStr = task.deadlineOffset !== undefined
+    ? format(addDays(projectStartDate, task.deadlineOffset), 'yyyy-MM-dd')
+    : '';
 
   const getDeadline = () => {
     if (task.deadlineOffset === undefined) return null;
@@ -26,8 +38,29 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
     return <span style={{ color, fontSize: '0.8em', marginLeft: '8px' }}>{days < 0 ? `${Math.abs(days)}日超過` : days === 0 ? '今日まで' : `あと${days}日`}</span>;
   };
 
+  const handleSave = () => {
+    if (editName.trim() && editName !== task.name) {
+      onRename(editName);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      setEditName(task.name);
+      setIsEditing(false);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #333', marginLeft: `${depth * 24}px` }}>
+    <div 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #333', marginLeft: `${depth * 24}px` }}
+    >
       <button 
         disabled={hasChildren} 
         onClick={() => onStatusChange(((task.status + 1) % 4) as 0|1|2|3)}
@@ -35,15 +68,81 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
       >
         {config.l}
       </button>
-      {/* 修正箇所: wordBreakとwhiteSpaceを追加 */}
+      
       <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
         <span style={{ fontSize: '0.7em', color: '#555', marginRight: '8px', fontFamily: 'monospace' }}>{task.id}</span>
-        <span style={{ fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1 }}>{task.name}</span>
-        {getDeadline()}
+        
+        {isEditing ? (
+          <input 
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            autoFocus
+            style={{ 
+              backgroundColor: '#333', 
+              color: '#fff', 
+              border: '1px solid #555', 
+              padding: '2px 4px', 
+              borderRadius: '4px', 
+              width: 'calc(100% - 20px)',
+              fontSize: 'inherit'
+            }}
+          />
+        ) : (
+          <>
+            <span style={{ fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1 }}>
+              {task.name}
+            </span>
+            {isEditingDeadline ? (
+                <input 
+                    type="date" 
+                    defaultValue={currentDeadlineStr} 
+                    onChange={(e) => {
+                        onDeadlineChange(e.target.value);
+                        setIsEditingDeadline(false);
+                    }}
+                    onBlur={() => setIsEditingDeadline(false)}
+                    autoFocus
+                    style={{ marginLeft: '8px', padding: '2px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#fff', colorScheme: 'dark' }}
+                />
+            ) : (
+                getDeadline()
+            )}
+          </>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: '4px' }}>
-        <button onClick={onAddSubTask} style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>＋</button>
-        <button onClick={onDelete} style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
+      
+      <div style={{ 
+        display: 'flex', 
+        gap: '4px',
+        visibility: isHovered || isEditing || isEditingDeadline ? 'visible' : 'hidden',
+      }}>
+        <button 
+          onClick={() => {
+            if (isEditing) {
+              setEditName(task.name);
+              setIsEditing(false);
+            } else {
+              setEditName(task.name);
+              setIsEditing(true);
+            }
+          }}
+          title={isEditing ? "キャンセル" : "名前を編集"}
+          style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}
+        >
+          {isEditing ? '✕' : '✎'}
+        </button>
+        <button 
+          onClick={() => setIsEditingDeadline(!isEditingDeadline)} 
+          title="期限を設定"
+          style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}
+        >
+          📅
+        </button>
+        <button onClick={onAddSubTask} title="子タスク追加" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>＋</button>
+        <button onClick={onDelete} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
       </div>
     </div>
   );
