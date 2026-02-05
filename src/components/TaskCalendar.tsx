@@ -57,7 +57,7 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
                 
                 return (
                     <div key={kq} style={{ 
-                        minHeight: '80px', 
+                        minHeight: '120px', 
                         minWidth: 0, // グリッド内で中身に引っ張られないようにする
                         backgroundColor: isCurrentMonth ? '#333' : '#222', 
                         padding: '4px',
