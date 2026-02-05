@@ -1,3 +1,4 @@
+// src/types/index.ts
 export interface Task {
   id: string;        // 36進数のID
   name: string;      
@@ -9,6 +10,7 @@ export interface Task {
 }
 
 export interface AppData {
+  projectName: string; // 追加: プロジェクト名
   projectStartDate: number; 
   tasks: Task[];
   lastSynced: number;

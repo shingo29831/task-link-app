@@ -26,6 +26,9 @@ function App() {
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
+  const activeTasks = data.tasks.filter(t => !t.isDeleted);
+  const canEditProjectName = activeTasks.length === 0;
+
   const recalculate = (tasks: Task[]): Task[] => {
     const next = [...tasks];
     let changed = true;
@@ -135,7 +138,6 @@ function App() {
       }}>
         <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-            {/* 変更: projectStartDate と 生のtasks を渡す */}
             <TaskCalendar 
               tasks={data.tasks} 
               projectStartDate={data.projectStartDate}
@@ -155,17 +157,47 @@ function App() {
                   📅
                 </button>
                 <div>
-                    <h1 style={{ margin: 0, fontSize: '1.5em' }}>TaskLink</h1>
+                    <h1 
+                        style={{ 
+                            margin: 0, 
+                            fontSize: '1.5em', 
+                            cursor: canEditProjectName ? 'pointer' : 'default',
+                            textDecoration: canEditProjectName ? 'underline dotted' : 'none'
+                        }}
+                        onClick={() => {
+                            if (!canEditProjectName) {
+                                alert('タスクが存在するため、プロジェクト名は変更できません。');
+                                return;
+                            }
+                            const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
+                            if (newName && newName.trim()) {
+                                setData({ ...data, projectName: newName, lastSynced: Date.now() });
+                            }
+                        }}
+                        title={canEditProjectName ? "クリックしてプロジェクト名を変更" : "タスクがあるため変更不可"}
+                    >
+                        TaskLink: {data.projectName}
+                    </h1>
                     <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
                 </div>
             </div>
             <ProjectControls 
                 onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
                 onExport={() => {
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = 'tasklink.json'; a.click();
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click();
                 }}
                 onImport={(f) => {
-                const r = new FileReader(); r.onload = (e) => save(mergeAppData(data, JSON.parse(e.target?.result as string) as AppData).tasks); r.readAsText(f);
+                const r = new FileReader(); 
+                r.onload = (e) => {
+                    const incoming = JSON.parse(e.target?.result as string) as AppData;
+                    const merged = mergeAppData(data, incoming);
+                    if (merged.projectName !== data.projectName && incoming.projectName !== data.projectName) {
+                        alert(`プロジェクト名が一致しません。\n(現在: ${data.projectName}, 読込先: ${incoming.projectName})`);
+                        return;
+                    }
+                    setData({ ...merged, lastSynced: Date.now() });
+                }; 
+                r.readAsText(f);
                 }}
                 onResetDate={() => confirm('今日を開始日にしますか？') && setData({ ...data, projectStartDate: Date.now(), lastSynced: Date.now() })}
             />
@@ -191,7 +223,7 @@ function App() {
             padding: '16px',
             backgroundColor: '#1e1e1e'
         }}>
-          {data.tasks.filter(t => !t.isDeleted).length === 0 ? (
+          {activeTasks.length === 0 ? (
             <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
           ) : (
             buildTree(data.tasks).map(root => {
@@ -235,6 +267,7 @@ function App() {
           </button>
           {showDebug && (
             <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
+              <p><b>プロジェクト名:</b> {data.projectName}</p>
               <p><b>1. 圧縮直前データ:</b></p>
               <code style={{ wordBreak: 'break-all', color: '#888' }}>
                 {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}

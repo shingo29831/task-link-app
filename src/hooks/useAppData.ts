@@ -17,8 +17,13 @@ export const useAppData = () => {
     const load = () => {
       const localJson = localStorage.getItem(STORAGE_KEY);
       const localData: AppData = localJson 
-        ? JSON.parse(localJson) 
-        : { projectStartDate: DEFAULT_START, tasks: [], lastSynced: 0 };
+      ? JSON.parse(localJson) 
+      : { 
+          projectName: 'マイプロジェクト', // デフォルト名
+          projectStartDate: DEFAULT_START, 
+          tasks: [], 
+          lastSynced: 0 
+        };
 
       const params = new URLSearchParams(window.location.search);
       const compressed = params.get('d');
