@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
 import type { Task } from '../types';
 
+// 子要素を持つTaskNode型を定義
+type TaskNode = Task & { children: TaskNode[] };
+
 interface Props {
   task: Task;
   projectStartDate: number;
@@ -37,6 +40,35 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
     const color = days < 0 ? '#dc3545' : days === 0 ? '#ffc107' : '#888';
     return <span style={{ color, fontSize: '0.8em', marginLeft: '8px' }}>{days < 0 ? `${Math.abs(days)}日超過` : days === 0 ? '今日まで' : `あと${days}日`}</span>;
   };
+
+  // 進捗率を計算する関数
+  const calculateProgress = (): number | null => {
+    const node = task as unknown as TaskNode;
+    if (!node.children || node.children.length === 0) return null;
+
+    let total = 0;
+    let count = 0;
+
+    const traverse = (n: TaskNode) => {
+      // 子要素を持たない（リーフ）ノードのみを計算対象とする
+      if (!n.children || n.children.length === 0) {
+        if (n.status !== 3) { // 休止は除外
+          // 完了=100%, 進行中=50%, 未着手=0%
+          total += n.status === 2 ? 100 : n.status === 1 ? 50 : 0;
+          count++;
+        }
+      } else {
+        n.children.forEach(traverse);
+      }
+    };
+
+    node.children.forEach(traverse);
+
+    if (count === 0) return null;
+    return Math.round(total / count);
+  };
+
+  const progress = hasChildren ? calculateProgress() : null;
 
   const handleSave = () => {
     if (editName.trim() && editName !== task.name) {
@@ -95,6 +127,12 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
             <span style={{ fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1 }}>
               {task.name}
             </span>
+            {/* 進捗率表示 */}
+            {progress !== null && (
+              <span style={{ fontSize: '0.8em', color: '#aaa', marginLeft: '8px', fontWeight: 'normal' }}>
+                ({progress}%)
+              </span>
+            )}
             {isEditingDeadline ? (
                 <input 
                     type="date" 
