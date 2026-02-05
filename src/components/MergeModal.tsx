@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { AppData, Task } from '../types';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
 
 type MergeMode = 'ID' | 'NAME';
 type ResolveAction = 'USE_LOCAL' | 'USE_REMOTE' | 'DELETE' | 'ADD_REMOTE';
+type Priority = 'LOCAL' | 'REMOTE';
+type StrategyOption = 'CUSTOM' | 'NO_MERGE' | 'NAME' | 'ID';
 
 interface ComparisonRow {
   key: string; // ID or Name
@@ -19,23 +21,45 @@ interface ComparisonRow {
   displayName: string;
 }
 
+interface HierarchicalRow extends ComparisonRow {
+    depth: number;
+}
+
 export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm, onCancel }) => {
   const [step, setStep] = useState<'PROJECT' | 'TASKS'>(
     localData.projectName !== incomingData.projectName ? 'PROJECT' : 'TASKS'
   );
   const [projectNameChoice, setProjectNameChoice] = useState<'LOCAL' | 'REMOTE'>('LOCAL');
-  const [mergeMode, setMergeMode] = useState<MergeMode>('NAME'); // Recommended default
+  
+  // マージ設定
+  const [mergeMode, setMergeMode] = useState<MergeMode>('NAME');
+  const [priority, setPriority] = useState<Priority>('LOCAL');
+  const [strategySelect, setStrategySelect] = useState<StrategyOption>('NAME');
+  
   const [rows, setRows] = useState<ComparisonRow[]>([]);
 
-  // Helper to display parent name
-  const getDisplayName = (t: Task, all: Task[]) => {
-    if (!t.parentId) return t.name;
-    const p = all.find(x => x.id === t.parentId);
-    return p ? `${p.name} > ${t.name}` : t.name;
-  };
-
+  // Rowsの構築（データの突合 + 初期アクション決定）
   useEffect(() => {
     const newRows: ComparisonRow[] = [];
+    const getSimpleDisplayName = (t: Task) => t.name;
+
+    // 優先度に基づくデフォルトアクション決定ロジック
+    const decideAction = (local?: Task, remote?: Task): ResolveAction => {
+        if (local && remote) {
+            // 競合: 優先度に従う
+            return priority === 'LOCAL' ? 'USE_LOCAL' : 'USE_REMOTE';
+        }
+        if (!local && remote) {
+            // Remoteのみ: Remote優先なら追加、Local優先なら無視(削除)
+            return priority === 'REMOTE' ? 'ADD_REMOTE' : 'DELETE';
+        }
+        if (local && !remote) {
+            // Localのみ: 基本維持
+            return 'USE_LOCAL';
+        }
+        return 'USE_LOCAL';
+    };
+
     if (mergeMode === 'ID') {
       const allIds = new Set([...localData.tasks.map(t => t.id), ...incomingData.tasks.map(t => t.id)]);
       const localMap = new Map(localData.tasks.map(t => [t.id, t]));
@@ -44,22 +68,17 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
       allIds.forEach(id => {
         const local = localMap.get(id);
         const remote = remoteMap.get(id);
-        let action: ResolveAction = 'USE_LOCAL';
-        if (!local && remote) action = 'ADD_REMOTE';
-        else if (local && remote) action = 'USE_LOCAL'; // Default conflict resolution
-        else if (local && !remote) action = 'USE_LOCAL';
-
+        
         newRows.push({
           key: id,
           local,
           remote,
-          action,
-          displayName: local ? getDisplayName(local, localData.tasks) : (remote ? getDisplayName(remote, incomingData.tasks) : id)
+          action: decideAction(local, remote),
+          displayName: local ? getSimpleDisplayName(local) : (remote ? getSimpleDisplayName(remote) : id)
         });
       });
     } else {
       // NAME Mode
-      // Use names as keys. Simplify by handling first match only for duplicates.
       const allNames = new Set([
           ...localData.tasks.filter(t => !t.isDeleted).map(t => t.name),
           ...incomingData.tasks.filter(t => !t.isDeleted).map(t => t.name)
@@ -70,93 +89,128 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
       allNames.forEach(name => {
         const local = localMap.get(name);
         const remote = remoteMap.get(name);
-        let action: ResolveAction = 'USE_LOCAL';
-        if (!local && remote) action = 'ADD_REMOTE';
-        else if (local && remote) action = 'USE_LOCAL';
         
         newRows.push({
           key: name,
           local,
           remote,
-          action,
+          action: decideAction(local, remote),
           displayName: name
         });
       });
     }
     
-    // Sort rows: Local (hierarchy order) then Remote only
-    // Simple sort by displayName for now
-    newRows.sort((a, b) => a.displayName.localeCompare(b.displayName));
     setRows(newRows);
-  }, [mergeMode, localData, incomingData]);
+    // 自動再計算時はSelectの表示を現在のモードに合わせる
+    setStrategySelect(mergeMode);
+  }, [mergeMode, priority, localData, incomingData]);
 
-  const handleHeaderAction = (val: string) => {
-    if (val === 'NO_MERGE') {
-        // All to Keep Local (Ignore Remote)
+
+  // 階層構造の計算（表示用）
+  const displayedRows = useMemo(() => {
+    const idToKeyMap = new Map<string, string>();
+    if (mergeMode === 'NAME') {
+        [...localData.tasks, ...incomingData.tasks].forEach(t => {
+            if (!t.isDeleted) idToKeyMap.set(t.id, t.name);
+        });
+    }
+
+    const getParentKey = (r: ComparisonRow): string | undefined => {
+        const t = r.local || r.remote;
+        if (!t || !t.parentId) return undefined;
+        return mergeMode === 'ID' ? t.parentId : idToKeyMap.get(t.parentId);
+    };
+
+    const childrenMap = new Map<string, ComparisonRow[]>();
+    const roots: ComparisonRow[] = [];
+    const rowKeySet = new Set(rows.map(r => r.key));
+
+    rows.forEach(r => {
+        const parentKey = getParentKey(r);
+        if (parentKey && rowKeySet.has(parentKey)) {
+            if (!childrenMap.has(parentKey)) childrenMap.set(parentKey, []);
+            childrenMap.get(parentKey)!.push(r);
+        } else {
+            roots.push(r);
+        }
+    });
+
+    const result: HierarchicalRow[] = [];
+    const traverse = (nodes: ComparisonRow[], depth: number) => {
+        nodes.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        nodes.forEach(node => {
+            result.push({ ...node, depth });
+            const children = childrenMap.get(node.key);
+            if (children) traverse(children, depth + 1);
+        });
+    };
+
+    traverse(roots, 0);
+    return result;
+  }, [rows, mergeMode, localData, incomingData]);
+
+
+  // マージ戦略（右側のSelect）変更時のハンドラ
+  const handleStrategyChange = (val: string) => {
+    const selected = val as StrategyOption;
+    
+    if (selected === 'CUSTOM') {
+        setStrategySelect('CUSTOM');
+        return;
+    }
+
+    if (selected === 'NO_MERGE') {
+        setStrategySelect('NO_MERGE');
+        // 全行を「マージしない（Local維持 or 削除）」に設定
         setRows(prev => prev.map(r => ({
             ...r,
-            action: r.local ? 'USE_LOCAL' : 'DELETE' // If only remote, delete (don't add)
+            action: r.local ? 'USE_LOCAL' : 'DELETE'
         })));
         return;
     }
-    
-    const mode = val.includes('NAME') ? 'NAME' : 'ID';
-    if (mode !== mergeMode) {
-        setMergeMode(mode);
-        // Wait for useEffect to rebuild rows. 
-        // Note: Ideally we should apply the priority AFTER rows are rebuilt, but handling that async in React requires another effect or ref.
-        // For simplicity, changing mode resets actions to default (USE_LOCAL), and user can re-select priority if needed.
-        return;
-    }
 
-    const priority = val.includes('REMOTE') ? 'REMOTE' : 'LOCAL';
-    setRows(prev => prev.map(r => {
-        if (r.local && r.remote) return { ...r, action: priority === 'REMOTE' ? 'USE_REMOTE' : 'USE_LOCAL' };
-        if (!r.local && r.remote) return { ...r, action: priority === 'REMOTE' ? 'ADD_REMOTE' : 'DELETE' }; 
-        return r;
-    }));
+    // NAME or ID
+    setMergeMode(selected); // これによりuseEffectが発火し、rowsが再構築される
+  };
+
+  // 個別のアクション変更時のハンドラ
+  const handleRowActionChange = (key: string, act: ResolveAction) => {
+      setRows(prev => prev.map(r => r.key === key ? { ...r, action: act } : r));
+      setStrategySelect('CUSTOM'); // 個別に変更したら「カスタマイズ」表示にする
   };
 
   const executeMerge = () => {
     const finalTasks: Task[] = [];
     const idMap = new Map<string, string>(); // OldRemoteID -> NewLocalID
     
-    // Prepare ID generator
     let maxIdVal = 0;
     localData.tasks.forEach(t => {
         const v = parseInt(t.id, 36);
         if (!isNaN(v) && v > maxIdVal) maxIdVal = v;
     });
+    
     const generateId = () => { maxIdVal++; return maxIdVal.toString(36); };
 
-    // 1. Process tasks
     rows.forEach(row => {
         if (row.action === 'DELETE') return;
 
         let taskToUse: Task | undefined;
-        // If USE_LOCAL, we keep local task. 
         if (row.action === 'USE_LOCAL' && row.local) {
             taskToUse = { ...row.local };
-            // Map Remote ID to this Local ID if matched by name
             if (mergeMode === 'NAME' && row.remote) {
                 idMap.set(row.remote.id, row.local.id);
             }
         } 
-        // If USE_REMOTE (Conflict), we overwrite local with remote props but keep local ID
         else if (row.action === 'USE_REMOTE' && row.local && row.remote) {
-            taskToUse = { ...row.remote, id: row.local.id }; // Keep Local ID
+            taskToUse = { ...row.remote, id: row.local.id };
             idMap.set(row.remote.id, row.local.id);
         }
-        // If ADD_REMOTE (Unique Remote), we add it. 
         else if (row.action === 'ADD_REMOTE' && row.remote) {
-            // If ID mode, try to keep ID. If Name mode, generate new ID to avoid collision (or keep if safe).
-            // For safety, generate new ID if Name mode.
             if (mergeMode === 'NAME') {
                 const newId = generateId();
                 taskToUse = { ...row.remote, id: newId };
                 idMap.set(row.remote.id, newId);
             } else {
-                // ID Mode: Keep ID (it is unique because it's in ADD_REMOTE)
                 taskToUse = { ...row.remote };
             }
         }
@@ -164,18 +218,10 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         if (taskToUse) finalTasks.push(taskToUse);
     });
 
-    // 2. Fix Parent IDs
     finalTasks.forEach(t => {
-        if (t.parentId) {
-            // If we have a mapping for the parent (it was from Remote and got mapped)
-            if (idMap.has(t.parentId)) {
-                t.parentId = idMap.get(t.parentId);
-            } 
-            // If ID matched mode, parentId stays same usually.
-            // If Name matched mode and parent was Local, map might not have it if we didn't populate it for Local-only tasks.
-            // But if t is from Remote, t.parentId is RemoteID. We MUST find what that RemoteID mapped to.
-            // If mapped to nothing (deleted), orphan.
-        }
+        if (t.parentId && idMap.has(t.parentId)) {
+            t.parentId = idMap.get(t.parentId);
+        } 
     });
 
     onConfirm({
@@ -210,14 +256,29 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <select onChange={(e) => handleHeaderAction(e.target.value)} style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}>
-                        <option value="CUSTOM">カスタマイズ</option>
-                        <option value="NO_MERGE">マージをしない</option>
-                        <option value="NAME_LOCAL">マージ先(Local)優先 [タスク名]</option>
-                        <option value="NAME_REMOTE">マージ元(Remote)優先 [タスク名]</option>
-                        <option value="ID_LOCAL">マージ先(Local)優先 [ID]</option>
-                        <option value="ID_REMOTE">マージ元(Remote)優先 [ID]</option>
+                    {/* 優先度選択 Select */}
+                    <select 
+                        value={priority} 
+                        onChange={(e) => setPriority(e.target.value as Priority)} 
+                        style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                        title="競合時および新規タスクの扱いを決定します"
+                    >
+                        <option value="LOCAL">マージ先(Local)優先</option>
+                        <option value="REMOTE">マージ元(Remote)優先</option>
                     </select>
+
+                    {/* マージ戦略選択 Select */}
+                    <select 
+                        value={strategySelect} 
+                        onChange={(e) => handleStrategyChange(e.target.value)} 
+                        style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                    >
+                        <option value="CUSTOM">カスタマイズ</option>
+                        <option value="NO_MERGE">マージしない</option>
+                        <option value="NAME">タスク名マージ</option>
+                        <option value="ID">タスクIDマージ</option>
+                    </select>
+
                     <button onClick={executeMerge} style={{ ...btnStyle, backgroundColor: '#28a745', border: 'none' }}>実行</button>
                 </div>
             </div>
@@ -232,25 +293,29 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((row) => (
+                        {displayedRows.map((row) => (
                             <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
-                                <td style={{ padding: '8px', color: row.local ? '#fff' : '#666' }}>
-                                    {row.local ? (
-                                        <div title={`ID: ${row.local.id}\nStatus: ${row.local.status}`}>
-                                            {row.displayName} <span style={{fontSize: '0.8em', color: '#888'}}>({row.local.status === 2 ? '完了' : '未完'})</span>
-                                        </div>
-                                    ) : '(なし)'}
+                                <td style={{ 
+                                    padding: '8px', 
+                                    paddingLeft: `${8 + row.depth * 24}px`,
+                                    color: row.local ? '#fff' : '#666' 
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                        {row.local ? (
+                                            <div title={`ID: ${row.local.id}\nStatus: ${row.local.status}`}>
+                                                {row.local.name} <span style={{fontSize: '0.8em', color: '#888'}}>({row.local.status === 2 ? '完了' : '未完'})</span>
+                                            </div>
+                                        ) : '(なし)'}
+                                    </div>
                                 </td>
+                                
                                 <td style={{ padding: '8px' }}>
                                     <select 
                                         value={row.action} 
-                                        onChange={(e) => {
-                                            const act = e.target.value as ResolveAction;
-                                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, action: act } : r));
-                                        }}
+                                        onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)}
                                         style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
                                     >
-                                        {/* Dynamic options based on availability */}
                                         {row.local && row.remote && (
                                             <>
                                                 <option value="USE_LOCAL">マージ先優先</option>
@@ -272,12 +337,20 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                         )}
                                     </select>
                                 </td>
-                                <td style={{ padding: '8px', color: row.remote ? '#fff' : '#666' }}>
-                                    {row.remote ? (
-                                        <div title={`ID: ${row.remote.id}\nStatus: ${row.remote.status}`}>
-                                            {row.displayName} <span style={{fontSize: '0.8em', color: '#888'}}>({row.remote.status === 2 ? '完了' : '未完'})</span>
-                                        </div>
-                                    ) : '(なし)'}
+
+                                <td style={{ 
+                                    padding: '8px', 
+                                    paddingLeft: `${8 + row.depth * 24}px`,
+                                    color: row.remote ? '#fff' : '#666' 
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                        {row.remote ? (
+                                            <div title={`ID: ${row.remote.id}\nStatus: ${row.remote.status}`}>
+                                                {row.remote.name} <span style={{fontSize: '0.8em', color: '#888'}}>({row.remote.status === 2 ? '完了' : '未完'})</span>
+                                            </div>
+                                        ) : '(なし)'}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
