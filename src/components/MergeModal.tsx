@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { format, addDays } from 'date-fns';
 import type { AppData, Task } from '../types';
 
 interface Props {
@@ -35,6 +36,36 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   const [priority, setPriority] = useState<Priority>('LOCAL');
   
   const [rows, setRows] = useState<ComparisonRow[]>([]);
+
+  // ステータスバッジの表示コンポーネント
+  const StatusBadge = ({ status }: { status: number }) => {
+    const config = {
+        0: { l: '未着手', c: '#888' },
+        1: { l: '進行中', c: '#007bff' },
+        2: { l: '完了', c: '#28a745' },
+        3: { l: '休止', c: '#6f42c1' }
+    }[status as 0|1|2|3] || { l: '不明', c: '#555' };
+
+    return (
+        <span style={{
+            backgroundColor: config.c,
+            color: '#fff',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontSize: '0.75em',
+            marginRight: '6px',
+            whiteSpace: 'nowrap'
+        }}>
+            {config.l}
+        </span>
+    );
+  };
+
+  // 日付表示用のヘルパー
+  const getDeadlineDisplay = (task: Task, startDate: number) => {
+      if (task.deadlineOffset === undefined) return '';
+      return format(addDays(startDate, task.deadlineOffset), 'yx-MM-dd'); // 'yyyy-MM-dd'の誤記修正
+  };
 
   // Rowsの構築
   useEffect(() => {
@@ -116,12 +147,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
 
         // NAMEモード
-        // 1. Localタスクが存在する場合、Localの親子関係を優先
         if (r.local && r.local.parentId) {
             return localIdToName.get(r.local.parentId);
         }
-
-        // 2. Remoteタスクが存在する場合
         if (r.remote && r.remote.parentId) {
              return remoteIdToName.get(r.remote.parentId);
         }
@@ -135,7 +163,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
     rows.forEach(r => {
         const parentKey = getParentKey(r);
-        // 親キーが存在し、かつその親が行として存在する場合のみ子として扱う
         if (parentKey && rowKeySet.has(parentKey)) {
             if (!childrenMap.has(parentKey)) childrenMap.set(parentKey, []);
             childrenMap.get(parentKey)!.push(r);
@@ -182,7 +209,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         if (!isNaN(v) && v > maxIdVal) maxIdVal = v;
     });
     
-    // 修正済み
     const generateId = () => { maxIdVal++; return maxIdVal.toString(36); };
 
     rows.forEach(row => {
@@ -246,7 +272,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   return (
     <div style={overlayStyle}>
-        <div style={{ ...modalStyle, width: '900px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
+        {/* モーダルの横幅を広げました (900px -> 1200px) */}
+        <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -286,67 +313,76 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                         </tr>
                     </thead>
                     <tbody>
-                        {displayedRows.map((row) => (
-                            <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
-                                <td style={{ 
-                                    padding: '8px', 
-                                    paddingLeft: `${8 + row.depth * 24}px`,
-                                    color: row.local ? '#fff' : '#666' 
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                        {row.local ? (
-                                            <div title={`ID: ${row.local.id}\nStatus: ${row.local.status}`}>
-                                                {row.local.name} <span style={{fontSize: '0.8em', color: '#888'}}>({row.local.status === 2 ? '完了' : '未完'})</span>
-                                            </div>
-                                        ) : '(なし)'}
-                                    </div>
-                                </td>
-                                
-                                <td style={{ padding: '8px' }}>
-                                    <select 
-                                        value={row.action} 
-                                        onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)}
-                                        style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
-                                    >
-                                        {row.local && row.remote && (
-                                            <>
-                                                <option value="USE_LOCAL">Local優先</option>
-                                                <option value="USE_REMOTE">Remote優先</option>
-                                                <option value="DELETE">差分を削除</option>
-                                            </>
-                                        )}
-                                        {row.local && !row.remote && (
-                                            <>
-                                                <option value="USE_LOCAL">Local維持</option>
-                                                <option value="DELETE">差分を削除</option>
-                                            </>
-                                        )}
-                                        {!row.local && row.remote && (
-                                            <>
-                                                <option value="ADD_REMOTE">追加</option>
-                                                <option value="DELETE">差分を削除</option>
-                                            </>
-                                        )}
-                                    </select>
-                                </td>
+                        {displayedRows.map((row) => {
+                            const localDate = row.local ? getDeadlineDisplay(row.local, localData.projectStartDate) : '';
+                            const remoteDate = row.remote ? getDeadlineDisplay(row.remote, incomingData.projectStartDate) : '';
+                            
+                            return (
+                                <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
+                                    <td style={{ 
+                                        padding: '8px', 
+                                        paddingLeft: `${8 + row.depth * 24}px`,
+                                        color: row.local ? '#fff' : '#666' 
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                            {row.local ? (
+                                                <div style={{ display: 'flex', alignItems: 'center' }} title={`ID: ${row.local.id}`}>
+                                                    <StatusBadge status={row.local.status} />
+                                                    <span>{row.local.name}</span>
+                                                    {localDate && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '8px' }}>({localDate})</span>}
+                                                </div>
+                                            ) : '(なし)'}
+                                        </div>
+                                    </td>
+                                    
+                                    <td style={{ padding: '8px' }}>
+                                        <select 
+                                            value={row.action} 
+                                            onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)}
+                                            style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
+                                        >
+                                            {row.local && row.remote && (
+                                                <>
+                                                    <option value="USE_LOCAL">Local優先</option>
+                                                    <option value="USE_REMOTE">Remote優先</option>
+                                                    <option value="DELETE">差分を削除</option>
+                                                </>
+                                            )}
+                                            {row.local && !row.remote && (
+                                                <>
+                                                    <option value="USE_LOCAL">Local維持</option>
+                                                    <option value="DELETE">差分を削除</option>
+                                                </>
+                                            )}
+                                            {!row.local && row.remote && (
+                                                <>
+                                                    <option value="ADD_REMOTE">追加</option>
+                                                    <option value="DELETE">差分を削除</option>
+                                                </>
+                                            )}
+                                        </select>
+                                    </td>
 
-                                <td style={{ 
-                                    padding: '8px', 
-                                    paddingLeft: `${8 + row.depth * 24}px`,
-                                    color: row.remote ? '#fff' : '#666' 
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                        {row.remote ? (
-                                            <div title={`ID: ${row.remote.id}\nStatus: ${row.remote.status}`}>
-                                                {row.remote.name} <span style={{fontSize: '0.8em', color: '#888'}}>({row.remote.status === 2 ? '完了' : '未完'})</span>
+                                    <td style={{ 
+                                        padding: '8px', 
+                                        paddingLeft: `${8 + row.depth * 24}px`,
+                                        color: row.remote ? '#fff' : '#666' 
+                                    }}>
+                                        {row.remote && (
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                                <div style={{ display: 'flex', alignItems: 'center' }} title={`ID: ${row.remote.id}`}>
+                                                    <StatusBadge status={row.remote.status} />
+                                                    <span>{row.remote.name}</span>
+                                                    {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '8px' }}>({remoteDate})</span>}
+                                                </div>
                                             </div>
-                                        ) : '(なし)'}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
