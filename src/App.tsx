@@ -23,22 +23,6 @@ function App() {
     return { before, after, beforeLen: before.length, afterLen: after.length };
   }, [data]);
 
-  // カレンダーに表示する「期間（枠）」だけ計算
-  const calendarDays = useMemo(() => {
-    if (!data) return [];
-    const days: Date[] = [];
-    const start = new Date(data.projectStartDate);
-    
-    // 60日分を表示
-    for (let i = 0; i < 60; i++) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      days.push(d);
-    }
-    return days;
-  }, [data?.projectStartDate]);
-
-  // Note: calendarTasks の変換ロジックは削除しました
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -153,7 +137,6 @@ function App() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
             {/* 変更: projectStartDate と 生のtasks を渡す */}
             <TaskCalendar 
-              calendarDays={calendarDays} 
               tasks={data.tasks} 
               projectStartDate={data.projectStartDate}
             />
