@@ -54,7 +54,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             borderRadius: '4px',
             fontSize: '0.75em',
             marginRight: '6px',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            alignSelf: 'flex-start', // 改行時に上揃えにする
+            marginTop: '2px'
         }}>
             {config.l}
         </span>
@@ -64,7 +66,22 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   // 日付表示用のヘルパー
   const getDeadlineDisplay = (task: Task, startDate: number) => {
       if (task.deadlineOffset === undefined) return '';
-      return format(addDays(startDate, task.deadlineOffset), 'yx-MM-dd'); // 'yyyy-MM-dd'の誤記修正
+      return format(addDays(startDate, task.deadlineOffset), 'yyyy-MM-dd');
+  };
+
+  // 15文字で改行するヘルパー関数
+  const breakText = (text: string) => {
+    if (text.length <= 15) return text;
+    const chunks = [];
+    for (let i = 0; i < text.length; i += 15) {
+      chunks.push(text.substring(i, i + 15));
+    }
+    return chunks.map((chunk, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <br />}
+        {chunk}
+      </React.Fragment>
+    ));
   };
 
   // Rowsの構築
@@ -272,7 +289,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   return (
     <div style={overlayStyle}>
-        {/* モーダルの横幅を広げました (900px -> 1200px) */}
         <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
@@ -327,10 +343,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                         <div style={{ display: 'flex', alignItems: 'center' }}>
                                             {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
                                             {row.local ? (
-                                                <div style={{ display: 'flex', alignItems: 'center' }} title={`ID: ${row.local.id}`}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.local.id}`}>
                                                     <StatusBadge status={row.local.status} />
-                                                    <span>{row.local.name}</span>
-                                                    {localDate && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '8px' }}>({localDate})</span>}
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span>{breakText(row.local.name)}</span>
+                                                        {localDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({localDate})</span>}
+                                                    </div>
                                                 </div>
                                             ) : '(なし)'}
                                         </div>
@@ -372,10 +390,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                         {row.remote && (
                                             <div style={{ display: 'flex', alignItems: 'center' }}>
                                                 {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                                <div style={{ display: 'flex', alignItems: 'center' }} title={`ID: ${row.remote.id}`}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.remote.id}`}>
                                                     <StatusBadge status={row.remote.status} />
-                                                    <span>{row.remote.name}</span>
-                                                    {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '8px' }}>({remoteDate})</span>}
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span>{breakText(row.remote.name)}</span>
+                                                        {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
