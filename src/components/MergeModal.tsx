@@ -19,6 +19,7 @@ interface ComparisonRow {
   remote?: Task;
   action: ResolveAction;
   displayName: string;
+  resolvedParentKey?: string; // 階層表示用の親キー
 }
 
 interface HierarchicalRow extends ComparisonRow {
@@ -31,13 +32,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   );
   const [projectNameChoice, setProjectNameChoice] = useState<'LOCAL' | 'REMOTE'>('LOCAL');
   
-  // マージ設定
   const [mergeMode, setMergeMode] = useState<MergeMode>('NAME');
   const [priority, setPriority] = useState<Priority>('LOCAL');
   
   const [rows, setRows] = useState<ComparisonRow[]>([]);
 
-  // ステータスバッジの表示コンポーネント
+  // ステータスバッジ
   const StatusBadge = ({ status }: { status: number }) => {
     const config = {
         0: { l: '未着手', c: '#888' },
@@ -63,13 +63,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     );
   };
 
-  // 日付表示用のヘルパー
   const getDeadlineDisplay = (task: Task, startDate: number) => {
       if (task.deadlineOffset === undefined) return '';
       return format(addDays(startDate, task.deadlineOffset), 'yyyy-MM-dd');
   };
 
-  // 15文字で改行するヘルパー関数
   const breakText = (text: string) => {
     if (text.length <= 15) return text;
     const chunks = [];
@@ -100,9 +98,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         if (!local && remote) {
             return 'ADD_REMOTE';
         }
-        if (local && !remote) {
-            return 'USE_LOCAL';
-        }
         return 'USE_LOCAL';
     };
 
@@ -115,35 +110,75 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         const local = localMap.get(id);
         const remote = remoteMap.get(id);
         
+        const parentKey = local?.parentId ?? remote?.parentId;
+
         newRows.push({
           key: id,
           local,
           remote,
           action: decideAction(local, remote),
-          displayName: local ? getSimpleDisplayName(local) : (remote ? getSimpleDisplayName(remote) : id)
+          displayName: local ? getSimpleDisplayName(local) : (remote ? getSimpleDisplayName(remote) : id),
+          resolvedParentKey: parentKey
         });
       });
     } else {
-      // NAME Mode
-      const allNames = new Set([
-          ...activeLocalTasks.map(t => t.name),
-          ...activeIncomingTasks.map(t => t.name)
-      ]);
-      const localMap = new Map(activeLocalTasks.map(t => [t.name, t]));
-      const remoteMap = new Map(activeIncomingTasks.map(t => [t.name, t]));
-
-      allNames.forEach(name => {
-        const local = localMap.get(name);
-        const remote = remoteMap.get(name);
-        
-        newRows.push({
-          key: name,
-          local,
-          remote,
-          action: decideAction(local, remote),
-          displayName: name
-        });
+      // NAME Mode - 階層構造に基づいてマッチングを行う
+      
+      const localChildrenMap = new Map<string, Task[]>();
+      activeLocalTasks.forEach(t => {
+          const pid = t.parentId ?? 'root';
+          if (!localChildrenMap.has(pid)) localChildrenMap.set(pid, []);
+          localChildrenMap.get(pid)!.push(t);
       });
+
+      const remoteChildrenMap = new Map<string, Task[]>();
+      activeIncomingTasks.forEach(t => {
+          const pid = t.parentId ?? 'root';
+          if (!remoteChildrenMap.has(pid)) remoteChildrenMap.set(pid, []);
+          remoteChildrenMap.get(pid)!.push(t);
+      });
+
+      // 処理済みタスクを記録して重複を防ぐ
+      const visitedLocalIds = new Set<string>();
+      const visitedRemoteIds = new Set<string>();
+
+      const traverseMatching = (lParentId: string | undefined | null, rParentId: string | undefined | null, parentRowKey: string | undefined) => {
+           // 親が存在しない(null)場合は空配列、undefined(ルート)またはIDがある場合はマップから取得
+           const lChildren = lParentId === null ? [] : (localChildrenMap.get(lParentId ?? 'root') || []);
+           const rChildren = rParentId === null ? [] : (remoteChildrenMap.get(rParentId ?? 'root') || []);
+           
+           // この階層にある全タスク名（重複なし）
+           const names = new Set([...lChildren.map(t => t.name), ...rChildren.map(t => t.name)]);
+           
+           names.forEach(name => {
+               // まだ処理されていないタスクの中から、名前が一致するものを探す
+               const lTask = lChildren.find(t => t.name === name && !visitedLocalIds.has(t.id));
+               const rTask = rChildren.find(t => t.name === name && !visitedRemoteIds.has(t.id));
+               
+               if (lTask || rTask) {
+                   // 処理済みとしてマーク
+                   if (lTask) visitedLocalIds.add(lTask.id);
+                   if (rTask) visitedRemoteIds.add(rTask.id);
+
+                   const rowKey = lTask ? lTask.id : rTask!.id;
+                   
+                   newRows.push({
+                       key: rowKey,
+                       local: lTask,
+                       remote: rTask,
+                       action: decideAction(lTask, rTask),
+                       displayName: name,
+                       resolvedParentKey: parentRowKey
+                   });
+                   
+                   // 子階層へ再帰（タスクが存在する場合のみIDを渡し、存在しなければnullを渡して探索を止める）
+                   traverseMatching(lTask ? lTask.id : null, rTask ? rTask.id : null, rowKey);
+               }
+           });
+      };
+      
+      // トップレベルから開始
+      traverseMatching(undefined, undefined, undefined);
     }
     
     setRows(newRows);
@@ -152,55 +187,27 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   // 階層構造の計算（表示用）
   const displayedRows = useMemo(() => {
-    const localIdToName = new Map<string, string>();
-    localData.tasks.forEach(t => {
-        if (!t.isDeleted) localIdToName.set(t.id, t.name);
-    });
-
-    const remoteIdToName = new Map<string, string>();
-    incomingData.tasks.forEach(t => {
-        if (!t.isDeleted) remoteIdToName.set(t.id, t.name);
-    });
-
-    const getParentKey = (r: ComparisonRow): string | undefined => {
-        if (mergeMode === 'ID') {
-            return r.local?.parentId ?? r.remote?.parentId;
-        }
-
-        // NAMEモード
-        if (r.local && r.local.parentId) {
-            return localIdToName.get(r.local.parentId);
-        }
-        if (r.remote && r.remote.parentId) {
-             return remoteIdToName.get(r.remote.parentId);
-        }
-
-        return undefined;
-    };
-
     const childrenMap = new Map<string, ComparisonRow[]>();
     const roots: ComparisonRow[] = [];
-    const rowKeySet = new Set(rows.map(r => r.key));
-
+    
+    // resolvedParentKey を使って親子関係を構築
     rows.forEach(r => {
-        const parentKey = getParentKey(r);
-        if (parentKey && rowKeySet.has(parentKey)) {
-            if (!childrenMap.has(parentKey)) childrenMap.set(parentKey, []);
-            childrenMap.get(parentKey)!.push(r);
+        if (r.resolvedParentKey) {
+            if (!childrenMap.has(r.resolvedParentKey)) childrenMap.set(r.resolvedParentKey, []);
+            childrenMap.get(r.resolvedParentKey)!.push(r);
         } else {
             roots.push(r);
         }
     });
 
     const result: HierarchicalRow[] = [];
+    
     const traverse = (nodes: ComparisonRow[], depth: number) => {
         nodes.sort((a, b) => {
             if (mergeMode === 'NAME') {
                 return a.displayName.localeCompare(b.displayName);
             } else {
-                const idA = a.local?.id ?? a.remote?.id ?? a.key;
-                const idB = b.local?.id ?? b.remote?.id ?? b.key;
-                return idA.localeCompare(idB, undefined, { numeric: true });
+                return a.key.localeCompare(b.key, undefined, { numeric: true });
             }
         });
 
@@ -213,7 +220,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
     traverse(roots, 0);
     return result;
-  }, [rows, mergeMode, localData, incomingData]);
+  }, [rows, mergeMode]);
 
 
   const handleRowActionChange = (key: string, act: ResolveAction) => {
@@ -222,7 +229,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const executeMerge = () => {
     const finalTasks: Task[] = [];
-    const idMap = new Map<string, string>(); // OldRemoteID -> NewLocalID
+    const idMap = new Map<string, string>();
     
     let maxIdVal = 0;
     localData.tasks.forEach(t => {
