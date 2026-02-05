@@ -266,7 +266,7 @@ function App() {
         <div style={{ 
             flex: 1, 
             overflowX: 'auto', 
-            overflowY: 'hidden', 
+            overflowY: 'auto', // 修正: hidden -> auto (縦スクロールを有効化)
             display: 'flex', 
             gap: '16px', 
             alignItems: 'flex-start',
@@ -291,7 +291,7 @@ function App() {
                       padding: '10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      maxHeight: '100%',
+                      height: 'fit-content', // 修正: maxHeight: '100%' を削除し fit-content に変更
                   }}>
                       <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
                           <TaskItem 
@@ -304,7 +304,7 @@ function App() {
                               onAddSubTask={() => onTaskItemAddClick(root)}
                           />
                       </div>
-                      <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px' }}>
+                      <div style={{ paddingLeft: '4px' }}> {/* 修正: overflowY: 'auto', flex: 1 を削除 */}
                           {renderColumnChildren(root.children, 0)}
                       </div>
                   </div>

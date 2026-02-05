@@ -35,7 +35,8 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
       >
         {config.l}
       </button>
-      <div style={{ flex: 1, textAlign: 'left' }}>
+      {/* 修正箇所: wordBreakとwhiteSpaceを追加 */}
+      <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
         <span style={{ fontSize: '0.7em', color: '#555', marginRight: '8px', fontFamily: 'monospace' }}>{task.id}</span>
         <span style={{ fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1 }}>{task.name}</span>
         {getDeadline()}
