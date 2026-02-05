@@ -84,6 +84,22 @@ function App() {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
     });
 
+    const targetParentId = explicitParentId ?? parent?.id;
+
+    // トップレベル（親がない）の場合のみ重複チェック
+    if (!targetParentId) {
+      const isDuplicate = data.tasks.some(t => 
+        !t.isDeleted && // 削除されていない
+        !t.parentId &&  // トップレベルである
+        t.name === normalizedName // 名前が一致
+      );
+
+      if (isDuplicate) {
+        alert('トップレベルの親階層では、同じ名前のタスクを作成できません。');
+        return;
+      }
+    }
+
     const newId = (data.tasks.length + 1).toString(36);
     const newTask: Task = { 
       id: newId, 
@@ -91,7 +107,7 @@ function App() {
       status: 0, 
       deadlineOffset: offset || undefined, 
       lastUpdated: Date.now(), 
-      parentId: explicitParentId ?? parent?.id 
+      parentId: targetParentId 
     };
     save([...data.tasks, newTask]);
     setParent(null);
@@ -102,6 +118,11 @@ function App() {
     const normalizedName = newName.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
     });
+    
+    // リネーム時にも重複チェックが必要な場合はここに追加できますが、
+    // 今回は「作成できないように」との指示なので追加時は必須です。
+    // 必要であればここにも同様のチェックを追加してください。
+
     const newTasks = data.tasks.map(t => 
       t.id === id ? { ...t, name: normalizedName, lastUpdated: Date.now() } : t
     );

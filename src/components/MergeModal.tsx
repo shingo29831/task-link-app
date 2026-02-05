@@ -55,7 +55,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             fontSize: '0.75em',
             marginRight: '6px',
             whiteSpace: 'nowrap',
-            alignSelf: 'flex-start', // 改行時に上揃えにする
+            alignSelf: 'flex-start',
             marginTop: '2px'
         }}>
             {config.l}
@@ -89,6 +89,10 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const newRows: ComparisonRow[] = [];
     const getSimpleDisplayName = (t: Task) => t.name;
 
+    // 削除されていないタスクのみを抽出
+    const activeLocalTasks = localData.tasks.filter(t => !t.isDeleted);
+    const activeIncomingTasks = incomingData.tasks.filter(t => !t.isDeleted);
+
     const decideAction = (local?: Task, remote?: Task): ResolveAction => {
         if (local && remote) {
             return priority === 'LOCAL' ? 'USE_LOCAL' : 'USE_REMOTE';
@@ -103,9 +107,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     };
 
     if (mergeMode === 'ID') {
-      const allIds = new Set([...localData.tasks.map(t => t.id), ...incomingData.tasks.map(t => t.id)]);
-      const localMap = new Map(localData.tasks.map(t => [t.id, t]));
-      const remoteMap = new Map(incomingData.tasks.map(t => [t.id, t]));
+      const allIds = new Set([...activeLocalTasks.map(t => t.id), ...activeIncomingTasks.map(t => t.id)]);
+      const localMap = new Map(activeLocalTasks.map(t => [t.id, t]));
+      const remoteMap = new Map(activeIncomingTasks.map(t => [t.id, t]));
 
       allIds.forEach(id => {
         const local = localMap.get(id);
@@ -122,11 +126,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     } else {
       // NAME Mode
       const allNames = new Set([
-          ...localData.tasks.filter(t => !t.isDeleted).map(t => t.name),
-          ...incomingData.tasks.filter(t => !t.isDeleted).map(t => t.name)
+          ...activeLocalTasks.map(t => t.name),
+          ...activeIncomingTasks.map(t => t.name)
       ]);
-      const localMap = new Map(localData.tasks.map(t => [t.name, t]));
-      const remoteMap = new Map(incomingData.tasks.map(t => [t.name, t]));
+      const localMap = new Map(activeLocalTasks.map(t => [t.name, t]));
+      const remoteMap = new Map(activeIncomingTasks.map(t => [t.name, t]));
 
       allNames.forEach(name => {
         const local = localMap.get(name);
