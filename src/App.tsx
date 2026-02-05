@@ -28,10 +28,38 @@ function App() {
     return { before, after, beforeLen: before.length, afterLen: after.length };
   }, [data]);
 
+  // 修正: activeTasks の計算を早期リターンの前に移動 (dataがnullの場合は空配列)
+  const activeTasks = useMemo(() => {
+    return data ? data.tasks.filter(t => !t.isDeleted) : [];
+  }, [data]);
 
+  // 修正: projectProgress の計算フックを早期リターンの前に移動
+  const projectProgress = useMemo(() => {
+    if (!data || activeTasks.length === 0) return 0;
+
+    // 親として参照されているIDのセットを作成
+    const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
+    // 子を持たないタスク（リーフタスク）を抽出
+    const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
+
+    let total = 0;
+    let count = 0;
+
+    leafTasks.forEach(t => {
+      if (t.status !== 3) { // 休止(3)は除外
+        total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
+        count++;
+      }
+    });
+
+    if (count === 0) return 0;
+    return Math.round(total / count);
+  }, [data, activeTasks]);
+
+  // データ読み込み待ちの早期リターン
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
-  const activeTasks = data.tasks.filter(t => !t.isDeleted);
+  // ここからは data が存在することが保証されている
   const canEditProjectName = activeTasks.length === 0;
 
   const recalculate = (tasks: Task[]): Task[] => {
@@ -57,9 +85,7 @@ function App() {
 
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
-  // explicitParentId 引数を追加
   const addTask = (name: string, offset?: number, explicitParentId?: string) => {
-    // 英数字を半角に変換する処理を追加
     const normalizedName = name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
     });
@@ -67,7 +93,7 @@ function App() {
     const newId = (data.tasks.length + 1).toString(36);
     const newTask: Task = { 
       id: newId, 
-      name: normalizedName, // 変換後の名前を使用
+      name: normalizedName,
       status: 0, 
       deadlineOffset: offset || undefined, 
       lastUpdated: Date.now(), 
@@ -77,7 +103,6 @@ function App() {
     setParent(null);
   };
 
-  // タスク名変更ハンドラ
   const handleRenameTask = (id: string, newName: string) => {
     if (!newName.trim()) return;
     const normalizedName = newName.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
@@ -89,7 +114,6 @@ function App() {
     save(newTasks);
   };
 
-  // タスク期限変更ハンドラ
   const handleUpdateDeadline = (id: string, dateStr: string) => {
     let offset: number | undefined;
     if (dateStr) {
@@ -106,7 +130,6 @@ function App() {
     save(newTasks);
   };
 
-  // 統合されたタスク追加ハンドラ
   const handleAddTask = (targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
 
@@ -124,13 +147,10 @@ function App() {
     setInputDateStr('');
   };
 
-  // タスクアイテムの+ボタンクリック時の処理
   const onTaskItemAddClick = (node: TaskNode) => {
     if (inputTaskName.trim()) {
-      // 入力がある場合はそのタスクの子として即時追加
       handleAddTask(node.id);
     } else {
-      // 入力がない場合は親タスク設定モードへ（従来通りの挙動）
       setParent({ id: node.id, name: node.name });
     }
   };
@@ -256,7 +276,10 @@ function App() {
                     >
                         TaskLink: {data.projectName}
                     </h1>
-                    <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                      <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
+                      <span style={{ color: '#888', fontSize: '0.8em' }}>全進捗: {projectProgress}%</span>
+                    </div>
                 </div>
             </div>
             <ProjectControls 
