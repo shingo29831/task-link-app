@@ -87,7 +87,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const newRows: ComparisonRow[] = [];
     const getSimpleDisplayName = (t: Task) => t.name;
 
-    // 削除されていないタスクのみを抽出
+    // 削除されていないタスクのみを抽出（削除済みタスクが表示されないようにするため）
     const activeLocalTasks = localData.tasks.filter(t => !t.isDeleted);
     const activeIncomingTasks = incomingData.tasks.filter(t => !t.isDeleted);
 
@@ -110,6 +110,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         const local = localMap.get(id);
         const remote = remoteMap.get(id);
         
+        // IDモードの場合、親IDはそのまま親のキーとなる（親もIDで一意に特定されるため）
         const parentKey = local?.parentId ?? remote?.parentId;
 
         newRows.push({
@@ -147,20 +148,24 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
            const lChildren = lParentId === null ? [] : (localChildrenMap.get(lParentId ?? 'root') || []);
            const rChildren = rParentId === null ? [] : (remoteChildrenMap.get(rParentId ?? 'root') || []);
            
-           // この階層にある全タスク名（重複なし）
+           // この階層にある全タスク名
            const names = new Set([...lChildren.map(t => t.name), ...rChildren.map(t => t.name)]);
            
            names.forEach(name => {
-               // まだ処理されていないタスクの中から、名前が一致するものを探す
                const lTask = lChildren.find(t => t.name === name && !visitedLocalIds.has(t.id));
                const rTask = rChildren.find(t => t.name === name && !visitedRemoteIds.has(t.id));
                
                if (lTask || rTask) {
-                   // 処理済みとしてマーク
                    if (lTask) visitedLocalIds.add(lTask.id);
                    if (rTask) visitedRemoteIds.add(rTask.id);
 
-                   const rowKey = lTask ? lTask.id : rTask!.id;
+                   // キーの重複を防ぐためのロジック
+                   // Localタスクがある場合はLocalのIDをキーとする。
+                   // LocalがなくRemoteのみの場合、Localの別のタスクのIDと重複する可能性があるためプレフィックスを付与する。
+                   let rowKey = lTask ? lTask.id : rTask!.id;
+                   if (!lTask && rTask) {
+                       rowKey = `remote_${rTask.id}`;
+                   }
                    
                    newRows.push({
                        key: rowKey,
@@ -171,7 +176,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                        resolvedParentKey: parentRowKey
                    });
                    
-                   // 子階層へ再帰（タスクが存在する場合のみIDを渡し、存在しなければnullを渡して探索を止める）
+                   // 子階層へ再帰
                    traverseMatching(lTask ? lTask.id : null, rTask ? rTask.id : null, rowKey);
                }
            });
@@ -229,7 +234,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const executeMerge = () => {
     const finalTasks: Task[] = [];
-    const idMap = new Map<string, string>();
+    const idMap = new Map<string, string>(); // OldRemoteID -> NewLocalID
     
     let maxIdVal = 0;
     localData.tasks.forEach(t => {
