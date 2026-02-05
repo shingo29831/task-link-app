@@ -53,8 +53,20 @@ function App() {
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
   const addTask = (name: string, offset?: number) => {
+    // 英数字を半角に変換する処理を追加
+    const normalizedName = name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+
     const newId = (data.tasks.length + 1).toString(36);
-    const newTask: Task = { id: newId, name, status: 0, deadlineOffset: offset || undefined, lastUpdated: Date.now(), parentId: parent?.id };
+    const newTask: Task = { 
+      id: newId, 
+      name: normalizedName, // 変換後の名前を使用
+      status: 0, 
+      deadlineOffset: offset || undefined, 
+      lastUpdated: Date.now(), 
+      parentId: parent?.id 
+    };
     save([...data.tasks, newTask]);
     setParent(null);
   };
