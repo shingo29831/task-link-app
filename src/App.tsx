@@ -98,7 +98,7 @@ function App() {
 
       <div style={{ marginBottom: '20px' }}>
         {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
-        <TaskInput onAdd={addTask} />
+        <TaskInput onAdd={addTask} projectStartDate={data.projectStartDate} />
       </div>
 
       <div style={{ marginTop: '20px' }}>

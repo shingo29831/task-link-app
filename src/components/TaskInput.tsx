@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
+import { differenceInCalendarDays } from 'date-fns';
 
 interface Props {
   onAdd: (name: string, deadlineOffset?: number) => void;
+  projectStartDate: number;
 }
 
-export const TaskInput: React.FC<Props> = ({ onAdd }) => {
+export const TaskInput: React.FC<Props> = ({ onAdd, projectStartDate }) => {
   const [text, setText] = useState('');
-  const [days, setDays] = useState('');
+  const [dateStr, setDateStr] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
 
-    const offset = days ? parseInt(days, 10) : undefined;
+    let offset: number | undefined;
+    if (dateStr) {
+      // dateStr は "YYYY-MM-DD" 形式
+      const [y, m, d] = dateStr.split('-').map(Number);
+      // ローカル時間の0時0分としてDateオブジェクトを作成
+      const targetDate = new Date(y, m - 1, d);
+      // プロジェクト開始日との差分（日数）を計算
+      offset = differenceInCalendarDays(targetDate, projectStartDate);
+    }
+
     onAdd(text, offset);
     
     setText('');
-    setDays('');
+    setDateStr('');
   };
 
   return (
@@ -29,11 +40,10 @@ export const TaskInput: React.FC<Props> = ({ onAdd }) => {
         style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #555', background: '#333', color: '#fff' }}
       />
       <input
-        type="number"
-        placeholder="期限(日後)"
-        value={days}
-        onChange={(e) => setDays(e.target.value)}
-        style={{ width: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #555', background: '#333', color: '#fff' }}
+        type="date"
+        value={dateStr}
+        onChange={(e) => setDateStr(e.target.value)}
+        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', background: '#333', color: '#fff', colorScheme: 'dark' }}
       />
       <button type="submit" disabled={!text.trim()}>追加</button>
     </form>
