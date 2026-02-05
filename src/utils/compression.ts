@@ -1,3 +1,4 @@
+// src/utils/compression.ts
 import LZString from 'lz-string';
 import type { AppData } from '../types';
 
@@ -10,6 +11,9 @@ const USER_DICTIONARY: Record<string, string> = {
 
 const HIRAGANA_START = 0x3041;
 const MAPPING_START = 0x0080;
+
+// デフォルトのプロジェクト名（merge.tsなどと共通化するのが望ましい）
+const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 
 const preProcess = (str: string): string => {
   let res = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
@@ -38,7 +42,8 @@ export const getIntermediateJson = (data: AppData): string => {
     return `[${preProcess(t.name)},${status},${deadline},${updated},${parent}`;
   }).join('');
 
-  return `${start}${tasksStr}]${end}`;
+  // プロジェクト名を先頭に配置（カンマで区切る）
+  return `${preProcess(data.projectName)},${start}${tasksStr}]${end}`;
 };
 
 export const compressData = (data: AppData): string => {
@@ -49,17 +54,34 @@ export const decompressData = (compressed: string): AppData | null => {
   try {
     const raw = LZString.decompressFromEncodedURIComponent(compressed);
     if (!raw) return null;
-    const firstIdx = raw.indexOf('[');
-    const lastIdx = raw.lastIndexOf(']');
+
+    // プロジェクト名とそれ以外を分割
+    const nameEndIdx = raw.indexOf(',');
+    if (nameEndIdx === -1) return null;
+    
+    const projectName = postProcess(raw.substring(0, nameEndIdx)) || DEFAULT_PROJECT_NAME;
+    const body = raw.substring(nameEndIdx + 1);
+
+    const firstIdx = body.indexOf('[');
+    const lastIdx = body.lastIndexOf(']');
+
     if (firstIdx === -1) {
-      const parts = raw.split(']');
-      return { projectStartDate: (parseInt(parts[0], 36) + EPOCH_2020_MIN) * 60000, tasks: [], lastSynced: (parseInt(parts[1], 36) + EPOCH_2020_MIN) * 60000 };
+      const parts = body.split(']');
+      return { 
+        projectName,
+        projectStartDate: (parseInt(parts[0], 36) + EPOCH_2020_MIN) * 60000, 
+        tasks: [], 
+        lastSynced: (parseInt(parts[1], 36) + EPOCH_2020_MIN) * 60000 
+      };
     }
-    const startDate = (parseInt(raw.substring(0, firstIdx), 36) + EPOCH_2020_MIN) * 60000;
-    const lastSynced = (parseInt(raw.substring(lastIdx + 1), 36) + EPOCH_2020_MIN) * 60000;
-    const tasksBody = raw.substring(firstIdx, lastIdx);
+
+    const startDate = (parseInt(body.substring(0, firstIdx), 36) + EPOCH_2020_MIN) * 60000;
+    const lastSynced = (parseInt(body.substring(lastIdx + 1), 36) + EPOCH_2020_MIN) * 60000;
+    const tasksBody = body.substring(firstIdx, lastIdx);
     const taskStrings = tasksBody.split('[').slice(1);
+
     return {
+      projectName,
       projectStartDate: startDate,
       tasks: taskStrings.map((tStr, index) => {
         const id = (index + 1).toString(36);
