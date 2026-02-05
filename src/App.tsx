@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { differenceInCalendarDays } from 'date-fns';
 import { useAppData } from './hooks/useAppData';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
@@ -15,6 +16,10 @@ function App() {
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+
+  // TaskInputの状態をAppにリフトアップ
+  const [inputTaskName, setInputTaskName] = useState('');
+  const [inputDateStr, setInputDateStr] = useState('');
 
   const debugInfo = useMemo(() => {
     if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
@@ -52,7 +57,8 @@ function App() {
 
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
-  const addTask = (name: string, offset?: number) => {
+  // explicitParentId 引数を追加
+  const addTask = (name: string, offset?: number, explicitParentId?: string) => {
     // 英数字を半角に変換する処理を追加
     const normalizedName = name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
@@ -65,10 +71,39 @@ function App() {
       status: 0, 
       deadlineOffset: offset || undefined, 
       lastUpdated: Date.now(), 
-      parentId: parent?.id 
+      parentId: explicitParentId ?? parent?.id 
     };
     save([...data.tasks, newTask]);
     setParent(null);
+  };
+
+  // 統合されたタスク追加ハンドラ
+  const handleAddTask = (targetParentId?: string) => {
+    if (!inputTaskName.trim()) return;
+
+    let offset: number | undefined;
+    if (inputDateStr) {
+      const [y, m, d] = inputDateStr.split('-').map(Number);
+      const targetDate = new Date(y, m - 1, d);
+      offset = differenceInCalendarDays(targetDate, data.projectStartDate);
+    }
+
+    addTask(inputTaskName, offset, targetParentId);
+    
+    // 入力をクリア
+    setInputTaskName('');
+    setInputDateStr('');
+  };
+
+  // タスクアイテムの+ボタンクリック時の処理
+  const onTaskItemAddClick = (node: TaskNode) => {
+    if (inputTaskName.trim()) {
+      // 入力がある場合はそのタスクの子として即時追加
+      handleAddTask(node.id);
+    } else {
+      // 入力がない場合は親タスク設定モードへ（従来通りの挙動）
+      setParent({ id: node.id, name: node.name });
+    }
   };
 
   const buildTree = (tasks: Task[]): TaskNode[] => {
@@ -118,7 +153,7 @@ function App() {
         hasChildren={n.children.length > 0}
         onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
         onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === n.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
-        onAddSubTask={() => setParent({ id: n.id, name: n.name })}
+        onAddSubTask={() => onTaskItemAddClick(n)}
       />
       {renderColumnChildren(n.children, depth + 1)}
     </React.Fragment>
@@ -218,7 +253,13 @@ function App() {
         {/* 入力エリア */}
         <div style={{ marginBottom: '20px' }}>
           {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
-          <TaskInput onAdd={addTask} projectStartDate={data.projectStartDate} />
+          <TaskInput 
+            taskName={inputTaskName}
+            setTaskName={setInputTaskName}
+            dateStr={inputDateStr}
+            setDateStr={setInputDateStr}
+            onSubmit={() => handleAddTask()}
+          />
         </div>
 
         {/* カンバンボードエリア */}
@@ -260,7 +301,7 @@ function App() {
                               hasChildren={root.children.length > 0}
                               onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
                               onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === root.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
-                              onAddSubTask={() => setParent({ id: root.id, name: root.name })}
+                              onAddSubTask={() => onTaskItemAddClick(root)}
                           />
                       </div>
                       <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px' }}>
