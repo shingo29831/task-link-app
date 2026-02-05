@@ -50,8 +50,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             return priority === 'LOCAL' ? 'USE_LOCAL' : 'USE_REMOTE';
         }
         if (!local && remote) {
-            // Remoteのみ: Remote優先なら追加、Local優先なら無視(削除)
-            return priority === 'REMOTE' ? 'ADD_REMOTE' : 'DELETE';
+            // Remoteのみ: 
+            // 競合しないタスクは優先度設定に関わらず「追加」をデフォルトとする
+            return 'ADD_REMOTE';
         }
         if (local && !remote) {
             // Localのみ: 基本維持
@@ -101,7 +102,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     }
     
     setRows(newRows);
-    // 自動再計算時はSelectの表示を現在のモードに合わせる
     setStrategySelect(mergeMode);
   }, [mergeMode, priority, localData, incomingData]);
 
@@ -150,7 +150,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   }, [rows, mergeMode, localData, incomingData]);
 
 
-  // マージ戦略（右側のSelect）変更時のハンドラ
   const handleStrategyChange = (val: string) => {
     const selected = val as StrategyOption;
     
@@ -173,10 +172,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     setMergeMode(selected); // これによりuseEffectが発火し、rowsが再構築される
   };
 
-  // 個別のアクション変更時のハンドラ
   const handleRowActionChange = (key: string, act: ResolveAction) => {
       setRows(prev => prev.map(r => r.key === key ? { ...r, action: act } : r));
-      setStrategySelect('CUSTOM'); // 個別に変更したら「カスタマイズ」表示にする
+      setStrategySelect('CUSTOM');
   };
 
   const executeMerge = () => {
@@ -242,8 +240,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                 <p>Remote: {incomingData.projectName}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                     <button onClick={onCancel} style={btnStyle}>マージしない (中止)</button>
-                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>マージ先(Local)のプロジェクト名を適用</button>
-                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>マージ元(Remote)のプロジェクト名を適用</button>
+                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>Localのプロジェクト名を適用</button>
+                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>Remoteのプロジェクト名を適用</button>
                 </div>
             </div>
         </div>
@@ -256,18 +254,16 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {/* 優先度選択 Select */}
                     <select 
                         value={priority} 
                         onChange={(e) => setPriority(e.target.value as Priority)} 
                         style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
-                        title="競合時および新規タスクの扱いを決定します"
+                        title="競合時の優先度を選択します"
                     >
-                        <option value="LOCAL">マージ先(Local)優先</option>
-                        <option value="REMOTE">マージ元(Remote)優先</option>
+                        <option value="LOCAL">Local優先</option>
+                        <option value="REMOTE">Remote優先</option>
                     </select>
 
-                    {/* マージ戦略選択 Select */}
                     <select 
                         value={strategySelect} 
                         onChange={(e) => handleStrategyChange(e.target.value)} 
@@ -287,9 +283,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
                     <thead>
                         <tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}>
-                            <th style={{ padding: '8px' }}>マージ先 (Local)</th>
+                            <th style={{ padding: '8px' }}>Local</th>
                             <th style={{ padding: '8px', width: '150px' }}>アクション</th>
-                            <th style={{ padding: '8px' }}>マージ元 (Remote)</th>
+                            <th style={{ padding: '8px' }}>Remote</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -318,20 +314,20 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                     >
                                         {row.local && row.remote && (
                                             <>
-                                                <option value="USE_LOCAL">マージ先優先</option>
-                                                <option value="USE_REMOTE">マージ元優先</option>
+                                                <option value="USE_LOCAL">Local優先</option>
+                                                <option value="USE_REMOTE">Remote優先</option>
                                                 <option value="DELETE">差分を削除</option>
                                             </>
                                         )}
                                         {row.local && !row.remote && (
                                             <>
-                                                <option value="USE_LOCAL">マージ先優先(維持)</option>
+                                                <option value="USE_LOCAL">Local維持</option>
                                                 <option value="DELETE">差分を削除</option>
                                             </>
                                         )}
                                         {!row.local && row.remote && (
                                             <>
-                                                <option value="ADD_REMOTE">マージ元優先(追加)</option>
+                                                <option value="ADD_REMOTE">追加</option>
                                                 <option value="DELETE">差分を削除</option>
                                             </>
                                         )}
