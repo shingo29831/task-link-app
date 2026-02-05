@@ -73,9 +73,16 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
                             {/* 表示件数を制限 */}
                             {dayTasks.slice(0, MAX_DISPLAY_TASKS).map(t => (
                                 <div key={t.id} style={{ 
-                                    fontSize: '0.9em', backgroundColor: t.status === 2 ? '#28a745' : t.status === 3 ? '#6f42c1' : '#007bff', 
-                                    color: '#fff', borderRadius: '2px', padding: '1px 3px',
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    fontSize: '0.9em', 
+                                    backgroundColor: t.status === 2 ? '#28a745' : t.status === 3 ? '#6f42c1' : '#007bff', 
+                                    color: '#fff', 
+                                    borderRadius: '2px', 
+                                    padding: '1px 3px',
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis',
+                                    // 以下の行を追加: 完了(2)の場合に取り消し線を適用
+                                    textDecoration: t.status === 2 ? 'line-through' : 'none'
                                 }}>
                                     {t.name}
                                 </div>

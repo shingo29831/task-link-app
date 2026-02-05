@@ -60,7 +60,7 @@ function App() {
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
   // ここからは data が存在することが保証されている
-  const canEditProjectName = activeTasks.length === 0;
+  // 以前の canEditProjectName 変数は削除または使用しない
 
   const recalculate = (tasks: Task[]): Task[] => {
     const next = [...tasks];
@@ -176,7 +176,7 @@ function App() {
   };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 220;
+    const BASE_WIDTH = 240;
     const INDENT_WIDTH = 24;
     const CHAR_WIDTH_PX = 12;
 
@@ -255,34 +255,40 @@ function App() {
                   📅
                 </button>
                 <div>
-                    <h1 
-                        style={{ 
-                            margin: 0, 
-                            fontSize: '1.5em', 
-                            cursor: canEditProjectName ? 'pointer' : 'default',
-                            textDecoration: canEditProjectName ? 'underline dotted' : 'none'
-                        }}
-                        onClick={() => {
-                            if (!canEditProjectName) {
-                                alert('タスクが存在するため、プロジェクト名は変更できません。');
-                                return;
-                            }
-                            const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
-                            if (newName && newName.trim()) {
-                                setData({ ...data, projectName: newName, lastSynced: Date.now() });
-                            }
-                        }}
-                        title={canEditProjectName ? "クリックしてプロジェクト名を変更" : "タスクがあるため変更不可"}
-                    >
-                        TaskLink: {data.projectName}
-                    </h1>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '15px' }}>
+                        <h1 
+                            style={{ 
+                                margin: 0, 
+                                fontSize: '1.5em', 
+                                cursor: 'pointer', // 常にポインターを表示
+                                textDecoration: 'underline dotted' // 常に下線を表示
+                            }}
+                            onClick={() => {
+                                // タスクが存在する場合の警告ロジックを追加
+                                if (activeTasks.length > 0) {
+                                    if (!confirm('プロジェクト名を変更した場合、変更後の同一プロジェクト名のみとマージできます。\n変更しますか？')) {
+                                        return;
+                                    }
+                                }
+                                const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
+                                if (newName && newName.trim()) {
+                                    setData({ ...data, projectName: newName, lastSynced: Date.now() });
+                                }
+                            }}
+                            title="クリックしてプロジェクト名を変更"
+                        >
+                            TaskLink: {data.projectName}
+                        </h1>
+                        <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>
+                            (全進捗: {projectProgress}%)
+                        </span>
+                    </div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
                       <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
-                      <span style={{ color: '#888', fontSize: '0.8em' }}>全進捗: {projectProgress}%</span>
                     </div>
                 </div>
             </div>
-            <ProjectControls 
+            <ProjectControls
                 onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
                 onExport={() => {
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click();
