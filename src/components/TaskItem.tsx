@@ -102,7 +102,7 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
       </button>
       
       <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-        <span style={{ fontSize: '0.7em', color: '#555', marginRight: '8px', fontFamily: 'monospace' }}>{task.id}</span>
+        {/* <span style={{ fontSize: '0.7em', color: '#555', marginRight: '8px', fontFamily: 'monospace' }}>{task.id}</span> */}
         
         {isEditing ? (
           <input 
