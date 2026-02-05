@@ -11,7 +11,6 @@ interface Props {
 type MergeMode = 'ID' | 'NAME';
 type ResolveAction = 'USE_LOCAL' | 'USE_REMOTE' | 'DELETE' | 'ADD_REMOTE';
 type Priority = 'LOCAL' | 'REMOTE';
-type StrategyOption = 'CUSTOM' | 'NO_MERGE' | 'NAME' | 'ID';
 
 interface ComparisonRow {
   key: string; // ID or Name
@@ -34,28 +33,22 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   // マージ設定
   const [mergeMode, setMergeMode] = useState<MergeMode>('NAME');
   const [priority, setPriority] = useState<Priority>('LOCAL');
-  const [strategySelect, setStrategySelect] = useState<StrategyOption>('NAME');
   
   const [rows, setRows] = useState<ComparisonRow[]>([]);
 
-  // Rowsの構築（データの突合 + 初期アクション決定）
+  // Rowsの構築
   useEffect(() => {
     const newRows: ComparisonRow[] = [];
     const getSimpleDisplayName = (t: Task) => t.name;
 
-    // 優先度に基づくデフォルトアクション決定ロジック
     const decideAction = (local?: Task, remote?: Task): ResolveAction => {
         if (local && remote) {
-            // 競合: 優先度に従う
             return priority === 'LOCAL' ? 'USE_LOCAL' : 'USE_REMOTE';
         }
         if (!local && remote) {
-            // Remoteのみ: 
-            // 競合しないタスクは優先度設定に関わらず「追加」をデフォルトとする
             return 'ADD_REMOTE';
         }
         if (local && !remote) {
-            // Localのみ: 基本維持
             return 'USE_LOCAL';
         }
         return 'USE_LOCAL';
@@ -102,23 +95,38 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     }
     
     setRows(newRows);
-    setStrategySelect(mergeMode);
   }, [mergeMode, priority, localData, incomingData]);
 
 
   // 階層構造の計算（表示用）
   const displayedRows = useMemo(() => {
-    const idToKeyMap = new Map<string, string>();
-    if (mergeMode === 'NAME') {
-        [...localData.tasks, ...incomingData.tasks].forEach(t => {
-            if (!t.isDeleted) idToKeyMap.set(t.id, t.name);
-        });
-    }
+    const localIdToName = new Map<string, string>();
+    localData.tasks.forEach(t => {
+        if (!t.isDeleted) localIdToName.set(t.id, t.name);
+    });
+
+    const remoteIdToName = new Map<string, string>();
+    incomingData.tasks.forEach(t => {
+        if (!t.isDeleted) remoteIdToName.set(t.id, t.name);
+    });
 
     const getParentKey = (r: ComparisonRow): string | undefined => {
-        const t = r.local || r.remote;
-        if (!t || !t.parentId) return undefined;
-        return mergeMode === 'ID' ? t.parentId : idToKeyMap.get(t.parentId);
+        if (mergeMode === 'ID') {
+            return r.local?.parentId ?? r.remote?.parentId;
+        }
+
+        // NAMEモード
+        // 1. Localタスクが存在する場合、Localの親子関係を優先
+        if (r.local && r.local.parentId) {
+            return localIdToName.get(r.local.parentId);
+        }
+
+        // 2. Remoteタスクが存在する場合
+        if (r.remote && r.remote.parentId) {
+             return remoteIdToName.get(r.remote.parentId);
+        }
+
+        return undefined;
     };
 
     const childrenMap = new Map<string, ComparisonRow[]>();
@@ -127,6 +135,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
     rows.forEach(r => {
         const parentKey = getParentKey(r);
+        // 親キーが存在し、かつその親が行として存在する場合のみ子として扱う
         if (parentKey && rowKeySet.has(parentKey)) {
             if (!childrenMap.has(parentKey)) childrenMap.set(parentKey, []);
             childrenMap.get(parentKey)!.push(r);
@@ -137,7 +146,16 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
     const result: HierarchicalRow[] = [];
     const traverse = (nodes: ComparisonRow[], depth: number) => {
-        nodes.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        nodes.sort((a, b) => {
+            if (mergeMode === 'NAME') {
+                return a.displayName.localeCompare(b.displayName);
+            } else {
+                const idA = a.local?.id ?? a.remote?.id ?? a.key;
+                const idB = b.local?.id ?? b.remote?.id ?? b.key;
+                return idA.localeCompare(idB, undefined, { numeric: true });
+            }
+        });
+
         nodes.forEach(node => {
             result.push({ ...node, depth });
             const children = childrenMap.get(node.key);
@@ -150,31 +168,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   }, [rows, mergeMode, localData, incomingData]);
 
 
-  const handleStrategyChange = (val: string) => {
-    const selected = val as StrategyOption;
-    
-    if (selected === 'CUSTOM') {
-        setStrategySelect('CUSTOM');
-        return;
-    }
-
-    if (selected === 'NO_MERGE') {
-        setStrategySelect('NO_MERGE');
-        // 全行を「マージしない（Local維持 or 削除）」に設定
-        setRows(prev => prev.map(r => ({
-            ...r,
-            action: r.local ? 'USE_LOCAL' : 'DELETE'
-        })));
-        return;
-    }
-
-    // NAME or ID
-    setMergeMode(selected); // これによりuseEffectが発火し、rowsが再構築される
-  };
-
   const handleRowActionChange = (key: string, act: ResolveAction) => {
       setRows(prev => prev.map(r => r.key === key ? { ...r, action: act } : r));
-      setStrategySelect('CUSTOM');
   };
 
   const executeMerge = () => {
@@ -187,6 +182,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         if (!isNaN(v) && v > maxIdVal) maxIdVal = v;
     });
     
+    // 修正済み
     const generateId = () => { maxIdVal++; return maxIdVal.toString(36); };
 
     rows.forEach(row => {
@@ -236,7 +232,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             <div style={modalStyle}>
                 <h3>プロジェクト名の競合</h3>
                 <p>プロジェクト名が異なります。</p>
-                <p>Local: {localData.projectName}</p>\
+                <p>Local: {localData.projectName}</p>
                 <p>Remote: {incomingData.projectName}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                     <button onClick={onCancel} style={btnStyle}>マージしない (中止)</button>
@@ -254,6 +250,17 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
+                    
+                    <select
+                        value={mergeMode}
+                        onChange={(e) => setMergeMode(e.target.value as MergeMode)}
+                        style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                        title="リストの表示順とマージ基準を選択"
+                    >
+                        <option value="NAME">タスク名</option>
+                        <option value="ID">タスクID</option>
+                    </select>
+
                     <select 
                         value={priority} 
                         onChange={(e) => setPriority(e.target.value as Priority)} 
@@ -264,17 +271,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                         <option value="REMOTE">Remote優先</option>
                     </select>
 
-                    <select 
-                        value={strategySelect} 
-                        onChange={(e) => handleStrategyChange(e.target.value)} 
-                        style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
-                    >
-                        <option value="CUSTOM">カスタマイズ</option>
-                        <option value="NO_MERGE">マージしない</option>
-                        <option value="NAME">タスク名マージ</option>
-                        <option value="ID">タスクIDマージ</option>
-                    </select>
-
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: '#dc3545', border: 'none' }}>キャンセル</button>
                     <button onClick={executeMerge} style={{ ...btnStyle, backgroundColor: '#28a745', border: 'none' }}>実行</button>
                 </div>
             </div>
