@@ -32,11 +32,11 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
       </button>
       
       <button onClick={onExport} style={{ backgroundColor: '#333' }}>
-        ⬇ JSON保存
+        ⬇ ファイルに保存
       </button>
       
       <button onClick={() => fileInputRef.current?.click()} style={{ backgroundColor: '#333' }}>
-        ⬆ JSON読込
+        ⬆ ファイル読込
       </button>
       <input 
         type="file" 
