@@ -67,6 +67,36 @@ function App() {
     return roots;
   };
 
+  // 文字列の長さを計算（半角=1, 全角=2）
+  const getStrLen = (str: string) => {
+    let len = 0;
+    for (let i = 0; i < str.length; i++) {
+      len += (str.charCodeAt(i) < 256) ? 1 : 2;
+    }
+    return len;
+  };
+
+  // カラムの最大幅を計算
+  // インデント + (タスク名の長さ min 20文字) + 固定要素幅
+  const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
+    const BASE_WIDTH = 220; // ステータスボタン(92) + ID(30) + 操作ボタン(60) + 余白など
+    const INDENT_WIDTH = 24;
+    const CHAR_WIDTH_PX = 12; // 1文字あたりの概算幅(px)
+
+    const len = getStrLen(node.name);
+    // 20文字（半角）までは幅を広げ、それ以降は折り返す
+    const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
+    
+    let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth;
+
+    if (node.children) {
+      for (const child of node.children) {
+        max = Math.max(max, calculateColumnWidth(child, depth + 1));
+      }
+    }
+    return max;
+  };
+
   // カラム内の子タスクを再帰的に表示する関数
   const renderColumnChildren = (nodes: TaskNode[], depth = 0) => nodes.map(n => (
     <React.Fragment key={n.id}>
@@ -136,36 +166,39 @@ function App() {
           {data.tasks.filter(t => !t.isDeleted).length === 0 ? (
             <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
           ) : (
-            buildTree(data.tasks).map(root => (
-                <div key={root.id} style={{ 
-                    minWidth: '300px', 
-                    maxWidth: '300px', 
-                    backgroundColor: '#2a2a2a', 
-                    borderRadius: '8px', 
-                    border: '1px solid #444', 
-                    padding: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    maxHeight: '100%', // 縦スクロール用
-                }}>
-                    {/* 親タスクヘッダー */}
-                    <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                        <TaskItem 
-                            task={root} 
-                            projectStartDate={data.projectStartDate} 
-                            depth={0} 
-                            hasChildren={root.children.length > 0}
-                            onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
-                            onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === root.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
-                            onAddSubTask={() => setParent({ id: root.id, name: root.name })}
-                        />
-                    </div>
-                    {/* 子タスクリスト (スクロール可能に) */}
-                    <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px' }}>
-                        {renderColumnChildren(root.children, 0)}
-                    </div>
-                </div>
-            ))
+            buildTree(data.tasks).map(root => {
+                const colWidth = calculateColumnWidth(root);
+                return (
+                  <div key={root.id} style={{ 
+                      minWidth: `${colWidth}px`, 
+                      maxWidth: `${colWidth}px`, 
+                      backgroundColor: '#2a2a2a', 
+                      borderRadius: '8px', 
+                      border: '1px solid #444', 
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      maxHeight: '100%', // 縦スクロール用
+                  }}>
+                      {/* 親タスクヘッダー */}
+                      <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
+                          <TaskItem 
+                              task={root} 
+                              projectStartDate={data.projectStartDate} 
+                              depth={0} 
+                              hasChildren={root.children.length > 0}
+                              onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
+                              onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === root.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
+                              onAddSubTask={() => setParent({ id: root.id, name: root.name })}
+                          />
+                      </div>
+                      {/* 子タスクリスト (スクロール可能に) */}
+                      <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px' }}>
+                          {renderColumnChildren(root.children, 0)}
+                      </div>
+                  </div>
+                );
+            })
           )}
         </div>
 
