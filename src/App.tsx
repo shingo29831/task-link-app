@@ -6,13 +6,13 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task, AppData } from './types';
-import { mergeAppData } from './utils/merge';
 import { getIntermediateJson, compressData } from './utils/compression';
+import { MergeModal } from './components/MergeModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
 function App() {
-  const { data, setData, getShareUrl } = useAppData();
+  const { data, setData, incomingData, setIncomingData, getShareUrl } = useAppData();
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -28,18 +28,14 @@ function App() {
     return { before, after, beforeLen: before.length, afterLen: after.length };
   }, [data]);
 
-  // 修正: activeTasks の計算を早期リターンの前に移動 (dataがnullの場合は空配列)
   const activeTasks = useMemo(() => {
     return data ? data.tasks.filter(t => !t.isDeleted) : [];
   }, [data]);
 
-  // 修正: projectProgress の計算フックを早期リターンの前に移動
   const projectProgress = useMemo(() => {
     if (!data || activeTasks.length === 0) return 0;
 
-    // 親として参照されているIDのセットを作成
     const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
-    // 子を持たないタスク（リーフタスク）を抽出
     const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
 
     let total = 0;
@@ -56,11 +52,9 @@ function App() {
     return Math.round(total / count);
   }, [data, activeTasks]);
 
-  // データ読み込み待ちの早期リターン
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
-  // ここからは data が存在することが保証されている
-  // 以前の canEditProjectName 変数は削除または使用しない
+  // canEditProjectName logic is handled inside onClick now
 
   const recalculate = (tasks: Task[]): Task[] => {
     const next = [...tasks];
@@ -141,8 +135,6 @@ function App() {
     }
 
     addTask(inputTaskName, offset, targetParentId);
-    
-    // 入力をクリア
     setInputTaskName('');
     setInputDateStr('');
   };
@@ -176,7 +168,7 @@ function App() {
   };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 240;
+    const BASE_WIDTH = 220;
     const INDENT_WIDTH = 24;
     const CHAR_WIDTH_PX = 12;
 
@@ -223,6 +215,20 @@ function App() {
       overflow: 'hidden'
     }}>
       
+      {/* マージモーダル: incomingDataが存在する場合に表示 */}
+      {incomingData && data && (
+        <MergeModal 
+            localData={data} 
+            incomingData={incomingData} 
+            onConfirm={(merged) => {
+                setData(merged);
+                setIncomingData(null);
+                alert('マージが完了しました');
+            }}
+            onCancel={() => setIncomingData(null)}
+        />
+      )}
+
       {/* 左カラム：カレンダー */}
       <div style={{ 
         flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
@@ -260,13 +266,12 @@ function App() {
                             style={{ 
                                 margin: 0, 
                                 fontSize: '1.5em', 
-                                cursor: 'pointer', // 常にポインターを表示
-                                textDecoration: 'underline dotted' // 常に下線を表示
+                                cursor: 'pointer',
+                                textDecoration: 'underline dotted'
                             }}
                             onClick={() => {
-                                // タスクが存在する場合の警告ロジックを追加
                                 if (activeTasks.length > 0) {
-                                    if (!confirm('プロジェクト名を変更した場合、変更後の同一プロジェクト名のみとマージできます。\n変更しますか？')) {
+                                    if (!confirm('プロジェクト名を変更した場合、共有済みの元のプロジェクト名とマージできません。\n変更しますか？')) {
                                         return;
                                     }
                                 }
@@ -288,23 +293,22 @@ function App() {
                     </div>
                 </div>
             </div>
-            <ProjectControls
+            <ProjectControls 
                 onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
                 onExport={() => {
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click();
                 }}
                 onImport={(f) => {
-                const r = new FileReader(); 
-                r.onload = (e) => {
-                    const incoming = JSON.parse(e.target?.result as string) as AppData;
-                    const merged = mergeAppData(data, incoming);
-                    if (merged.projectName !== data.projectName && incoming.projectName !== data.projectName) {
-                        alert(`プロジェクト名が一致しません。\n(現在: ${data.projectName}, 読込先: ${incoming.projectName})`);
-                        return;
-                    }
-                    setData({ ...merged, lastSynced: Date.now() });
-                }; 
-                r.readAsText(f);
+                    const r = new FileReader(); 
+                    r.onload = (e) => {
+                        try {
+                            const incoming = JSON.parse(e.target?.result as string) as AppData;
+                            setIncomingData(incoming);
+                        } catch(err) {
+                            alert('JSONの読み込みに失敗しました');
+                        }
+                    }; 
+                    r.readAsText(f);
                 }}
                 onResetDate={() => confirm('今日を開始日にしますか？') && setData({ ...data, projectStartDate: Date.now(), lastSynced: Date.now() })}
             />
@@ -326,7 +330,7 @@ function App() {
         <div style={{ 
             flex: 1, 
             overflowX: 'auto', 
-            overflowY: 'auto', // 修正: hidden -> auto (縦スクロールを有効化)
+            overflowY: 'auto',
             display: 'flex', 
             gap: '16px', 
             alignItems: 'flex-start',
@@ -351,7 +355,7 @@ function App() {
                       padding: '10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: 'fit-content', // 修正: maxHeight: '100%' を削除し fit-content に変更
+                      height: 'fit-content',
                   }}>
                       <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
                           <TaskItem 
@@ -366,7 +370,7 @@ function App() {
                               onDeadlineChange={(dateStr) => handleUpdateDeadline(root.id, dateStr)}
                           />
                       </div>
-                      <div style={{ paddingLeft: '4px' }}> {/* 修正: overflowY: 'auto', flex: 1 を削除 */}
+                      <div style={{ paddingLeft: '4px' }}>
                           {renderColumnChildren(root.children, 0)}
                       </div>
                   </div>

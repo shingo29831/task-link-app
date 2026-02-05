@@ -4,6 +4,16 @@ import type { AppData, Task } from '../types';
 // 初期状態のプロジェクト名を定義（useAppData.tsのデフォルト値と合わせる）
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 
+// ID生成用ヘルパー (exportを追加)
+export const generateNewId = (tasks: {id: string}[]): string => {
+  let maxIdVal = 0;
+  tasks.forEach(t => {
+    const v = parseInt(t.id, 36);
+    if (!isNaN(v) && v > maxIdVal) maxIdVal = v;
+  });
+  return (maxIdVal + 1).toString(36);
+};
+
 export const mergeAppData = (local: AppData, incoming: AppData): AppData => {
   // 条件: プロジェクト名が異なり、かつローカルが初期名ではない場合のみマージを拒否
   if (local.projectName !== incoming.projectName && local.projectName !== DEFAULT_PROJECT_NAME) {

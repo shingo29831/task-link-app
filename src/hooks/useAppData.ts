@@ -1,3 +1,4 @@
+// src/hooks/useAppData.ts
 import { useState, useEffect, useRef } from 'react';
 import type { AppData } from '../types';
 import { compressData, decompressData } from '../utils/compression';
@@ -8,6 +9,7 @@ const DEFAULT_START = 1577836800000; // 2020-01-01
 
 export const useAppData = () => {
   const [data, setData] = useState<AppData | null>(null);
+  const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
 
   useEffect(() => {
@@ -31,8 +33,9 @@ export const useAppData = () => {
       if (compressed) {
         const incoming = decompressData(compressed);
         if (incoming) {
-          const merged = mergeAppData(localData, incoming);
-          setData(merged);
+          // 自動マージせず、incomingDataにセットしてURLをクリア
+          setIncomingData(incoming);
+          setData(localData);
           window.history.replaceState(null, '', window.location.pathname);
           return;
         }
@@ -54,5 +57,5 @@ export const useAppData = () => {
     return `${window.location.origin}${window.location.pathname}?d=${compressed}`;
   };
 
-  return { data, setData, getShareUrl };
+  return { data, setData, incomingData, setIncomingData, getShareUrl };
 };
