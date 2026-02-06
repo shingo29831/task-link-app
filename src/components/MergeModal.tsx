@@ -84,13 +84,10 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   };
 
   // タスクの内容が一致しているか判定するヘルパー関数
-  // JSON経由の場合、undefinedが欠落したりnullになったりする可能性があるため、緩やかに比較します
   const isContentEqual = (a: Task, b: Task) => {
     const deadlineA = a.deadlineOffset ?? null;
     const deadlineB = b.deadlineOffset ?? null;
     
-    // IDモードの場合は親IDの一致も確認（構造変更の検知）
-    // NAMEモードの場合は親IDは無視（traverseMatchingで構造的にマッチングしているため）
     const parentA = a.parentId ?? null;
     const parentB = b.parentId ?? null;
 
@@ -105,7 +102,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const newRows: ComparisonRow[] = [];
     const getSimpleDisplayName = (t: Task) => t.name;
 
-    // 削除されていないタスクのみを抽出
     const activeLocalTasks = localData.tasks.filter(t => !t.isDeleted);
     const activeIncomingTasks = incomingData.tasks.filter(t => !t.isDeleted);
 
@@ -129,7 +125,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         const remote = remoteMap.get(id);
         
         const parentKey = local?.parentId ?? remote?.parentId;
-        // 両方存在し、内容が一致している場合は Identical とする
         const isIdentical = !!(local && remote && isContentEqual(local, remote));
 
         newRows.push({
@@ -144,7 +139,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
       });
     } else {
       // NAME Mode
-      
       const localChildrenMap = new Map<string, Task[]>();
       activeLocalTasks.forEach(t => {
           const pid = t.parentId ?? 'root';
@@ -197,7 +191,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                }
            });
       };
-      
       traverseMatching(undefined, undefined, undefined);
     }
     
@@ -205,7 +198,106 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   }, [mergeMode, priority, localData, incomingData]);
 
 
-  // 階層構造の計算（表示用）とフィルタリング
+  // 重複マッピングの計算 (RemoteID -> LocalID)
+  // 階層構造を考慮して、Remoteタスクが既存のLocalタスクの重複（ID違い）であるかを判定
+  const duplicateMap = useMemo(() => {
+    if (mergeMode !== 'ID') return new Map<string, string>();
+
+    const mapping = new Map<string, string>();
+    
+    // Helper maps
+    const localTasksById = new Map<string, Task>();
+    const localChildrenMap = new Map<string, Map<string, string>>(); // ParentID -> Name -> ID
+    
+    // Populate Local maps
+    rows.forEach(row => {
+        if (row.local) {
+            localTasksById.set(row.local.id, row.local);
+            const pid = row.local.parentId || 'root';
+            if (!localChildrenMap.has(pid)) localChildrenMap.set(pid, new Map());
+            localChildrenMap.get(pid)!.set(row.local.name, row.local.id);
+        }
+    });
+
+    const remoteTasksById = new Map<string, Task>();
+    rows.forEach(row => {
+        if (row.remote) {
+            remoteTasksById.set(row.remote.id, row.remote);
+        }
+    });
+
+    // Cache for resolved equivalent local ID
+    const resolvedLocalIdCache = new Map<string, string | null>();
+
+    // Function to find equivalent Local ID for a Remote ID
+    const findEquivalentLocalId = (remoteId: string): string | null => {
+        if (resolvedLocalIdCache.has(remoteId)) return resolvedLocalIdCache.get(remoteId)!;
+        
+        // 1. Check if Local exists with same ID (ID Match)
+        if (localTasksById.has(remoteId)) {
+             resolvedLocalIdCache.set(remoteId, remoteId);
+             return remoteId;
+        }
+
+        // 2. Check if it's a Name Duplicate
+        const remoteTask = remoteTasksById.get(remoteId);
+        if (!remoteTask) {
+            resolvedLocalIdCache.set(remoteId, null);
+            return null;
+        }
+
+        const remoteParentId = remoteTask.parentId || 'root';
+        let localParentId: string = 'root';
+
+        if (remoteParentId !== 'root') {
+             // Recursive step: resolve parent
+             const resolvedParent = findEquivalentLocalId(remoteParentId);
+             if (resolvedParent) {
+                 localParentId = resolvedParent;
+             } else {
+                 // 親がRemoteにしかなく、かつLocalに相当するものがない場合、
+                 // このタスクもLocalに相当するものがないとみなす
+                 resolvedLocalIdCache.set(remoteId, null);
+                 return null;
+             }
+        }
+
+        // Now check if localParentId has a child with this name
+        const children = localChildrenMap.get(localParentId);
+        if (children && children.has(remoteTask.name)) {
+            const equivId = children.get(remoteTask.name)!;
+            resolvedLocalIdCache.set(remoteId, equivId);
+            return equivId;
+        }
+
+        resolvedLocalIdCache.set(remoteId, null);
+        return null;
+    };
+
+    // Iterate all Remote tasks (via rows) to set mapping
+    rows.forEach(row => {
+        if (row.remote && !row.local) { // Only check purely remote rows (ID mismatch)
+             const equivId = findEquivalentLocalId(row.remote.id);
+             if (equivId) {
+                 mapping.set(row.remote.id, equivId);
+             }
+        }
+    });
+
+    return mapping;
+  }, [rows, mergeMode]);
+
+  // duplicateMapから警告メッセージMapを生成
+  const duplicateWarnings = useMemo(() => {
+      const warnings = new Map<string, string>();
+      duplicateMap.forEach((_, key) => {
+          warnings.set(key, "重複しているタスク名のためLocalのタスクのみ保持します。");
+      });
+      return warnings;
+  }, [duplicateMap]);
+
+
+  // 階層構造の計算とフィルタリング
   const displayedRows = useMemo(() => {
     const childrenMap = new Map<string, ComparisonRow[]>();
     const roots: ComparisonRow[] = [];
@@ -219,20 +311,22 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
     });
 
-    // フィルタリングのための可視性判定マップ
-    // キー: 行のkey, 値: 表示するかどうか
     const visibilityMap = new Map<string, boolean>();
 
     const checkVisibility = (row: ComparisonRow): boolean => {
         if (visibilityMap.has(row.key)) return visibilityMap.get(row.key)!;
         
-        // 1. 差分がある（一致していない）場合は必ず表示
+        // 重複警告がある場合は必ず表示
+        if (duplicateWarnings.has(row.key)) {
+             visibilityMap.set(row.key, true);
+             return true;
+        }
+
         if (!row.isIdentical) {
             visibilityMap.set(row.key, true);
             return true;
         }
 
-        // 2. 一致している場合でも、子孫に表示すべき行があれば表示（階層維持のため）
         const children = childrenMap.get(row.key) || [];
         const hasVisibleChild = children.some(child => checkVisibility(child));
         
@@ -252,7 +346,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         });
 
         nodes.forEach(node => {
-            // 可視と判定された場合のみリストに追加
             if (checkVisibility(node)) {
                 result.push({ ...node, depth });
                 const children = childrenMap.get(node.key);
@@ -263,7 +356,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
     traverse(roots, 0);
     return result;
-  }, [rows, mergeMode]);
+  }, [rows, mergeMode, duplicateWarnings]);
 
 
   const handleRowActionChange = (key: string, act: ResolveAction) => {
@@ -272,7 +365,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const executeMerge = () => {
     const finalTasks: Task[] = [];
-    const idMap = new Map<string, string>(); // OldRemoteID -> NewLocalID
+    const idMap = new Map<string, string>();
     
     let maxIdVal = 0;
     localData.tasks.forEach(t => {
@@ -283,6 +376,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const generateId = () => { maxIdVal++; return maxIdVal.toString(36); };
 
     rows.forEach(row => {
+        // 重複警告がある場合
+        if (duplicateMap.has(row.key)) {
+             // 重複としてスキップされるタスクのIDを、相当するLocalタスクのIDにマッピングする
+             // これにより、このタスクの子タスクが正しくLocal側の親にぶら下がるようになる
+             idMap.set(row.key, duplicateMap.get(row.key)!);
+             return; 
+        }
+
         if (row.action === 'DELETE') return;
 
         let taskToUse: Task | undefined;
@@ -347,7 +448,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    
                     <select
                         value={mergeMode}
                         onChange={(e) => setMergeMode(e.target.value as MergeMode)}
@@ -392,9 +492,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                 const localDate = row.local ? getDeadlineDisplay(row.local, localData.projectStartDate) : '';
                                 const remoteDate = row.remote ? getDeadlineDisplay(row.remote, incomingData.projectStartDate) : '';
                                 
-                                // 一致しているが子孫のために表示されている行は少し薄くするなどのスタイル
-                                const isContextRow = row.isIdentical;
+                                const isContextRow = row.isIdentical && !duplicateWarnings.has(row.key);
                                 const rowOpacity = isContextRow ? 0.6 : 1;
+                                const warningMsg = duplicateWarnings.get(row.key);
 
                                 return (
                                     <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
@@ -455,15 +555,22 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                             color: row.remote ? `rgba(255,255,255,${rowOpacity})` : '#666' 
                                         }}>
                                             {row.remote && (
-                                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                    {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                                    <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.remote.id}`}>
-                                                        <StatusBadge status={row.remote.status} />
-                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                            <span>{breakText(row.remote.name)}</span>
-                                                            {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.remote.id}`}>
+                                                            <StatusBadge status={row.remote.status} />
+                                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                <span>{breakText(row.remote.name)}</span>
+                                                                {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    {warningMsg && (
+                                                        <div style={{ color: '#ff6b6b', fontSize: '0.8em', marginTop: '4px', marginLeft: `${row.depth * 24}px` }}>
+                                                            ⚠️ {warningMsg}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>
