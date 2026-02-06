@@ -13,10 +13,11 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 
 import { useAppData } from './hooks/useAppData';
-import { useTaskOperations } from './hooks/useTaskOperations'; // 追加
+import { useTaskOperations } from './hooks/useTaskOperations';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
@@ -31,7 +32,6 @@ type TaskNode = Task & { children: TaskNode[] };
 function App() {
   const { data, setData, incomingData, setIncomingData, getShareUrl } = useAppData();
   
-  // ロジックをフックから取得
   const { 
     addTask, 
     deleteTask, 
@@ -47,11 +47,9 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isEditingStartDate, setIsEditingStartDate] = useState(false);
 
-  // TaskInputの状態
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
 
-  // DnD用センサー設定
   const sensors = useSensors(
     useSensor(PointerSensor, {
         activationConstraint: { distance: 5 },
@@ -77,7 +75,6 @@ function App() {
 
   const projectProgress = useMemo(() => {
     if (!data || activeTasks.length === 0) return 0;
-
     const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
     const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
 
@@ -85,7 +82,7 @@ function App() {
     let count = 0;
 
     leafTasks.forEach(t => {
-      if (t.status !== 3) { // 休止(3)は除外
+      if (t.status !== 3) {
         total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
         count++;
       }
@@ -95,26 +92,39 @@ function App() {
     return Math.round(total / count);
   }, [data, activeTasks]);
 
+  const rootNodes = useMemo(() => {
+    if (!data) return [];
+    
+    const buildTree = (tasks: Task[]): TaskNode[] => {
+      const map = new Map<string, TaskNode>();
+      tasks.filter(t => !t.isDeleted).forEach(t => map.set(t.id, { ...t, children: [] }));
+      const roots: TaskNode[] = [];
+      tasks.filter(t => !t.isDeleted).forEach(t => {
+        const node = map.get(t.id)!;
+        if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
+        else roots.push(node);
+      });
+      
+      const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
+      map.forEach(node => node.children.sort(sortFn));
+      roots.sort(sortFn);
+
+      return roots;
+    };
+    
+    return buildTree(data.tasks);
+  }, [data]);
+
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
-  // UIイベントハンドラ（フックの関数を呼び出すラッパー）
   const handleAddTaskWrapper = (targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
 
     let offset: number | undefined;
     if (inputDateStr) {
       const [y, m, d] = inputDateStr.split('-').map(Number);
-      // useTaskOperations内ではdifferenceInCalendarDaysを使うため、ここではDateオブジェクト変換まででも良いが
-      // 既存ロジックに合わせてoffset計算ロジックをフック側へ持たせたため、
-      // ここでは日数計算済みのoffsetを渡すか、日付文字列/Dateを渡す設計にする必要があります。
-      // 今回提供した useTaskOperations の addTask は offset (number) を受け取る仕様なので計算して渡します。
       const targetDate = new Date(y, m - 1, d);
-      // differenceInCalendarDaysはdate-fnsからimportが必要ですが、
-      // ここで計算するよりフック側を「日付文字列を受け取る」ように変更するか、
-      // またはここで計算するのが適切です。
-      // 今回はApp.tsxでもdate-fnsを使っているのでここで計算します。
-      // （※フック側のaddTask実装によりますが、今回はoffset値を受け取る仕様として実装しました）
-       offset = Math.ceil((targetDate.getTime() - data.projectStartDate) / 86400000);
+      offset = Math.ceil((targetDate.getTime() - data.projectStartDate) / 86400000);
     }
 
     addTask(inputTaskName, offset, targetParentId ?? parent?.id);
@@ -134,25 +144,6 @@ function App() {
     } else {
       setParent({ id: node.id, name: node.name });
     }
-  };
-
-  // --- 以下の表示用ヘルパー関数群は、さらに utils/taskTree.ts 等へ切り出し可能です ---
-
-  const buildTree = (tasks: Task[]): TaskNode[] => {
-    const map = new Map<string, TaskNode>();
-    tasks.filter(t => !t.isDeleted).forEach(t => map.set(t.id, { ...t, children: [] }));
-    const roots: TaskNode[] = [];
-    tasks.filter(t => !t.isDeleted).forEach(t => {
-      const node = map.get(t.id)!;
-      if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
-      else roots.push(node);
-    });
-    
-    const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
-    map.forEach(node => node.children.sort(sortFn));
-    roots.sort(sortFn);
-
-    return roots;
   };
 
   const getStrLen = (str: string) => {
@@ -181,7 +172,6 @@ function App() {
     return max;
   };
 
-  // 再帰レンダラー
   const renderColumnChildren = (nodes: TaskNode[], depth = 0) => {
     return (
       <SortableContext 
@@ -192,24 +182,13 @@ function App() {
           <React.Fragment key={n.id}>
             <SortableTaskItem id={n.id}>
                 <TaskItem 
-                  task={n} 
+                  task={n}
+                  tasks={data.tasks} // ★ 追加: tasksを渡す
                   projectStartDate={data.projectStartDate} 
                   depth={depth} 
                   hasChildren={n.children.length > 0}
-                  // ステータス更新はタスク更新として扱う（addTask等を参考にtaskOpsにupdateStatusを追加するか、全保存で対応）
-                  // 今回は簡易的に save を直接呼べないため、taskOpsに汎用的な更新関数を追加するか、
-                  // 既存のタスクリストを受け取って更新する形にする必要があります。
-                  // ※ここでは最も簡単な「status更新用の一時的な対応」として、
-                  // useTaskOperationsに `updateTaskStatus` を追加するのがベストですが、
-                  // 提供済みのコードにないので、App.tsx内でデータ更新をトリガーする必要があります。
-                  // しかし setData はここにあるので、直接更新関数を書くか、
-                  // **提供したuseTaskOperationsに追加の実装が必要**かもしれません。
-                  // 現状の useTaskOperations の仕様に合わせて実装します。
-                  // (後述の補足参照)
                   onStatusChange={(s) => {
                     const newTasks = data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t);
-                    // useTaskOperations内の save は外に公開していないため、
-                    // ここで setData を使って更新します。(saveロジックの再利用のためにはフックに updateStatus があると良い)
                     setData({ ...data, tasks: newTasks, lastSynced: Date.now() });
                   }}
                   onDelete={() => deleteTask(n.id)}
@@ -247,7 +226,6 @@ function App() {
           overflow: 'hidden'
         }}>
           
-          {/* マージモーダル */}
           {incomingData && data && (
             <MergeModal 
                 localData={data} 
@@ -261,7 +239,6 @@ function App() {
             />
           )}
 
-          {/* 左カラム：カレンダー */}
           <div style={{ 
             flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
             display: 'flex', 
@@ -281,7 +258,6 @@ function App() {
             </div>
           </div>
 
-          {/* 右カラム：メインコンテンツ */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -295,18 +271,12 @@ function App() {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '15px' }}>
                             <h1 
-                                style={{ 
-                                    margin: 0, 
-                                    fontSize: '1.5em',
-                                }}
+                                style={{ margin: 0, fontSize: '1.5em' }}
                                 title="クリックしてプロジェクト名を変更"
                             >
                                 TaskLink:
                                 <span 
-                                  style={{ 
-                                    cursor: 'pointer',
-                                    textDecoration: 'underline dotted'
-                                  }}
+                                  style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
                                   onClick={() => {
                                       const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
                                       if (newName && newName.trim()) {
@@ -367,7 +337,6 @@ function App() {
                 />
             </header>
 
-            {/* 入力エリア */}
             <div style={{ marginBottom: '20px' }}>
               {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
               <TaskInput 
@@ -379,7 +348,6 @@ function App() {
               />
             </div>
 
-            {/* カンバンボードエリア */}
             <div style={{ 
                 flex: 1, 
                 overflowX: 'auto', 
@@ -396,47 +364,51 @@ function App() {
               {activeTasks.length === 0 ? (
                 <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
               ) : (
-                buildTree(data.tasks).map(root => {
-                    const colWidth = calculateColumnWidth(root);
-                    return (
-                      <div key={root.id} style={{ 
-                          minWidth: `${colWidth}px`, 
-                          maxWidth: `${colWidth}px`, 
-                          backgroundColor: '#2a2a2a', 
-                          borderRadius: '8px', 
-                          border: '1px solid #444', 
-                          padding: '10px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          height: 'fit-content',
-                      }}>
-                          <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                              <TaskItem 
-                                  task={root} 
-                                  projectStartDate={data.projectStartDate} 
-                                  depth={0} 
-                                  hasChildren={root.children.length > 0}
-                                  // 親タスクのステータス更新も同様にsetDataで対応
-                                  onStatusChange={(s) => {
-                                    const newTasks = data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t);
-                                    setData({ ...data, tasks: newTasks, lastSynced: Date.now() });
-                                  }}
-                                  onDelete={() => deleteTask(root.id)}
-                                  onAddSubTask={() => onTaskItemAddClick(root)}
-                                  onRename={(newName) => renameTask(root.id, newName)}
-                                  onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)}
-                              />
+                <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
+                  {rootNodes.map(root => {
+                      const colWidth = calculateColumnWidth(root);
+                      return (
+                        <SortableTaskItem key={root.id} id={root.id}>
+                          <div style={{ 
+                              minWidth: `${colWidth}px`, 
+                              maxWidth: `${colWidth}px`, 
+                              backgroundColor: '#2a2a2a', 
+                              borderRadius: '8px', 
+                              border: '1px solid #444', 
+                              padding: '10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              height: 'fit-content',
+                              cursor: 'grab'
+                          }}>
+                              <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
+                                  <TaskItem 
+                                      task={root}
+                                      tasks={data.tasks} // ★ 追加: tasksを渡す
+                                      projectStartDate={data.projectStartDate} 
+                                      depth={0} 
+                                      hasChildren={root.children.length > 0}
+                                      onStatusChange={(s) => {
+                                        const newTasks = data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t);
+                                        setData({ ...data, tasks: newTasks, lastSynced: Date.now() });
+                                      }}
+                                      onDelete={() => deleteTask(root.id)}
+                                      onAddSubTask={() => onTaskItemAddClick(root)}
+                                      onRename={(newName) => renameTask(root.id, newName)}
+                                      onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)}
+                                  />
+                              </div>
+                              <div style={{ paddingLeft: '4px', cursor: 'auto' }}>
+                                  {renderColumnChildren(root.children, 0)}
+                              </div>
                           </div>
-                          <div style={{ paddingLeft: '4px' }}>
-                              {renderColumnChildren(root.children, 0)}
-                          </div>
-                      </div>
-                    );
-                })
+                        </SortableTaskItem>
+                      );
+                  })}
+                </SortableContext>
               )}
             </div>
 
-            {/* デバッグ */}
             <div style={{ marginTop: '10px' }}>
               <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
                 {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}

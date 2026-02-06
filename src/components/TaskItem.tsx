@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
+import { useDroppable, useDndContext } from '@dnd-kit/core'; // useDndContextを追加
 import type { Task } from '../types';
 
 // 子要素を持つTaskNode型を定義
@@ -7,6 +8,7 @@ type TaskNode = Task & { children: TaskNode[] };
 
 interface Props {
   task: Task;
+  tasks: Task[]; // 全タスクデータを参照できるように追加
   projectStartDate: number;
   depth: number;
   hasChildren: boolean;
@@ -17,11 +19,40 @@ interface Props {
   onDeadlineChange: (dateStr: string) => void;
 }
 
-export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasChildren, onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange }) => {
+export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth, hasChildren, onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [editName, setEditName] = useState(task.name);
   const [isHovered, setIsHovered] = useState(false);
+
+  const { active } = useDndContext(); // ドラッグ中のアイテム情報を取得
+
+  // ドロップ無効判定ロジック
+  const isDropDisabled = (() => {
+    if (!active) return false;
+    const activeId = String(active.id);
+
+    // 1. 自分自身がドラッグされている場合
+    if (activeId === task.id) return true;
+
+    // 2. ドラッグされているタスクが自分の「祖先」である場合（＝自分がドラッグ中のタスクの子孫である場合）
+    // 親を遡って activeId に到達するかチェック
+    let current = task;
+    while (current.parentId) {
+      if (current.parentId === activeId) return true;
+      const parent = tasks.find(t => t.id === current.parentId);
+      if (!parent) break;
+      current = parent;
+    }
+    return false;
+  })();
+
+  // ドロップ領域の設定
+  const { setNodeRef, isOver } = useDroppable({
+    id: `nest-${task.id}`,
+    data: { type: 'nest', task },
+    disabled: isDropDisabled // 無効化フラグを設定
+  });
 
   const config = { 
     0: { l: '未着手', c: '#888' }, 
@@ -41,7 +72,6 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
     return <span style={{ color, fontSize: '0.8em', marginLeft: '8px' }}>{days < 0 ? `${Math.abs(days)}日超過` : days === 0 ? '今日まで' : `あと${days}日`}</span>;
   };
 
-  // 進捗率を計算する関数
   const calculateProgress = (): number | null => {
     const node = task as unknown as TaskNode;
     if (!node.children || node.children.length === 0) return null;
@@ -50,10 +80,8 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
     let count = 0;
 
     const traverse = (n: TaskNode) => {
-      // 子要素を持たない（リーフ）ノードのみを計算対象とする
       if (!n.children || n.children.length === 0) {
-        if (n.status !== 3) { // 休止は除外
-          // 完了=100%, 進行中=50%, 未着手=0%
+        if (n.status !== 3) {
           total += n.status === 2 ? 100 : n.status === 1 ? 50 : 0;
           count++;
         }
@@ -91,8 +119,33 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
     <div 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #333', marginLeft: `${depth * 24}px` }}
+      style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        padding: '10px 0', 
+        borderBottom: '1px solid #333', 
+        marginLeft: `${depth * 24}px`,
+        position: 'relative'
+      }}
     >
+      {/* 全域枠線用オーバーレイ */}
+      {isOver && !isDropDisabled && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            border: '2px dashed #646cff',
+            boxSizing: 'border-box',
+            pointerEvents: 'none',
+            zIndex: 20,
+            borderRadius: '4px'
+          }}
+        />
+      )}
+
       <button 
         disabled={hasChildren} 
         onClick={() => onStatusChange(((task.status + 1) % 4) as 0|1|2|3)}
@@ -101,7 +154,36 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
         {config.l}
       </button>
       
-      <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+      <div 
+        style={{ 
+          flex: 1, 
+          textAlign: 'left', 
+          wordBreak: 'break-all', 
+          whiteSpace: 'pre-wrap',
+          position: 'relative',
+          backgroundColor: 'transparent',
+          borderRadius: '4px',
+          padding: '2px',
+        }}
+      >
+        {/* ドロップ判定用エリア（右1/3） */}
+        <div
+            ref={setNodeRef}
+            style={{
+                position: 'absolute',
+                top: 0,
+                right: 0, 
+                width: '33%', // 右1/3
+                height: '100%',
+                pointerEvents: 'none',
+                backgroundColor: isOver && !isDropDisabled ? '#2a2a2a' : 'transparent', 
+                backgroundImage: isOver && !isDropDisabled ? 'linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05))' : 'none',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s',
+                zIndex: 10,
+            }}
+        />
+
         {isEditing ? (
           <input 
             type="text"
@@ -137,7 +219,6 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
             >
               {task.name}
             </span>
-            {/* 進捗率表示 */}
             {progress !== null && (
               <span style={{ fontSize: '0.8em', color: '#aaa', marginLeft: '8px', fontWeight: 'normal' }}>
                 ({progress}%)

@@ -33,7 +33,6 @@ const recalculateStatus = (tasks: Task[]): Task[] => {
 
 export const useTaskOperations = (data: AppData | null, setData: (data: AppData) => void) => {
   
-  // データを保存する共通処理（ステータス再計算を含む）
   const save = useCallback((newTasks: Task[]) => {
     if (!data) return;
     setData({
@@ -43,13 +42,11 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  // タスクの追加
   const addTask = useCallback((name: string, offset?: number, parentId?: string) => {
     if (!data) return;
 
     const normalizedName = name;
     
-    // 重複チェック
     const isDuplicate = data.tasks.some(t =>
       !t.isDeleted &&
       t.parentId === parentId &&
@@ -87,7 +84,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     }
   }, [data, save]);
 
-  // タスクの削除
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
 
@@ -116,7 +112,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     save(newTasks);
   }, [data, save]);
 
-  // タスク名の変更
   const renameTask = useCallback((id: string, newName: string) => {
     if (!data || !newName.trim()) return;
     
@@ -141,7 +136,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     save(newTasks);
   }, [data, save]);
 
-  // 期限の更新
   const updateTaskDeadline = useCallback((id: string, dateStr: string) => {
     if (!data) return;
 
@@ -160,13 +154,13 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     save(newTasks);
   }, [data, save]);
 
-  // プロジェクト開始日の更新
   const updateProjectStartDate = useCallback((dateStr: string) => {
     if (!dateStr || !data) return;
     
     const [y, m, d] = dateStr.split('-').map(Number);
     const newStartDate = new Date(y, m - 1, d).getTime();
 
+    // 修正箇所: 不要な行を削除しました
     const diffDays = differenceInCalendarDays(newStartDate, data.projectStartDate);
 
     const newTasks = data.tasks.map(t => {
@@ -186,7 +180,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  // データの最適化
   const optimizeData = useCallback(() => {
     if (!data) return;
 
@@ -233,25 +226,24 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       return;
     }
 
+    // ネスト移動判定
+    const overIdStr = String(over.id);
+    const isNestDrop = overIdStr.startsWith('nest-');
+    const targetIdRaw = isNestDrop ? overIdStr.replace('nest-', '') : overIdStr;
+
     const activeTask = data.tasks.find(t => t.id === active.id);
-    const overTask = data.tasks.find(t => t.id === over.id);
+    const overTask = data.tasks.find(t => t.id === targetIdRaw);
 
     if (!activeTask || !overTask) return;
 
-    // 移動先の親ID候補
-    const nextParentId = overTask.parentId;
+    // ネストドロップならターゲット自体が親、そうでなければターゲットの親が親
+    const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
 
-    // --- 自己参照・循環参照の防止ロジック ---
-
-    // 1. 移動先の親が「自分自身」である場合
-    // (例: 自分の子タスクの上にドロップして、その兄弟になろうとした場合など)
+    // --- 循環参照防止ロジック ---
     if (nextParentId === activeTask.id) {
-      // 親IDが自分のIDになる変更は不正なので、処理を中断して元の状態を維持する
       return;
     }
 
-    // 2. 移動先の親が「自分の子孫」である場合 (循環参照)
-    // 階層を遡ってチェックする
     let currentCheckId = nextParentId;
     let isCircular = false;
     while (currentCheckId) {
@@ -266,37 +258,47 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     if (isCircular) {
       return;
     }
-    // ----------------------------------------
+    // -------------------------
 
     const newTasks = [...data.tasks];
 
-    // 1. 親IDの更新 (階層移動の場合)
+    // 親IDの更新
     if (activeTask.parentId !== nextParentId) {
       const taskIndex = newTasks.findIndex(t => t.id === active.id);
       newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: nextParentId };
     }
 
-    // 2. 順序の並び替え
+    // 順序の並び替え
     const siblings = newTasks
       .filter(t => !t.isDeleted && t.parentId === nextParentId)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    const oldIndex = siblings.findIndex(t => t.id === active.id);
-    const newIndex = siblings.findIndex(t => t.id === over.id);
+    if (!isNestDrop) {
+      const oldIndex = siblings.findIndex(t => t.id === active.id);
+      const newIndex = siblings.findIndex(t => t.id === targetIdRaw);
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const reorderedSiblings = arrayMove(siblings, oldIndex, newIndex);
-
-      // order値を再割り当て
-      reorderedSiblings.forEach((t, index) => {
-        const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
-        if (globalIndex !== -1) {
-          newTasks[globalIndex] = { ...newTasks[globalIndex], order: index + 1, lastUpdated: Date.now() };
-        }
-      });
-
-      save(newTasks);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedSiblings = arrayMove(siblings, oldIndex, newIndex);
+        reorderedSiblings.forEach((t, idx) => {
+           const globalIdx = newTasks.findIndex(nt => nt.id === t.id);
+           if (globalIdx > -1) {
+             newTasks[globalIdx] = { ...newTasks[globalIdx], order: idx + 1 };
+           }
+        });
+        save(newTasks);
+        return;
+      }
     }
+
+    // order再割り当て
+    siblings.forEach((t, index) => {
+      const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
+      if (globalIndex !== -1) {
+        newTasks[globalIndex] = { ...newTasks[globalIndex], order: index + 1, lastUpdated: Date.now() };
+      }
+    });
+
+    save(newTasks);
   }, [data, save]);
 
   return {
