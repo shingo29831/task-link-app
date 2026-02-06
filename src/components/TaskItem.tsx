@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react'; // useMemoを追加
 import { format, addDays, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext } from '@dnd-kit/core'; 
 import type { Task } from '../types';
@@ -65,7 +65,21 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
     ? differenceInCalendarDays(addDays(projectStartDate, task.deadlineOffset), new Date())
     : null;
     
-  const isUrgent = task.status !== 2 && daysRemaining !== null && daysRemaining <= 1;
+  // 変更: 自身または子孫タスクが緊急かどうかの判定 (再帰)
+  const isUrgent = useMemo(() => {
+    const checkRecursive = (t: Task): boolean => {
+        // 自身の判定
+        if (t.status !== 2 && t.deadlineOffset !== undefined) {
+            const d = addDays(projectStartDate, t.deadlineOffset);
+            const diff = differenceInCalendarDays(d, new Date());
+            if (diff <= 1) return true;
+        }
+        // 子タスクの判定
+        const children = tasks.filter(c => !c.isDeleted && c.parentId === t.id);
+        return children.some(checkRecursive);
+    };
+    return checkRecursive(task);
+  }, [task, tasks, projectStartDate]);
 
   const getDeadline = () => {
     if (daysRemaining === null) return null;
