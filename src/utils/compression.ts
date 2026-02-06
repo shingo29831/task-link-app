@@ -78,11 +78,23 @@ export const getIntermediateJson = (data: AppData): string => {
   
   const tasksStr = data.tasks.map(t => {
     if (t.isDeleted) return "[";
-    const status = t.status === 0 ? "" : t.status;
-    const deadline = (t.deadlineOffset === 0 || t.deadlineOffset === undefined) ? "" : t.deadlineOffset;
-    const updated = Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN).toString(36);
-    const parent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;
-    return `[${preProcess(t.name)},${status},${deadline},${updated},${parent}`;
+    
+    // 値の定義: [タスク名, 並び順, updated, parent, status, deadline]
+    const vName = preProcess(t.name);
+    const vOrder = (t.order && t.order !== 0) ? t.order.toString(36) : ""; // 0または未定義は空文字
+    const vUpdated = Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN).toString(36);
+    const vParent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;
+    const vStatus = t.status === 0 ? "" : t.status.toString();
+    const vDeadline = (t.deadlineOffset === 0 || t.deadlineOffset === undefined) ? "" : t.deadlineOffset.toString();
+
+    const parts = [vName, vOrder, vUpdated, vParent, vStatus, vDeadline];
+
+    // 右端から空文字を削除（カンマごと消す）
+    while (parts.length > 0 && parts[parts.length - 1] === "") {
+      parts.pop();
+    }
+
+    return "[" + parts.join(",");
   }).join('');
 
   return `${preProcess(data.projectName)},${start}${tasksStr}]${end}`;
@@ -128,15 +140,33 @@ export const decompressData = (compressed: string): AppData | null => {
       tasks: taskStrings.map((tStr, index) => {
         const id = (index + 1).toString(36);
         if (tStr === "") return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
+        
         const parts = tStr.split(',');
+        
+        // 構造: [name, order, updated, parent, status, deadline]
+        const name = postProcess(parts[0]);
+        const orderVal = parts[1] ? parseInt(parts[1], 36) : 0;
+        const order = isNaN(orderVal) ? 0 : orderVal;
+        
+        const updatedVal = parts[2] ? parseInt(parts[2], 36) : 0;
+        const lastUpdated = (updatedVal + EPOCH_2020_MIN) * 60000;
+        
+        const parentId = (parts[3] && parts[3] !== "") ? parts[3] : undefined;
+        
+        const statusVal = parts[4] ? Number(parts[4]) : 0;
+        const status = (isNaN(statusVal) ? 0 : statusVal) as 0|1|2|3;
+        
+        const deadlineVal = parts[5] ? Number(parts[5]) : undefined;
+        const deadlineOffset = (deadlineVal !== undefined && !isNaN(deadlineVal)) ? deadlineVal : undefined;
+
         return {
           id,
-          // 復元された文字列をそのまま使用
-          name: postProcess(parts[0]), 
-          status: (parts[1] === "" ? 0 : Number(parts[1])) as 0|1|2|3,
-          deadlineOffset: parts[2] === "" ? undefined : Number(parts[2]),
-          lastUpdated: (parseInt(parts[3], 36) + EPOCH_2020_MIN) * 60000,
-          parentId: parts[4] === "" ? undefined : parts[4]
+          name,
+          status,
+          deadlineOffset,
+          lastUpdated,
+          parentId,
+          order
         };
       }),
       lastSynced: lastSynced

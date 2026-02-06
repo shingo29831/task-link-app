@@ -7,6 +7,7 @@ export interface Task {
   lastUpdated: number; 
   parentId?: string;   
   isDeleted?: boolean;
+  order?: number; // 追加: 並び順
 }
 
 export interface AppData {
