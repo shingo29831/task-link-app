@@ -1,5 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { differenceInCalendarDays, format } from 'date-fns';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  TouchSensor, 
+  useSensor, 
+  useSensors, 
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core'; // 修正: 型のみのインポートに変更
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+
 import { useAppData } from './hooks/useAppData';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
@@ -8,6 +25,7 @@ import { TaskCalendar } from './components/TaskCalendar';
 import type { Task, AppData } from './types';
 import { getIntermediateJson, compressData } from './utils/compression';
 import { MergeModal } from './components/MergeModal';
+import { SortableTaskItem } from './components/SortableTaskItem';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -21,6 +39,21 @@ function App() {
   // TaskInputの状態をAppにリフトアップ
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
+
+  // DnD用センサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+        // マウス等のポインター: 距離5px移動でドラッグ開始（誤操作防止）
+        activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+        // タッチ操作: 250msの長押しでドラッグ開始
+        activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const debugInfo = useMemo(() => {
     if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
@@ -100,6 +133,11 @@ function App() {
     // リセット時は ID を "1" に、そうでなければ従来のロジック
     const newId = shouldReset ? "1" : (data.tasks.length + 1).toString(36);
 
+    // 同じ親を持つ兄弟タスクの中で最大のorderを探す
+    const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === targetParentId);
+    const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+    const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
+
     const newTask: Task = { 
       id: newId, 
       name: normalizedName,
@@ -108,7 +146,7 @@ function App() {
       lastUpdated: Date.now(), 
       // リセット時は親タスクも存在し得ないため undefined を強制
       parentId: shouldReset ? undefined : targetParentId,
-      order: data.tasks.length // 追加: 現在のタスク数をオーダーとして設定
+      order: shouldReset ? 1 : nextOrder // リセット時は1、それ以外は兄弟の末尾
     };
 
     // リセット時はこれまでの data.tasks を捨てて newTask のみの配列で上書きする
@@ -141,7 +179,7 @@ function App() {
       children.forEach(c => stack.push(c.id));
     }
 
-    // フラグ更新
+    // フラグ更新 (修正: 変数名をnewTasksに修正)
     const newTasks = data.tasks.map(t => 
       idsToDelete.has(t.id) 
         ? { ...t, isDeleted: true, lastUpdated: Date.now() } 
@@ -198,6 +236,7 @@ function App() {
     const [y, m, d] = dateStr.split('-').map(Number);
     const newStartDate = new Date(y, m - 1, d).getTime();
 
+    // 修正: 変数名をdiffDaysに修正
     const diffDays = differenceInCalendarDays(newStartDate, data.projectStartDate);
 
     const newTasks = data.tasks.map(t => {
@@ -278,6 +317,60 @@ function App() {
     alert('最適化が完了しました。');
   };
 
+  // -------------------------
+  // DnD Handlers
+  // -------------------------
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // 操作対象のタスク
+    const activeTask = data.tasks.find(t => t.id === active.id);
+    const overTask = data.tasks.find(t => t.id === over.id);
+
+    if (!activeTask || !overTask) return;
+
+    // 移動先の親ID（overされたタスクと同じ階層へ移動）
+    const targetParentId = overTask.parentId;
+
+    // データ更新
+    const newTasks = [...data.tasks];
+    
+    // 1. 親IDの更新 (階層移動の場合)
+    if (activeTask.parentId !== targetParentId) {
+       const taskIndex = newTasks.findIndex(t => t.id === active.id);
+       newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: targetParentId };
+    }
+
+    // 2. 順序の並び替え
+    // 同じ親を持つタスクのリストを取得
+    const siblings = newTasks
+        .filter(t => !t.isDeleted && t.parentId === targetParentId)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    const oldIndex = siblings.findIndex(t => t.id === active.id);
+    const newIndex = siblings.findIndex(t => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+        // 配列内での移動
+        const reorderedSiblings = arrayMove(siblings, oldIndex, newIndex);
+        
+        // order値を再割り当て（1から連番）
+        reorderedSiblings.forEach((t, index) => {
+            const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
+            if (globalIndex !== -1) {
+                newTasks[globalIndex] = { ...newTasks[globalIndex], order: index + 1, lastUpdated: Date.now() };
+            }
+        });
+        
+        save(newTasks);
+    }
+  };
+
+
   const onTaskItemAddClick = (node: TaskNode) => {
     if (inputTaskName.trim()) {
       handleAddTask(node.id);
@@ -295,6 +388,12 @@ function App() {
       if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
       else roots.push(node);
     });
+    
+    // ソート処理: order順
+    const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
+    map.forEach(node => node.children.sort(sortFn));
+    roots.sort(sortFn);
+
     return roots;
   };
 
@@ -324,238 +423,262 @@ function App() {
     return max;
   };
 
-  const renderColumnChildren = (nodes: TaskNode[], depth = 0) => nodes.map(n => (
-    <React.Fragment key={n.id}>
-      <TaskItem 
-        task={n} 
-        projectStartDate={data.projectStartDate} 
-        depth={depth} 
-        hasChildren={n.children.length > 0}
-        onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
-        onDelete={() => handleDeleteTask(n.id)}
-        onAddSubTask={() => onTaskItemAddClick(n)}
-        onRename={(newName) => handleRenameTask(n.id, newName)}
-        onDeadlineChange={(dateStr) => handleUpdateDeadline(n.id, dateStr)}
-      />
-      {renderColumnChildren(n.children, depth + 1)}
-    </React.Fragment>
-  ));
+  // DnD対応の再帰レンダラー
+  const renderColumnChildren = (nodes: TaskNode[], depth = 0) => {
+    return (
+      <SortableContext 
+        items={nodes.map(n => n.id)} 
+        strategy={verticalListSortingStrategy}
+      >
+        {nodes.map(n => (
+          <React.Fragment key={n.id}>
+            {/* SortableTaskItemでラップすることでドラッグ可能にする */}
+            <SortableTaskItem id={n.id}>
+                <TaskItem 
+                  task={n} 
+                  projectStartDate={data.projectStartDate} 
+                  depth={depth} 
+                  hasChildren={n.children.length > 0}
+                  onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
+                  onDelete={() => handleDeleteTask(n.id)}
+                  onAddSubTask={() => onTaskItemAddClick(n)}
+                  onRename={(newName) => handleRenameTask(n.id, newName)}
+                  onDeadlineChange={(dateStr) => handleUpdateDeadline(n.id, dateStr)}
+                />
+                {/* 子供のコンテナ（親と一緒に移動するためSortableTaskItemの中に含める） */}
+                {n.children.length > 0 && (
+                    <div style={{ paddingLeft: '0px' }}>
+                        {renderColumnChildren(n.children, depth + 1)}
+                    </div>
+                )}
+            </SortableTaskItem>
+          </React.Fragment>
+        ))}
+      </SortableContext>
+    );
+  };
 
   return (
-    <div style={{ 
-      maxWidth: '100%', 
-      margin: '0 auto', 
-      padding: '20px', 
-      display: 'flex', 
-      flexDirection: 'row', 
-      gap: showSidebar ? '20px' : '0', 
-      height: '100vh', 
-      boxSizing: 'border-box',
-      overflow: 'hidden'
-    }}>
-      
-      {/* マージモーダル */}
-      {incomingData && data && (
-        <MergeModal 
-            localData={data} 
-            incomingData={incomingData} 
-            onConfirm={(merged) => {
-                setData(merged);
-                setIncomingData(null);
-                alert('マージが完了しました');
-            }}
-            onCancel={() => setIncomingData(null)}
-        />
-      )}
-
-      {/* 左カラム：カレンダー */}
-      <div style={{ 
-        flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
-        display: 'flex', 
-        flexDirection: 'column',
-        overflow: 'hidden',
-        transition: 'flex 0.3s ease, opacity 0.3s ease',
-        opacity: showSidebar ? 1 : 0,
-        pointerEvents: showSidebar ? 'auto' : 'none',
-        minWidth: showSidebar ? '300px' : '0'
-      }}>
-        <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-            <TaskCalendar 
-              tasks={data.tasks} 
-              projectStartDate={data.projectStartDate}
+    <DndContext 
+      sensors={sensors} 
+      collisionDetection={closestCenter} 
+      onDragEnd={handleDragEnd}
+    >
+        <div style={{ 
+          maxWidth: '100%', 
+          margin: '0 auto', 
+          padding: '20px', 
+          display: 'flex', 
+          flexDirection: 'row', 
+          gap: showSidebar ? '20px' : '0', 
+          height: '100vh', 
+          boxSizing: 'border-box',
+          overflow: 'hidden'
+        }}>
+          
+          {/* マージモーダル */}
+          {incomingData && data && (
+            <MergeModal 
+                localData={data} 
+                incomingData={incomingData} 
+                onConfirm={(merged) => {
+                    setData(merged);
+                    setIncomingData(null);
+                    alert('マージが完了しました');
+                }}
+                onCancel={() => setIncomingData(null)}
             />
-        </div>
-      </div>
+          )}
 
-      {/* 右カラム：メインコンテンツ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <button 
-                  onClick={() => setShowSidebar(!showSidebar)} 
-                  style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }}
-                  title={showSidebar ? "カレンダーを隠す" : "カレンダーを表示"}
-                >
-                  📅
-                </button>
-                <div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '15px' }}>
-                        <h1 
-                            style={{ 
-                                margin: 0, 
-                                fontSize: '1.5em',
-                            }}
-                            title="クリックしてプロジェクト名を変更"
-                        >
-                            TaskLink:
-                            <span 
-                              style={{ 
-                                cursor: 'pointer',
-                                textDecoration: 'underline dotted'
-                              }}
-                              onClick={() => {
-                                  // 警告なしで直接変更
-                                  const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
-                                  if (newName && newName.trim()) {
-                                      setData({ ...data, projectName: newName, lastSynced: Date.now() });
-                                  }
-                              }}
+          {/* 左カラム：カレンダー */}
+          <div style={{ 
+            flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
+            display: 'flex', 
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transition: 'flex 0.3s ease, opacity 0.3s ease',
+            opacity: showSidebar ? 1 : 0,
+            pointerEvents: showSidebar ? 'auto' : 'none',
+            minWidth: showSidebar ? '300px' : '0'
+          }}>
+            <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+                <TaskCalendar 
+                  tasks={data.tasks} 
+                  projectStartDate={data.projectStartDate}
+                />
+            </div>
+          </div>
+
+          {/* 右カラム：メインコンテンツ */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <button 
+                      onClick={() => setShowSidebar(!showSidebar)} 
+                      style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }}
+                      title={showSidebar ? "カレンダーを隠す" : "カレンダーを表示"}
+                    >
+                      📅
+                    </button>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '15px' }}>
+                            <h1 
+                                style={{ 
+                                    margin: 0, 
+                                    fontSize: '1.5em',
+                                }}
+                                title="クリックしてプロジェクト名を変更"
                             >
-                              {data.projectName}
-                            </span> 
-                        </h1>
-                        <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>
-                            (全進捗: {projectProgress}%)
-                        </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                      {isEditingStartDate ? (
-                        <input
-                          type="date"
-                          value={format(data.projectStartDate, 'yyyy-MM-dd')}
-                          onChange={(e) => handleUpdateStartDate(e.target.value)}
-                          onBlur={() => setIsEditingStartDate(false)}
-                          autoFocus
-                          style={{ fontSize: '0.8em', color: '#888', background: 'transparent', border: '1px solid #555', borderRadius: '4px', colorScheme: 'dark' }}
-                        />
-                      ) : (
-                        <span 
-                          onClick={() => setIsEditingStartDate(true)}
-                          style={{ color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline dotted' }}
-                          title="クリックして開始日を変更"
-                        >
-                          開始: {new Date(data.projectStartDate).toLocaleDateString()}
-                        </span>
-                      )}
+                                TaskLink:
+                                <span 
+                                  style={{ 
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline dotted'
+                                  }}
+                                  onClick={() => {
+                                      // 警告なしで直接変更
+                                      const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
+                                      if (newName && newName.trim()) {
+                                          setData({ ...data, projectName: newName, lastSynced: Date.now() });
+                                      }
+                                  }}
+                                >
+                                  {data.projectName}
+                                </span> 
+                            </h1>
+                            <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>
+                                (全進捗: {projectProgress}%)
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                          {isEditingStartDate ? (
+                            <input
+                              type="date"
+                              value={format(data.projectStartDate, 'yyyy-MM-dd')}
+                              onChange={(e) => handleUpdateStartDate(e.target.value)}
+                              onBlur={() => setIsEditingStartDate(false)}
+                              autoFocus
+                              style={{ fontSize: '0.8em', color: '#888', background: 'transparent', border: '1px solid #555', borderRadius: '4px', colorScheme: 'dark' }}
+                            />
+                          ) : (
+                            <span 
+                              onClick={() => setIsEditingStartDate(true)}
+                              style={{ color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline dotted' }}
+                              title="クリックして開始日を変更"
+                            >
+                              開始: {new Date(data.projectStartDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                     </div>
                 </div>
+                <ProjectControls 
+                    onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
+                    onExport={() => {
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click();
+                    }}
+                    onImport={(f) => {
+                        const r = new FileReader(); 
+                        r.onload = (e) => {
+                            try {
+                                const incoming = JSON.parse(e.target?.result as string) as AppData;
+                                setIncomingData(incoming);
+                            } catch(err) {
+                                alert('JSONの読み込みに失敗しました');
+                            }
+                        }; 
+                        r.readAsText(f);
+                    }}
+                    onOptimize={handleOptimize}
+                />
+            </header>
+
+            {/* 入力エリア */}
+            <div style={{ marginBottom: '20px' }}>
+              {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
+              <TaskInput 
+                taskName={inputTaskName}
+                setTaskName={setInputTaskName}
+                dateStr={inputDateStr}
+                setDateStr={setInputDateStr}
+                onSubmit={() => handleAddTask()}
+              />
             </div>
-            <ProjectControls 
-                onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
-                onExport={() => {
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click();
-                }}
-                onImport={(f) => {
-                    const r = new FileReader(); 
-                    r.onload = (e) => {
-                        try {
-                            const incoming = JSON.parse(e.target?.result as string) as AppData;
-                            setIncomingData(incoming);
-                        } catch(err) {
-                            alert('JSONの読み込みに失敗しました');
-                        }
-                    }; 
-                    r.readAsText(f);
-                }}
-                onOptimize={handleOptimize}
-            />
-        </header>
 
-        {/* 入力エリア */}
-        <div style={{ marginBottom: '20px' }}>
-          {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
-          <TaskInput 
-            taskName={inputTaskName}
-            setTaskName={setInputTaskName}
-            dateStr={inputDateStr}
-            setDateStr={setInputDateStr}
-            onSubmit={() => handleAddTask()}
-          />
-        </div>
-
-        {/* カンバンボードエリア */}
-        <div style={{ 
-            flex: 1, 
-            overflowX: 'auto', 
-            overflowY: 'auto',
-            display: 'flex', 
-            gap: '16px', 
-            alignItems: 'flex-start',
-            paddingBottom: '20px',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            padding: '16px',
-            backgroundColor: '#1e1e1e'
-        }}>
-          {activeTasks.length === 0 ? (
-            <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
-          ) : (
-            buildTree(data.tasks).map(root => {
-                const colWidth = calculateColumnWidth(root);
-                return (
-                  <div key={root.id} style={{ 
-                      minWidth: `${colWidth}px`, 
-                      maxWidth: `${colWidth}px`, 
-                      backgroundColor: '#2a2a2a', 
-                      borderRadius: '8px', 
-                      border: '1px solid #444', 
-                      padding: '10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      height: 'fit-content',
-                  }}>
-                      <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                          <TaskItem 
-                              task={root} 
-                              projectStartDate={data.projectStartDate} 
-                              depth={0} 
-                              hasChildren={root.children.length > 0}
-                              onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
-                              onDelete={() => handleDeleteTask(root.id)}
-                              onAddSubTask={() => onTaskItemAddClick(root)}
-                              onRename={(newName) => handleRenameTask(root.id, newName)}
-                              onDeadlineChange={(dateStr) => handleUpdateDeadline(root.id, dateStr)}
-                          />
+            {/* カンバンボードエリア */}
+            <div style={{ 
+                flex: 1, 
+                overflowX: 'auto', 
+                overflowY: 'auto',
+                display: 'flex', 
+                gap: '16px', 
+                alignItems: 'flex-start',
+                paddingBottom: '20px',
+                border: '1px solid #333',
+                borderRadius: '8px',
+                padding: '16px',
+                backgroundColor: '#1e1e1e'
+            }}>
+              {activeTasks.length === 0 ? (
+                <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
+              ) : (
+                buildTree(data.tasks).map(root => {
+                    const colWidth = calculateColumnWidth(root);
+                    return (
+                      <div key={root.id} style={{ 
+                          minWidth: `${colWidth}px`, 
+                          maxWidth: `${colWidth}px`, 
+                          backgroundColor: '#2a2a2a', 
+                          borderRadius: '8px', 
+                          border: '1px solid #444', 
+                          padding: '10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          height: 'fit-content',
+                      }}>
+                          <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
+                              <TaskItem 
+                                  task={root} 
+                                  projectStartDate={data.projectStartDate} 
+                                  depth={0} 
+                                  hasChildren={root.children.length > 0}
+                                  onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
+                                  onDelete={() => handleDeleteTask(root.id)}
+                                  onAddSubTask={() => onTaskItemAddClick(root)}
+                                  onRename={(newName) => handleRenameTask(root.id, newName)}
+                                  onDeadlineChange={(dateStr) => handleUpdateDeadline(root.id, dateStr)}
+                              />
+                          </div>
+                          <div style={{ paddingLeft: '4px' }}>
+                              {renderColumnChildren(root.children, 0)}
+                          </div>
                       </div>
-                      <div style={{ paddingLeft: '4px' }}>
-                          {renderColumnChildren(root.children, 0)}
-                      </div>
-                  </div>
-                );
-            })
-          )}
-        </div>
-
-        {/* デバッグ */}
-        <div style={{ marginTop: '10px' }}>
-          <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
-            {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
-          </button>
-          {showDebug && (
-            <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
-              <p><b>プロジェクト名:</b> {data.projectName}</p>
-              <p><b>1. 圧縮直前データ:</b></p>
-              <code style={{ wordBreak: 'break-all', color: '#888' }}>
-                {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
-              </code>
-              <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後:</b></p>
-              <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
+                    );
+                })
+              )}
             </div>
-          )}
+
+            {/* デバッグ */}
+            <div style={{ marginTop: '10px' }}>
+              <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
+                {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
+              </button>
+              {showDebug && (
+                <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
+                  <p><b>プロジェクト名:</b> {data.projectName}</p>
+                  <p><b>1. 圧縮直前データ:</b></p>
+                  <code style={{ wordBreak: 'break-all', color: '#888' }}>
+                    {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
+                  </code>
+                  <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後:</b></p>
+                  <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+    </DndContext>
   );
 }
 
