@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addDays } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addDays, differenceInCalendarDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
-import { TaskDetailModal } from './TaskDetailModal'; // 追加
+import { TaskDetailModal } from './TaskDetailModal';
 
 interface Props {
   projectStartDate: number;
@@ -11,7 +11,6 @@ interface Props {
 
 export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  // 選択された日付とタスクを管理するステートを追加
   const [selectedDay, setSelectedDay] = useState<{ date: Date, tasks: Task[] } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
@@ -30,11 +29,14 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
      });
   };
 
-  const MAX_DISPLAY_TASKS = 5; // カレンダー上に表示する最大件数
+  const MAX_DISPLAY_TASKS = 5;
+
+  // 今日の日付を取得（時間情報は除去）
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return (
     <div style={{ backgroundColor: '#2a2a2a', borderRadius: '8px', padding: '15px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' }}>
-        {/* Header 等はそのまま */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ padding: '4px 8px', minWidth: 'auto' }}>&lt;</button>
             <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{format(currentMonth, 'yyyy年 M月', { locale: ja })}</span>
@@ -54,7 +56,7 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
                 return (
                     <div 
                         key={kq} 
-                        onClick={() => setSelectedDay({ date: day, tasks: dayTasks })} // クリックイベント追加
+                        onClick={() => setSelectedDay({ date: day, tasks: dayTasks })} 
                         style={{ 
                             minHeight: '130px', minWidth: 0,
                             backgroundColor: isCurrentMonth ? '#333' : '#222', 
@@ -63,31 +65,46 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
                             borderRadius: '4px',
                             opacity: isCurrentMonth ? 1 : 0.4,
                             display: 'flex', flexDirection: 'column',
-                            cursor: 'pointer', overflow: 'hidden' // cursor追加
+                            cursor: 'pointer', overflow: 'hidden'
                         }}
                     >
                         <div style={{ textAlign: 'right', fontSize: '0.9em', color: isToday ? '#646cff' : '#aaa', marginBottom: '4px' }}>
                             {format(day, 'd')}
                         </div>
                         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {/* 表示件数を制限 */}
-                            {dayTasks.slice(0, MAX_DISPLAY_TASKS).map(t => (
-                                <div key={t.id} style={{ 
-                                    fontSize: '0.9em', 
-                                    backgroundColor: t.status === 2 ? '#28a745' : t.status === 3 ? '#6f42c1' : '#007bff', 
-                                    color: '#fff', 
-                                    borderRadius: '2px', 
-                                    padding: '1px 3px',
-                                    whiteSpace: 'nowrap', 
-                                    overflow: 'hidden', 
-                                    textOverflow: 'ellipsis',
-                                    // 以下の行を追加: 完了(2)の場合に取り消し線を適用
-                                    textDecoration: t.status === 2 ? 'line-through' : 'none'
-                                }}>
-                                    {t.name}
-                                </div>
-                            ))}
-                            {/* 省略された場合の「他○件」表示 */}
+                            {dayTasks.slice(0, MAX_DISPLAY_TASKS).map(t => {
+                                // 期限切れ判定ロジック
+                                const deadline = addDays(projectStartDate, t.deadlineOffset!);
+                                const diffDays = differenceInCalendarDays(deadline, today);
+                                // 完了(2)以外で、期限が明日(1)以下なら強調
+                                const isUrgent = t.status !== 2 && diffDays <= 1;
+
+                                // 背景色決定
+                                let bgColor = '#007bff'; // Default: 進行中など
+                                if (t.status === 2) bgColor = '#28a745'; // 完了
+                                else if (t.status === 3) bgColor = '#6f42c1'; // 休止
+                                
+                                // 強調表示の場合は赤系（完了以外）
+                                if (isUrgent) {
+                                    bgColor = '#e53935'; // 赤
+                                }
+
+                                return (
+                                    <div key={t.id} style={{ 
+                                        fontSize: '0.9em', 
+                                        backgroundColor: bgColor, 
+                                        color: '#fff', 
+                                        borderRadius: '2px', 
+                                        padding: '1px 3px',
+                                        whiteSpace: 'nowrap', 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis',
+                                        textDecoration: t.status === 2 ? 'line-through' : 'none'
+                                    }}>
+                                        {t.name}
+                                    </div>
+                                );
+                            })}
                             {dayTasks.length > MAX_DISPLAY_TASKS && (
                                 <div style={{ fontSize: '0.75em', color: '#888', textAlign: 'center' }}>
                                     他{dayTasks.length - MAX_DISPLAY_TASKS}件...
@@ -99,7 +116,6 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
             })}
         </div>
 
-        {/* モーダルの表示 */}
         {selectedDay && (
             <TaskDetailModal 
                 date={selectedDay.date} 

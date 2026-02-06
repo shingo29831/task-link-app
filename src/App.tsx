@@ -84,6 +84,21 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isEditingStartDate, setIsEditingStartDate] = useState(false);
 
+  // 開閉状態管理（折りたたまれているIDを保持）
+  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+
+  const toggleNodeExpansion = useCallback((nodeId: string) => {
+    setCollapsedNodeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  }, []);
+
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
 
@@ -200,8 +215,6 @@ function App() {
     let count = 0;
 
     leafTasks.forEach(t => {
-      // 変更点: 休止中(3)も分母に含め、進捗0%としてカウントする
-      // 元のコード: if (t.status !== 3) { ... }
       total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
       count++;
     });
@@ -250,14 +263,17 @@ function App() {
   };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 220;
+    const BASE_WIDTH = 220; // 基本幅
     const INDENT_WIDTH = 24;
     const CHAR_WIDTH_PX = 12;
+    const DEADLINE_WIDTH = 80; // 期限日表示用の追加幅
 
     const len = getStrLen(node.name);
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
+    // 期限日が設定されている場合は幅を追加
+    const extraWidth = node.deadlineOffset !== undefined ? DEADLINE_WIDTH : 0;
     
-    let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth;
+    let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth + extraWidth;
 
     if (node.children) {
       for (const child of node.children) {
@@ -287,8 +303,10 @@ function App() {
                   onAddSubTask={() => onTaskItemAddClick(n)}
                   onRename={(newName) => renameTask(n.id, newName)}
                   onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)}
+                  isExpanded={!collapsedNodeIds.has(n.id)}
+                  onToggleExpand={() => toggleNodeExpansion(n.id)}
                 />
-                {n.children.length > 0 && (
+                {n.children.length > 0 && !collapsedNodeIds.has(n.id) && (
                     <div style={{ paddingLeft: '0px' }}>
                         {renderColumnChildren(n.children, depth + 1)}
                     </div>
@@ -470,10 +488,12 @@ function App() {
                                       onAddSubTask={() => onTaskItemAddClick(root)}
                                       onRename={(newName) => renameTask(root.id, newName)}
                                       onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)}
+                                      isExpanded={!collapsedNodeIds.has(root.id)}
+                                      onToggleExpand={() => toggleNodeExpansion(root.id)}
                                   />
                               </div>
                               <div style={{ paddingLeft: '4px', cursor: 'auto' }}>
-                                  {renderColumnChildren(root.children, 0)}
+                                  {!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}
                               </div>
                           </div>
                         </SortableTaskItem>
