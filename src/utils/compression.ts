@@ -7,11 +7,6 @@ const EPOCH_2020_MIN = 26297280;
 const HIRAGANA_START = 0x3041;
 const MAPPING_START = 0x0080;
 
-// 追加: カタカナの開始位置 (ァ: U+30A1)
-const KATAKANA_START = 0x30A1;
-// 追加: カタカナのマッピング先 (Latin Extended-A: U+0100〜)
-const KATAKANA_MAPPING_START = 0x0100;
-
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 
 // 区切り文字の一時退避用コード（制御文字）
@@ -49,26 +44,20 @@ const preProcess = (str: string): string => {
            .replace(/,/g,  ESCAPE_MAP[',']);
 
   // 4. ひらがなのシフト
-  res = res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
-
-  // 5. カタカナのシフト (追加)
-  // [ァ-ヶ] (U+30A1 - U+30F6) と 長音符「ー」(U+30FC) を対象にします
-  return res.replace(/[ァ-ヶー]/g, (c) => String.fromCharCode(c.charCodeAt(0) - KATAKANA_START + KATAKANA_MAPPING_START));
+  // カタカナは効果が薄いため対象外としました
+  return res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
 };
 
 const postProcess = (str: string): string => {
-  // 1. ひらがなのアンシフト (U+0080 - U+00FF: Latin-1 Supplement)
+  // 1. ひらがなのアンシフト
   let res = str.replace(/[\u0080-\u00FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - MAPPING_START + HIRAGANA_START));
 
-  // 2. カタカナのアンシフト (追加) (U+0100 - U+017F: Latin Extended-A)
-  res = res.replace(/[\u0100-\u017F]/g, (c) => String.fromCharCode(c.charCodeAt(0) - KATAKANA_MAPPING_START + KATAKANA_START));
-
-  // 3. 特殊文字を元の半角区切り文字に戻す
+  // 2. 特殊文字を元の半角区切り文字に戻す
   res = res.replace(new RegExp(ESCAPE_MAP['['], 'g'), '[')
            .replace(new RegExp(ESCAPE_MAP[']'], 'g'), ']')
            .replace(new RegExp(ESCAPE_MAP[','], 'g'), ',');
 
-  // 4. 辞書の復元とアンエスケープ
+  // 3. 辞書の復元とアンエスケープ
   const reverseDict:Record<string, string> = {};
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => reverseDict[v] = k);
 
