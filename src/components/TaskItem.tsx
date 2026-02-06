@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
-import { useDroppable, useDndContext } from '@dnd-kit/core'; // useDndContextを追加
+import { useDroppable, useDndContext } from '@dnd-kit/core'; 
 import type { Task } from '../types';
 
-// 子要素を持つTaskNode型を定義
 type TaskNode = Task & { children: TaskNode[] };
 
 interface Props {
   task: Task;
-  tasks: Task[]; // 全タスクデータを参照できるように追加
+  tasks: Task[]; 
   projectStartDate: number;
   depth: number;
   hasChildren: boolean;
@@ -25,18 +24,14 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
   const [editName, setEditName] = useState(task.name);
   const [isHovered, setIsHovered] = useState(false);
 
-  const { active } = useDndContext(); // ドラッグ中のアイテム情報を取得
+  const { active } = useDndContext(); 
 
-  // ドロップ無効判定ロジック
   const isDropDisabled = (() => {
     if (!active) return false;
     const activeId = String(active.id);
 
-    // 1. 自分自身がドラッグされている場合
     if (activeId === task.id) return true;
 
-    // 2. ドラッグされているタスクが自分の「祖先」である場合（＝自分がドラッグ中のタスクの子孫である場合）
-    // 親を遡って activeId に到達するかチェック
     let current = task;
     while (current.parentId) {
       if (current.parentId === activeId) return true;
@@ -47,11 +42,10 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
     return false;
   })();
 
-  // ドロップ領域の設定
   const { setNodeRef, isOver } = useDroppable({
     id: `nest-${task.id}`,
     data: { type: 'nest', task },
-    disabled: isDropDisabled // 無効化フラグを設定
+    disabled: isDropDisabled 
   });
 
   const config = { 
@@ -81,10 +75,10 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
 
     const traverse = (n: TaskNode) => {
       if (!n.children || n.children.length === 0) {
-        if (n.status !== 3) {
-          total += n.status === 2 ? 100 : n.status === 1 ? 50 : 0;
-          count++;
-        }
+        // 変更点: 休止中(3)も分母に含め、進捗0%としてカウントする
+        // 元のコード: if (n.status !== 3) { ... }
+        total += n.status === 2 ? 100 : n.status === 1 ? 50 : 0;
+        count++;
       } else {
         n.children.forEach(traverse);
       }
@@ -128,7 +122,6 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
         position: 'relative'
       }}
     >
-      {/* 全域枠線用オーバーレイ */}
       {isOver && !isDropDisabled && (
         <div 
           style={{
@@ -166,20 +159,18 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, projectStartDate, depth
           padding: '2px',
         }}
       >
-        {/* ドロップ判定用エリア（背景色変更ロジックを削除） */}
         <div
             ref={setNodeRef}
             style={{
                 position: 'absolute',
                 top: 0,
-                // depthが0（トップレベル）の場合は中央1/3、それ以外は右1/3
                 left: depth === 0 ? '10%' : 'auto', 
                 right: depth === 0 ? 'auto' : 0, 
                 width: '80%',
                 height: '100%',
                 pointerEvents: 'none',
-                backgroundColor: 'transparent', // 常に透明
-                backgroundImage: 'none',        // 画像なし
+                backgroundColor: 'transparent', 
+                backgroundImage: 'none',        
                 borderRadius: '4px',
                 zIndex: 10,
             }}

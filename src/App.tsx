@@ -9,7 +9,7 @@ import {
   useSensor, 
   useSensors, 
   pointerWithin,
-  useDroppable, // 追加
+  useDroppable, 
   type CollisionDetection,
 } from '@dnd-kit/core';
 import {
@@ -32,7 +32,7 @@ import { SortableTaskItem } from './components/SortableTaskItem';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-// ボード領域コンポーネント (追加)
+// ボード領域コンポーネント
 const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activeTasks: Task[] }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
@@ -49,13 +49,12 @@ const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activ
         gap: '16px', 
         alignItems: 'flex-start',
         paddingBottom: '20px',
-        // 判定内であれば破線にする
         border: isOver ? '2px dashed #646cff' : '1px solid #333',
         borderRadius: '8px',
         padding: '16px',
         backgroundColor: '#1e1e1e',
         transition: 'border 0.2s',
-        minHeight: '200px' // 空の時もドロップしやすいように高さを確保
+        minHeight: '200px'
     }}>
       {activeTasks.length === 0 ? (
         <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
@@ -73,6 +72,7 @@ function App() {
     addTask, 
     deleteTask, 
     renameTask, 
+    updateTaskStatus, 
     updateTaskDeadline, 
     updateProjectStartDate, 
     optimizeData, 
@@ -129,7 +129,6 @@ function App() {
     return buildTree(data.tasks);
   }, [data]);
 
-  // カスタム衝突判定
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { pointerCoordinates } = args;
 
@@ -144,7 +143,6 @@ function App() {
 
     const pointerCollisions = pointerWithin(args);
     
-    // 1. ネスト領域最優先
     const nestCollisions = pointerCollisions.filter((collision) => 
       String(collision.id).startsWith('nest-')
     );
@@ -152,7 +150,6 @@ function App() {
       return nestCollisions;
     }
 
-    // 2. トップレベルの並び替え制御
     const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
 
     if (sortableCollisions.length > 0) {
@@ -177,10 +174,8 @@ function App() {
       }
     }
 
-    // 3. 標準のclosestCenter判定
     const collisions = closestCenter(args);
 
-    // 4. closestCenterで何もヒットしない場合（空き領域など）、pointerWithinでroot-boardを探す
     if (collisions.length === 0) {
         const board = pointerCollisions.find(c => c.id === 'root-board');
         if (board) return [board];
@@ -205,10 +200,10 @@ function App() {
     let count = 0;
 
     leafTasks.forEach(t => {
-      if (t.status !== 3) {
-        total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
-        count++;
-      }
+      // 変更点: 休止中(3)も分母に含め、進捗0%としてカウントする
+      // 元のコード: if (t.status !== 3) { ... }
+      total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
+      count++;
     });
 
     if (count === 0) return 0;
@@ -287,10 +282,7 @@ function App() {
                   projectStartDate={data.projectStartDate} 
                   depth={depth} 
                   hasChildren={n.children.length > 0}
-                  onStatusChange={(s) => {
-                    const newTasks = data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t);
-                    setData({ ...data, tasks: newTasks, lastSynced: Date.now() });
-                  }}
+                  onStatusChange={(s) => updateTaskStatus(n.id, s)} 
                   onDelete={() => deleteTask(n.id)}
                   onAddSubTask={() => onTaskItemAddClick(n)}
                   onRename={(newName) => renameTask(n.id, newName)}
@@ -448,7 +440,6 @@ function App() {
               />
             </div>
             
-            {/* BoardAreaを使用するように変更 */}
             <BoardArea activeTasks={activeTasks}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodes.map(root => {
@@ -474,10 +465,7 @@ function App() {
                                       projectStartDate={data.projectStartDate} 
                                       depth={0} 
                                       hasChildren={root.children.length > 0}
-                                      onStatusChange={(s) => {
-                                        const newTasks = data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t);
-                                        setData({ ...data, tasks: newTasks, lastSynced: Date.now() });
-                                      }}
+                                      onStatusChange={(s) => updateTaskStatus(root.id, s)} 
                                       onDelete={() => deleteTask(root.id)}
                                       onAddSubTask={() => onTaskItemAddClick(root)}
                                       onRename={(newName) => renameTask(root.id, newName)}
