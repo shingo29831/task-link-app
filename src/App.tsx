@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { useAppData } from './hooks/useAppData';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
@@ -16,6 +16,7 @@ function App() {
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [isEditingStartDate, setIsEditingStartDate] = useState(false);
 
   // TaskInputの状態をAppにリフトアップ
   const [inputTaskName, setInputTaskName] = useState('');
@@ -143,6 +144,14 @@ function App() {
       t.id === id ? { ...t, deadlineOffset: offset, lastUpdated: Date.now() } : t
     );
     save(newTasks);
+  };
+
+  const handleUpdateStartDate = (dateStr: string) => {
+    if (!dateStr || !data) return;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const newStartDate = new Date(y, m - 1, d).getTime();
+    setData({ ...data, projectStartDate: newStartDate, lastSynced: Date.now() });
+    setIsEditingStartDate(false);
   };
 
   const handleAddTask = (targetParentId?: string) => {
@@ -286,31 +295,54 @@ function App() {
                         <h1 
                             style={{ 
                                 margin: 0, 
-                                fontSize: '1.5em', 
-                                cursor: 'pointer',
-                                textDecoration: 'underline dotted'
-                            }}
-                            onClick={() => {
-                                if (activeTasks.length > 0) {
-                                    if (!confirm('プロジェクト名を変更した場合、共有済みの元のプロジェクト名とマージできません。\n変更しますか？')) {
-                                        return;
-                                    }
-                                }
-                                const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
-                                if (newName && newName.trim()) {
-                                    setData({ ...data, projectName: newName, lastSynced: Date.now() });
-                                }
+                                fontSize: '1.5em',
                             }}
                             title="クリックしてプロジェクト名を変更"
                         >
-                            TaskLink: {data.projectName}
+                            TaskLink:
+                            <span 
+                              style={{ 
+                                cursor: 'pointer',
+                                textDecoration: 'underline dotted'
+                              }}
+                              onClick={() => {
+                                  if (activeTasks.length > 0) {
+                                      if (!confirm('プロジェクト名を変更した場合、共有済みの元のプロジェクト名とマージできません。\n変更しますか？')) {
+                                          return;
+                                      }
+                                  }
+                                  const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
+                                  if (newName && newName.trim()) {
+                                      setData({ ...data, projectName: newName, lastSynced: Date.now() });
+                                  }
+                              }}
+                            >
+                              {data.projectName}
+                            </span> 
                         </h1>
                         <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>
                             (全進捗: {projectProgress}%)
                         </span>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                      <span style={{ color: '#888', fontSize: '0.8em' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
+                      {isEditingStartDate ? (
+                        <input
+                          type="date"
+                          value={format(data.projectStartDate, 'yyyy-MM-dd')}
+                          onChange={(e) => handleUpdateStartDate(e.target.value)}
+                          onBlur={() => setIsEditingStartDate(false)}
+                          autoFocus
+                          style={{ fontSize: '0.8em', color: '#888', background: 'transparent', border: '1px solid #555', borderRadius: '4px', colorScheme: 'dark' }}
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => setIsEditingStartDate(true)}
+                          style={{ color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline dotted' }}
+                          title="クリックして開始日を変更"
+                        >
+                          開始: {new Date(data.projectStartDate).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                 </div>
             </div>
@@ -331,7 +363,6 @@ function App() {
                     }; 
                     r.readAsText(f);
                 }}
-                onResetDate={() => confirm('今日を開始日にしますか？') && setData({ ...data, projectStartDate: Date.now(), lastSynced: Date.now() })}
             />
         </header>
 

@@ -4,10 +4,9 @@ interface Props {
   onCopyLink: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
-  onResetDate: () => void;
 }
 
-export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onResetDate }) => {
+export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,9 +45,6 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         onChange={handleFileChange} 
       />
 
-      <button onClick={onResetDate} style={{ marginLeft: 'auto', fontSize: '0.8em', backgroundColor: 'transparent', border: '1px solid #555' }}>
-        開始日を今日に更新
-      </button>
     </div>
   );
 };
