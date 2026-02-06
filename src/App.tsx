@@ -82,11 +82,11 @@ function App() {
     const normalizedName = name; 
     const targetParentId = explicitParentId ?? parent?.id;
 
-    // 重複チェック: 同じ親を持つタスクの中で同名のものがないか確認
+    // 重複チェック
     const isDuplicate = data.tasks.some(t => 
       !t.isDeleted &&
-      t.parentId === targetParentId && // 親が同じ
-      t.name === normalizedName        // 名前が一致
+      t.parentId === targetParentId && 
+      t.name === normalizedName        
     );
 
     if (isDuplicate) {
@@ -107,20 +107,50 @@ function App() {
     setParent(null);
   };
 
+  const handleDeleteTask = (taskId: string) => {
+    const targetTask = data.tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
+
+    // 指定されたメッセージ形式に変更
+    const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
+
+    if (!confirm(message)) return;
+
+    // 削除対象のID（自身とすべての子孫）を収集
+    const idsToDelete = new Set<string>();
+    const stack = [taskId];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      idsToDelete.add(currentId);
+      // 子タスクを検索してスタックに追加
+      const children = data.tasks.filter(t => !t.isDeleted && t.parentId === currentId);
+      children.forEach(c => stack.push(c.id));
+    }
+
+    // フラグ更新
+    const newTasks = data.tasks.map(t => 
+      idsToDelete.has(t.id) 
+        ? { ...t, isDeleted: true, lastUpdated: Date.now() } 
+        : t
+    );
+
+    save(newTasks);
+  };
+
   const handleRenameTask = (id: string, newName: string) => {
     if (!newName.trim()) return;
     const normalizedName = newName; 
 
-    // リネーム対象のタスクを探して親IDを取得
     const targetTask = data.tasks.find(t => t.id === id);
     if (!targetTask) return;
 
-    // 重複チェック: 同じ親を持つ兄弟タスク（自分以外）で同名のものがないか
+    // 重複チェック
     const isDuplicate = data.tasks.some(t => 
       !t.isDeleted &&
-      t.id !== id &&                   // 自分自身は除外
-      t.parentId === targetTask.parentId && // 親が同じ
-      t.name === normalizedName        // 名前が一致
+      t.id !== id &&                   
+      t.parentId === targetTask.parentId && 
+      t.name === normalizedName        
     );
 
     if (isDuplicate) {
@@ -244,7 +274,7 @@ function App() {
         depth={depth} 
         hasChildren={n.children.length > 0}
         onStatusChange={(s) => save(data.tasks.map(t => t.id === n.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
-        onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === n.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
+        onDelete={() => handleDeleteTask(n.id)}
         onAddSubTask={() => onTaskItemAddClick(n)}
         onRename={(newName) => handleRenameTask(n.id, newName)}
         onDeadlineChange={(dateStr) => handleUpdateDeadline(n.id, dateStr)}
@@ -433,7 +463,7 @@ function App() {
                               depth={0} 
                               hasChildren={root.children.length > 0}
                               onStatusChange={(s) => save(data.tasks.map(t => t.id === root.id ? { ...t, status: s, lastUpdated: Date.now() } : t))}
-                              onDelete={() => confirm('削除しますか？') && save(data.tasks.map(t => t.id === root.id ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t))}
+                              onDelete={() => handleDeleteTask(root.id)}
                               onAddSubTask={() => onTaskItemAddClick(root)}
                               onRename={(newName) => handleRenameTask(root.id, newName)}
                               onDeadlineChange={(dateStr) => handleUpdateDeadline(root.id, dateStr)}
