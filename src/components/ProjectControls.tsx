@@ -4,9 +4,10 @@ interface Props {
   onCopyLink: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onOptimize: () => void; // 追加: 最適化ボタン用コールバック
 }
 
-export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport}) => {
+export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onOptimize }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,6 +38,11 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
       <button onClick={() => fileInputRef.current?.click()} style={{ backgroundColor: '#333' }}>
         ⬆ ファイル読込
       </button>
+
+      <button onClick={onOptimize} style={{ backgroundColor: '#d9534f' }} title="削除済みデータを完全消去してIDを整理します">
+        🧹 リンク最適化
+      </button>
+
       <input 
         type="file" 
         accept=".json" 

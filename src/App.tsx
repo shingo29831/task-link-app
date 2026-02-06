@@ -94,16 +94,28 @@ function App() {
       return;
     }
 
-    const newId = (data.tasks.length + 1).toString(36);
+    // 有効なタスクが1つもない場合は初期化（リセット）を行う
+    const shouldReset = activeTasks.length === 0;
+
+    // リセット時は ID を "1" に、そうでなければ従来のロジック
+    const newId = shouldReset ? "1" : (data.tasks.length + 1).toString(36);
+
     const newTask: Task = { 
       id: newId, 
       name: normalizedName,
       status: 0, 
       deadlineOffset: offset || undefined, 
       lastUpdated: Date.now(), 
-      parentId: targetParentId 
+      // リセット時は親タスクも存在し得ないため undefined を強制
+      parentId: shouldReset ? undefined : targetParentId 
     };
-    save([...data.tasks, newTask]);
+
+    // リセット時はこれまでの data.tasks を捨てて newTask のみの配列で上書きする
+    if (shouldReset) {
+      save([newTask]);
+    } else {
+      save([...data.tasks, newTask]);
+    }
     setParent(null);
   };
 
@@ -218,6 +230,51 @@ function App() {
     addTask(inputTaskName, offset, targetParentId);
     setInputTaskName('');
     setInputDateStr('');
+  };
+
+  const handleOptimize = () => {
+    if (!data) return;
+    
+    // アラートで確認
+    if (!confirm('削除情報のキャッシュをクリアします。\nIDがずれる代わりにデータが最適化されます。')) {
+      return;
+    }
+
+    // 1. 削除されていないタスクのみ抽出
+    const validTasks = data.tasks.filter(t => !t.isDeleted);
+
+    if (validTasks.length === 0) {
+      // 全て削除済みの場合は空でリセット
+      setData({ ...data, tasks: [], lastSynced: Date.now() });
+      return;
+    }
+
+    // 2. 旧ID -> 新ID のマッピングを作成
+    const idMap = new Map<string, string>();
+    validTasks.forEach((t, index) => {
+      // IDを 1 から連番(36進数)で振り直す
+      idMap.set(t.id, (index + 1).toString(36));
+    });
+
+    // 3. タスクのIDとParentIDを新しいものに更新
+    const optimizedTasks = validTasks.map(t => {
+      const newId = idMap.get(t.id)!;
+      // 親IDが存在し、かつ親も削除されていなければ新しいIDに置き換える
+      const newParentId = (t.parentId && idMap.has(t.parentId)) 
+        ? idMap.get(t.parentId) 
+        : undefined; // 親が削除されていた場合はルートになる
+
+      return {
+        ...t,
+        id: newId,
+        parentId: newParentId,
+        lastUpdated: Date.now()
+      };
+    });
+
+    // 4. 保存
+    setData({ ...data, tasks: optimizedTasks, lastSynced: Date.now() });
+    alert('最適化が完了しました。');
   };
 
   const onTaskItemAddClick = (node: TaskNode) => {
@@ -410,6 +467,7 @@ function App() {
                     }; 
                     r.readAsText(f);
                 }}
+                onOptimize={handleOptimize}
             />
         </header>
 
