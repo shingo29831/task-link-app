@@ -108,7 +108,7 @@ function App() {
       lastUpdated: Date.now(), 
       // リセット時は親タスクも存在し得ないため undefined を強制
       parentId: shouldReset ? undefined : targetParentId,
-      order: data.tasks.length // 追加: 並び順の初期値 (配列の長さを使用)
+      order: data.tasks.length // 追加: 現在のタスク数をオーダーとして設定
     };
 
     // リセット時はこれまでの data.tasks を捨てて newTask のみの配列で上書きする
