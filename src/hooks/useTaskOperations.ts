@@ -160,7 +160,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     const [y, m, d] = dateStr.split('-').map(Number);
     const newStartDate = new Date(y, m - 1, d).getTime();
 
-    // 修正箇所: 不要な行を削除しました
     const diffDays = differenceInCalendarDays(newStartDate, data.projectStartDate);
 
     const newTasks = data.tasks.map(t => {
@@ -222,7 +221,31 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     if (!data) return;
     const { active, over } = event;
 
-    if (!over || active.id === over.id) {
+    if (!over) {
+      return;
+    }
+
+    // --- 追加: ルートボードへのドロップ判定 ---
+    if (over.id === 'root-board') {
+        const activeIdStr = String(active.id);
+        const task = data.tasks.find(t => t.id === activeIdStr);
+        if (task && task.parentId !== undefined) {
+             // ルートタスク化
+             const rootTasks = data.tasks.filter(t => !t.isDeleted && !t.parentId);
+             const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+
+             const newTasks = data.tasks.map(t => 
+                t.id === activeIdStr 
+                ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() }
+                : t
+             );
+             save(newTasks);
+        }
+        return;
+    }
+    // ------------------------------------
+
+    if (active.id === over.id) {
       return;
     }
 

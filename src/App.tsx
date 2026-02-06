@@ -9,6 +9,7 @@ import {
   useSensor, 
   useSensors, 
   pointerWithin,
+  useDroppable, // 追加
   type CollisionDetection,
 } from '@dnd-kit/core';
 import {
@@ -31,6 +32,40 @@ import { SortableTaskItem } from './components/SortableTaskItem';
 
 type TaskNode = Task & { children: TaskNode[] };
 
+// ボード領域コンポーネント (追加)
+const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activeTasks: Task[] }) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'root-board',
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      style={{ 
+        flex: 1, 
+        overflowX: 'auto', 
+        overflowY: 'auto',
+        display: 'flex', 
+        gap: '16px', 
+        alignItems: 'flex-start',
+        paddingBottom: '20px',
+        // 判定内であれば破線にする
+        border: isOver ? '2px dashed #646cff' : '1px solid #333',
+        borderRadius: '8px',
+        padding: '16px',
+        backgroundColor: '#1e1e1e',
+        transition: 'border 0.2s',
+        minHeight: '200px' // 空の時もドロップしやすいように高さを確保
+    }}>
+      {activeTasks.length === 0 ? (
+        <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
+      ) : (
+        children
+      )}
+    </div>
+  );
+};
+
 function App() {
   const { data, setData, incomingData, setIncomingData, getShareUrl } = useAppData();
   
@@ -52,7 +87,6 @@ function App() {
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
 
-  // 移動方向判定用のRef
   const lastPointerX = useRef<number | null>(null);
   const moveDirection = useRef<'left' | 'right' | null>(null);
 
@@ -68,99 +102,9 @@ function App() {
     })
   );
 
-  // カスタム衝突判定
-  const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const { pointerCoordinates } = args;
-
-    // 1. 移動方向の判定
-    if (pointerCoordinates) {
-      if (lastPointerX.current !== null) {
-        const diff = pointerCoordinates.x - lastPointerX.current;
-        if (diff > 0) moveDirection.current = 'right';
-        else if (diff < 0) moveDirection.current = 'left';
-      }
-      lastPointerX.current = pointerCoordinates.x;
-    }
-
-    // 2. ポインタ直下の衝突(重なり)を取得
-    const pointerCollisions = pointerWithin(args);
-    
-    // 3. ネスト領域 (nest-xxx) があれば最優先で返す
-    const nestCollisions = pointerCollisions.filter((collision) => 
-      String(collision.id).startsWith('nest-')
-    );
-    if (nestCollisions.length > 0) {
-      return nestCollisions;
-    }
-
-    // 4. トップレベルの並び替え制御
-    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
-
-    if (sortableCollisions.length > 0) {
-      const target = sortableCollisions[0];
-      const targetData = target.data?.droppableContainer?.data?.current;
-
-      // トップレベルタスク(depth === 0)の場合のみ、特殊な判定を行う
-      if (targetData && targetData.depth === 0) {
-        const rect = target.data?.droppableContainer?.rect?.current;
-        
-        if (rect && pointerCoordinates) {
-            // 左端からの相対位置(0.0 ~ 1.0)
-            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
-            const direction = moveDirection.current;
-
-            // 右へ移動中: ターゲットの左端〜中央(〜66%)にいる間は並び替えをブロック
-            // (右端の33%ゾーンに入って初めてスワップ)
-            if (direction === 'right') {
-                if (relativeX < 0.80) {
-                    return [];
-                }
-            }
-            // 左へ移動中: ターゲットの右端〜中央(33%〜)にいる間は並び替えをブロック
-            // (左端の33%ゾーンに入って初めてスワップ)
-            else if (direction === 'left') {
-                if (relativeX > 0.20) {
-                    return [];
-                }
-            }
-        }
-        return sortableCollisions;
-      }
-    }
-
-    // 5. それ以外は標準のclosestCenterを使用
-    return closestCenter(args);
-  }, []);
-
-  const debugInfo = useMemo(() => {
-    if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
-    const before = getIntermediateJson(data);
-    const after = compressData(data);
-    return { before, after, beforeLen: before.length, afterLen: after.length };
-  }, [data]);
-
   const activeTasks = useMemo(() => {
     return data ? data.tasks.filter(t => !t.isDeleted) : [];
   }, [data]);
-
-  const projectProgress = useMemo(() => {
-    if (!data || activeTasks.length === 0) return 0;
-    const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
-    const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
-
-    let total = 0;
-    let count = 0;
-
-    leafTasks.forEach(t => {
-      if (t.status !== 3) {
-        total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
-        count++;
-      }
-    });
-
-    if (count === 0) return 0;
-    return Math.round(total / count);
-  }, [data, activeTasks]);
 
   const rootNodes = useMemo(() => {
     if (!data) return [];
@@ -184,6 +128,92 @@ function App() {
     
     return buildTree(data.tasks);
   }, [data]);
+
+  // カスタム衝突判定
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const { pointerCoordinates } = args;
+
+    if (pointerCoordinates) {
+      if (lastPointerX.current !== null) {
+        const diff = pointerCoordinates.x - lastPointerX.current;
+        if (diff > 0) moveDirection.current = 'right';
+        else if (diff < 0) moveDirection.current = 'left';
+      }
+      lastPointerX.current = pointerCoordinates.x;
+    }
+
+    const pointerCollisions = pointerWithin(args);
+    
+    // 1. ネスト領域最優先
+    const nestCollisions = pointerCollisions.filter((collision) => 
+      String(collision.id).startsWith('nest-')
+    );
+    if (nestCollisions.length > 0) {
+      return nestCollisions;
+    }
+
+    // 2. トップレベルの並び替え制御
+    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
+
+    if (sortableCollisions.length > 0) {
+      const target = sortableCollisions[0];
+      const targetData = target.data?.droppableContainer?.data?.current;
+
+      if (targetData && targetData.depth === 0) {
+        const rect = target.data?.droppableContainer?.rect?.current;
+        
+        if (rect && pointerCoordinates) {
+            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
+            const direction = moveDirection.current;
+
+            if (direction === 'right') {
+                if (relativeX < 0.85) return [];
+            }
+            else if (direction === 'left') {
+                if (relativeX > 0.15) return [];
+            }
+        }
+        return sortableCollisions;
+      }
+    }
+
+    // 3. 標準のclosestCenter判定
+    const collisions = closestCenter(args);
+
+    // 4. closestCenterで何もヒットしない場合（空き領域など）、pointerWithinでroot-boardを探す
+    if (collisions.length === 0) {
+        const board = pointerCollisions.find(c => c.id === 'root-board');
+        if (board) return [board];
+    }
+
+    return collisions;
+  }, []);
+
+  const debugInfo = useMemo(() => {
+    if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
+    const before = getIntermediateJson(data);
+    const after = compressData(data);
+    return { before, after, beforeLen: before.length, afterLen: after.length };
+  }, [data]);
+
+  const projectProgress = useMemo(() => {
+    if (!data || activeTasks.length === 0) return 0;
+    const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
+    const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
+
+    let total = 0;
+    let count = 0;
+
+    leafTasks.forEach(t => {
+      if (t.status !== 3) {
+        total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
+        count++;
+      }
+    });
+
+    if (count === 0) return 0;
+    return Math.round(total / count);
+  }, [data, activeTasks]);
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -417,24 +447,10 @@ function App() {
                 onSubmit={() => handleAddTaskWrapper()}
               />
             </div>
-
-            <div style={{ 
-                flex: 1, 
-                overflowX: 'auto', 
-                overflowY: 'auto',
-                display: 'flex', 
-                gap: '16px', 
-                alignItems: 'flex-start',
-                paddingBottom: '20px',
-                border: '1px solid #333',
-                borderRadius: '8px',
-                padding: '16px',
-                backgroundColor: '#1e1e1e'
-            }}>
-              {activeTasks.length === 0 ? (
-                <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
-              ) : (
-                <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
+            
+            {/* BoardAreaを使用するように変更 */}
+            <BoardArea activeTasks={activeTasks}>
+              <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodes.map(root => {
                       const colWidth = calculateColumnWidth(root);
                       return (
@@ -475,9 +491,8 @@ function App() {
                         </SortableTaskItem>
                       );
                   })}
-                </SortableContext>
-              )}
-            </div>
+              </SortableContext>
+            </BoardArea>
 
             <div style={{ marginTop: '10px' }}>
               <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>
