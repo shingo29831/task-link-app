@@ -55,8 +55,6 @@ function App() {
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
-  // canEditProjectName logic is handled inside onClick now
-
   const recalculate = (tasks: Task[]): Task[] => {
     const next = [...tasks];
     let changed = true;
@@ -81,9 +79,8 @@ function App() {
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
   const addTask = (name: string, offset?: number, explicitParentId?: string) => {
-    const normalizedName = name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
-      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
+    // 正規化処理を削除し、入力された文字をそのまま使用
+    const normalizedName = name; 
 
     const targetParentId = explicitParentId ?? parent?.id;
 
@@ -116,13 +113,8 @@ function App() {
 
   const handleRenameTask = (id: string, newName: string) => {
     if (!newName.trim()) return;
-    const normalizedName = newName.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
-      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    
-    // リネーム時にも重複チェックが必要な場合はここに追加できますが、
-    // 今回は「作成できないように」との指示なので追加時は必須です。
-    // 必要であればここにも同様のチェックを追加してください。
+    // 正規化処理を削除し、入力された文字をそのまま使用
+    const normalizedName = newName; 
 
     const newTasks = data.tasks.map(t => 
       t.id === id ? { ...t, name: normalizedName, lastUpdated: Date.now() } : t
@@ -150,7 +142,24 @@ function App() {
     if (!dateStr || !data) return;
     const [y, m, d] = dateStr.split('-').map(Number);
     const newStartDate = new Date(y, m - 1, d).getTime();
-    setData({ ...data, projectStartDate: newStartDate, lastSynced: Date.now() });
+
+    const diffDays = differenceInCalendarDays(newStartDate, data.projectStartDate);
+
+    const newTasks = data.tasks.map(t => {
+      if (t.deadlineOffset === undefined) return t;
+      return {
+        ...t,
+        deadlineOffset: t.deadlineOffset - diffDays,
+        lastUpdated: Date.now()
+      };
+    });
+
+    setData({ 
+      ...data, 
+      projectStartDate: newStartDate, 
+      tasks: newTasks,
+      lastSynced: Date.now() 
+    });
     setIsEditingStartDate(false);
   };
 
@@ -245,7 +254,7 @@ function App() {
       overflow: 'hidden'
     }}>
       
-      {/* マージモーダル: incomingDataが存在する場合に表示 */}
+      {/* マージモーダル */}
       {incomingData && data && (
         <MergeModal 
             localData={data} 
@@ -306,11 +315,7 @@ function App() {
                                 textDecoration: 'underline dotted'
                               }}
                               onClick={() => {
-                                  if (activeTasks.length > 0) {
-                                      if (!confirm('プロジェクト名を変更した場合、共有済みの元のプロジェクト名とマージできません。\n変更しますか？')) {
-                                          return;
-                                      }
-                                  }
+                                  // 警告なしで直接変更
                                   const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
                                   if (newName && newName.trim()) {
                                       setData({ ...data, projectName: newName, lastSynced: Date.now() });

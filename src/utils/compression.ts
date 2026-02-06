@@ -8,7 +8,7 @@ const HIRAGANA_START = 0x3041;
 const MAPPING_START = 0x0080;
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 
-// ★追加: 区切り文字の一時退避用コード（制御文字などの普段入力しない文字を使用）
+// 区切り文字の一時退避用コード（制御文字）
 const ESCAPE_MAP = {
   '[': '\x10', // Data Link Escape
   ']': '\x11', // Device Control 1
@@ -23,28 +23,27 @@ const escapeRegExp = (string: string) => {
 };
 
 const preProcess = (str: string): string => {
-  // 1. 全角英数を半角に変換
-  let res = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+  let res = str;
 
-  // 2. 辞書機能向けのエスケープ（ \ -> \\, 辞書記号 -> \辞書記号 ）
+  // 1. 辞書機能向けのエスケープ（ \ -> \\, 辞書記号 -> \辞書記号 ）
   res = res.replace(/\\/g, '\\\\');
   const symbolsPattern = Array.from(DICT_SYMBOLS).map(escapeRegExp).join('|');
   if (symbolsPattern) {
     res = res.replace(new RegExp(`(${symbolsPattern})`, 'g'), '\\$1');
   }
 
-  // 3. 辞書による置換 ( 単語 -> 記号 )
+  // 2. 辞書による置換 ( 単語 -> 記号 )
   Object.entries(USER_DICTIONARY).forEach(([k, v]) => {
     res = res.split(k).join(v);
   });
 
-  // ★変更: 区切り文字を全角ではなく、特殊な制御文字に置換して退避
-  // これにより、データの区切り（,や[]）と、文字としての（,や[]）が衝突しなくなります
+  // 3. 構造を壊す文字（半角の [ ] , ）のみを制御文字にエスケープ
+  // これにより、全角の［ ］ ， や ー はそのまま維持されます
   res = res.replace(/\[/g, ESCAPE_MAP['['])
            .replace(/\]/g, ESCAPE_MAP[']'])
            .replace(/,/g,  ESCAPE_MAP[',']);
 
-  // 5. ひらがなのシフト
+  // 4. ひらがなのシフト
   return res.replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) - HIRAGANA_START + MAPPING_START));
 };
 
@@ -52,7 +51,7 @@ const postProcess = (str: string): string => {
   // 1. ひらがなのアンシフト
   let res = str.replace(/[\u0080-\u00FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - MAPPING_START + HIRAGANA_START));
 
-  // ★変更: 特殊文字を元の半角区切り文字に戻す
+  // 2. 特殊文字を元の半角区切り文字に戻す
   res = res.replace(new RegExp(ESCAPE_MAP['['], 'g'), '[')
            .replace(new RegExp(ESCAPE_MAP[']'], 'g'), ']')
            .replace(new RegExp(ESCAPE_MAP[','], 'g'), ',');
@@ -73,12 +72,7 @@ const postProcess = (str: string): string => {
   return res;
 };
 
-// ... 以下 getIntermediateJson, compressData, decompressData は変更なし ...
-// ※ getIntermediateJson 内で使用されるカンマやブラケットは「区切り」として機能し、
-//    preProcess で変換された制御文字は「値」として機能するため、正常にパースされます。
-
 export const getIntermediateJson = (data: AppData): string => {
-  // 既存の実装のまま使用
   const start = Math.floor(data.projectStartDate / 60000 - EPOCH_2020_MIN).toString(36);
   const end = Math.floor(data.lastSynced / 60000 - EPOCH_2020_MIN).toString(36);
   
@@ -88,8 +82,6 @@ export const getIntermediateJson = (data: AppData): string => {
     const deadline = (t.deadlineOffset === 0 || t.deadlineOffset === undefined) ? "" : t.deadlineOffset;
     const updated = Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN).toString(36);
     const parent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;
-    // ここで preProcess(t.name) が呼ばれ、名前の中のカンマ等は制御文字に変わっているため、
-    // 外側の区切り文字と混ざることはありません。
     return `[${preProcess(t.name)},${status},${deadline},${updated},${parent}`;
   }).join('');
 
@@ -108,7 +100,7 @@ export const decompressData = (compressed: string): AppData | null => {
     const nameEndIdx = raw.indexOf(',');
     if (nameEndIdx === -1) return null;
     
-    // ここで postProcess が呼ばれ、制御文字が元の半角文字に戻ります
+    // プロジェクト名の復元
     const projectName = postProcess(raw.substring(0, nameEndIdx)) || DEFAULT_PROJECT_NAME;
     const body = raw.substring(nameEndIdx + 1);
 
@@ -136,10 +128,11 @@ export const decompressData = (compressed: string): AppData | null => {
       tasks: taskStrings.map((tStr, index) => {
         const id = (index + 1).toString(36);
         if (tStr === "") return { id, name: "", status: 0, lastUpdated: 0, isDeleted: true };
-        const parts = tStr.split(','); // 制御文字はここでは分割されません
+        const parts = tStr.split(',');
         return {
           id,
-          name: postProcess(parts[0]), // ここで元の名前に復元
+          // 復元された文字列をそのまま使用
+          name: postProcess(parts[0]), 
           status: (parts[1] === "" ? 0 : Number(parts[1])) as 0|1|2|3,
           deadlineOffset: parts[2] === "" ? undefined : Number(parts[2]),
           lastUpdated: (parseInt(parts[3], 36) + EPOCH_2020_MIN) * 60000,
