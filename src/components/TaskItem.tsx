@@ -102,8 +102,6 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
       </button>
       
       <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-        {/* <span style={{ fontSize: '0.7em', color: '#555', marginRight: '8px', fontFamily: 'monospace' }}>{task.id}</span> */}
-        
         {isEditing ? (
           <input 
             type="text"
@@ -124,7 +122,19 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
           />
         ) : (
           <>
-            <span style={{ fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1 }}>
+            <span 
+              onDoubleClick={() => {
+                setEditName(task.name);
+                setIsEditing(true);
+              }}
+              title="ダブルクリックで編集"
+              style={{ 
+                fontWeight: hasChildren ? 'bold' : 'normal', 
+                textDecoration: task.status === 2 ? 'line-through' : 'none', 
+                opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1,
+                cursor: 'pointer'
+              }}
+            >
               {task.name}
             </span>
             {/* 進捗率表示 */}
@@ -157,21 +167,6 @@ export const TaskItem: React.FC<Props> = ({ task, projectStartDate, depth, hasCh
         gap: '4px',
         visibility: isHovered || isEditing || isEditingDeadline ? 'visible' : 'hidden',
       }}>
-        <button 
-          onClick={() => {
-            if (isEditing) {
-              setEditName(task.name);
-              setIsEditing(false);
-            } else {
-              setEditName(task.name);
-              setIsEditing(true);
-            }
-          }}
-          title={isEditing ? "キャンセル" : "名前を編集"}
-          style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}
-        >
-          {isEditing ? '✕' : '✎'}
-        </button>
         <button 
           onClick={() => setIsEditingDeadline(!isEditingDeadline)} 
           title="期限を設定"

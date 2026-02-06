@@ -62,13 +62,10 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     }
 
     const activeTasks = data.tasks.filter(t => !t.isDeleted);
-    // 有効なタスクが1つもない場合は初期化（リセット）を行う
     const shouldReset = activeTasks.length === 0;
 
-    // リセット時は ID を "1" に、そうでなければ従来のロジック
     const newId = shouldReset ? "1" : (data.tasks.length + 1).toString(36);
 
-    // 同じ親を持つ兄弟タスクの中で最大のorderを探す
     const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === parentId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
     const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
@@ -79,12 +76,10 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       status: 0,
       deadlineOffset: offset || undefined,
       lastUpdated: Date.now(),
-      // リセット時は親タスクも存在し得ないため undefined を強制
       parentId: shouldReset ? undefined : parentId,
-      order: shouldReset ? 1 : nextOrder // リセット時は1、それ以外は兄弟の末尾
+      order: shouldReset ? 1 : nextOrder
     };
 
-    // リセット時はこれまでの data.tasks を捨てて newTask のみの配列で上書きする
     if (shouldReset) {
       save([newTask]);
     } else {
@@ -102,14 +97,12 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
     if (!confirm(message)) return;
 
-    // 削除対象のID（自身とすべての子孫）を収集
     const idsToDelete = new Set<string>();
     const stack = [taskId];
 
     while (stack.length > 0) {
       const currentId = stack.pop()!;
       idsToDelete.add(currentId);
-      // 子タスクを検索してスタックに追加
       const children = data.tasks.filter(t => !t.isDeleted && t.parentId === currentId);
       children.forEach(c => stack.push(c.id));
     }
@@ -130,7 +123,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     const targetTask = data.tasks.find(t => t.id === id);
     if (!targetTask) return;
 
-    // 重複チェック
     const isDuplicate = data.tasks.some(t =>
       !t.isDeleted &&
       t.id !== id &&
@@ -157,7 +149,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     if (dateStr) {
       const [y, m, d] = dateStr.split('-').map(Number);
       const targetDate = new Date(y, m - 1, d);
-      // 修正箇所: 余分な 'zh' を削除しました
       offset = differenceInCalendarDays(targetDate, data.projectStartDate);
     } else {
       offset = undefined;
@@ -195,7 +186,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  // データの最適化（削除済みタスクの完全除去とID整理）
+  // データの最適化
   const optimizeData = useCallback(() => {
     if (!data) return;
 
@@ -210,13 +201,11 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       return;
     }
 
-    // 旧ID -> 新ID のマッピングを作成
     const idMap = new Map<string, string>();
     validTasks.forEach((t, index) => {
       idMap.set(t.id, (index + 1).toString(36));
     });
 
-    // タスクのIDとParentIDを新しいものに更新
     const optimizedTasks = validTasks.map(t => {
       const newId = idMap.get(t.id)!;
       const newParentId = (t.parentId && idMap.has(t.parentId))
@@ -249,18 +238,47 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
 
     if (!activeTask || !overTask) return;
 
-    const targetParentId = overTask.parentId;
+    // 移動先の親ID候補
+    const nextParentId = overTask.parentId;
+
+    // --- 自己参照・循環参照の防止ロジック ---
+
+    // 1. 移動先の親が「自分自身」である場合
+    // (例: 自分の子タスクの上にドロップして、その兄弟になろうとした場合など)
+    if (nextParentId === activeTask.id) {
+      // 親IDが自分のIDになる変更は不正なので、処理を中断して元の状態を維持する
+      return;
+    }
+
+    // 2. 移動先の親が「自分の子孫」である場合 (循環参照)
+    // 階層を遡ってチェックする
+    let currentCheckId = nextParentId;
+    let isCircular = false;
+    while (currentCheckId) {
+      if (currentCheckId === activeTask.id) {
+        isCircular = true;
+        break;
+      }
+      const parentTask = data.tasks.find(t => t.id === currentCheckId);
+      currentCheckId = parentTask?.parentId;
+    }
+
+    if (isCircular) {
+      return;
+    }
+    // ----------------------------------------
+
     const newTasks = [...data.tasks];
 
     // 1. 親IDの更新 (階層移動の場合)
-    if (activeTask.parentId !== targetParentId) {
+    if (activeTask.parentId !== nextParentId) {
       const taskIndex = newTasks.findIndex(t => t.id === active.id);
-      newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: targetParentId };
+      newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: nextParentId };
     }
 
     // 2. 順序の並び替え
     const siblings = newTasks
-      .filter(t => !t.isDeleted && t.parentId === targetParentId)
+      .filter(t => !t.isDeleted && t.parentId === nextParentId)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     const oldIndex = siblings.findIndex(t => t.id === active.id);
