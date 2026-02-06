@@ -79,23 +79,19 @@ function App() {
   const save = (newTasks: Task[]) => setData({ ...data, tasks: recalculate(newTasks), lastSynced: Date.now() });
 
   const addTask = (name: string, offset?: number, explicitParentId?: string) => {
-    // 正規化処理を削除し、入力された文字をそのまま使用
     const normalizedName = name; 
-
     const targetParentId = explicitParentId ?? parent?.id;
 
-    // トップレベル（親がない）の場合のみ重複チェック
-    if (!targetParentId) {
-      const isDuplicate = data.tasks.some(t => 
-        !t.isDeleted && // 削除されていない
-        !t.parentId &&  // トップレベルである
-        t.name === normalizedName // 名前が一致
-      );
+    // 重複チェック: 同じ親を持つタスクの中で同名のものがないか確認
+    const isDuplicate = data.tasks.some(t => 
+      !t.isDeleted &&
+      t.parentId === targetParentId && // 親が同じ
+      t.name === normalizedName        // 名前が一致
+    );
 
-      if (isDuplicate) {
-        alert('トップレベルの親階層では、同じ名前のタスクを作成できません。');
-        return;
-      }
+    if (isDuplicate) {
+      alert('同じ階層に同名のタスクが既に存在します。');
+      return;
     }
 
     const newId = (data.tasks.length + 1).toString(36);
@@ -113,8 +109,24 @@ function App() {
 
   const handleRenameTask = (id: string, newName: string) => {
     if (!newName.trim()) return;
-    // 正規化処理を削除し、入力された文字をそのまま使用
     const normalizedName = newName; 
+
+    // リネーム対象のタスクを探して親IDを取得
+    const targetTask = data.tasks.find(t => t.id === id);
+    if (!targetTask) return;
+
+    // 重複チェック: 同じ親を持つ兄弟タスク（自分以外）で同名のものがないか
+    const isDuplicate = data.tasks.some(t => 
+      !t.isDeleted &&
+      t.id !== id &&                   // 自分自身は除外
+      t.parentId === targetTask.parentId && // 親が同じ
+      t.name === normalizedName        // 名前が一致
+    );
+
+    if (isDuplicate) {
+      alert('同じ階層に同名のタスクが既に存在します。');
+      return;
+    }
 
     const newTasks = data.tasks.map(t => 
       t.id === id ? { ...t, name: normalizedName, lastUpdated: Date.now() } : t
