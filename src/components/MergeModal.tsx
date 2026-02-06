@@ -20,6 +20,7 @@ interface ComparisonRow {
   action: ResolveAction;
   displayName: string;
   resolvedParentKey?: string; // 階層表示用の親キー
+  isIdentical: boolean; // 完全に一致しているかどうかのフラグ
 }
 
 interface HierarchicalRow extends ComparisonRow {
@@ -82,12 +83,29 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     ));
   };
 
+  // タスクの内容が一致しているか判定するヘルパー関数
+  // JSON経由の場合、undefinedが欠落したりnullになったりする可能性があるため、緩やかに比較します
+  const isContentEqual = (a: Task, b: Task) => {
+    const deadlineA = a.deadlineOffset ?? null;
+    const deadlineB = b.deadlineOffset ?? null;
+    
+    // IDモードの場合は親IDの一致も確認（構造変更の検知）
+    // NAMEモードの場合は親IDは無視（traverseMatchingで構造的にマッチングしているため）
+    const parentA = a.parentId ?? null;
+    const parentB = b.parentId ?? null;
+
+    return a.name === b.name && 
+           a.status === b.status && 
+           deadlineA === deadlineB &&
+           (mergeMode === 'NAME' || parentA === parentB);
+  };
+
   // Rowsの構築
   useEffect(() => {
     const newRows: ComparisonRow[] = [];
     const getSimpleDisplayName = (t: Task) => t.name;
 
-    // 削除されていないタスクのみを抽出（削除済みタスクが表示されないようにするため）
+    // 削除されていないタスクのみを抽出
     const activeLocalTasks = localData.tasks.filter(t => !t.isDeleted);
     const activeIncomingTasks = incomingData.tasks.filter(t => !t.isDeleted);
 
@@ -110,8 +128,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         const local = localMap.get(id);
         const remote = remoteMap.get(id);
         
-        // IDモードの場合、親IDはそのまま親のキーとなる（親もIDで一意に特定されるため）
         const parentKey = local?.parentId ?? remote?.parentId;
+        // 両方存在し、内容が一致している場合は Identical とする
+        const isIdentical = !!(local && remote && isContentEqual(local, remote));
 
         newRows.push({
           key: id,
@@ -119,11 +138,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
           remote,
           action: decideAction(local, remote),
           displayName: local ? getSimpleDisplayName(local) : (remote ? getSimpleDisplayName(remote) : id),
-          resolvedParentKey: parentKey
+          resolvedParentKey: parentKey,
+          isIdentical
         });
       });
     } else {
-      // NAME Mode - 階層構造に基づいてマッチングを行う
+      // NAME Mode
       
       const localChildrenMap = new Map<string, Task[]>();
       activeLocalTasks.forEach(t => {
@@ -139,16 +159,13 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
           remoteChildrenMap.get(pid)!.push(t);
       });
 
-      // 処理済みタスクを記録して重複を防ぐ
       const visitedLocalIds = new Set<string>();
       const visitedRemoteIds = new Set<string>();
 
       const traverseMatching = (lParentId: string | undefined | null, rParentId: string | undefined | null, parentRowKey: string | undefined) => {
-           // 親が存在しない(null)場合は空配列、undefined(ルート)またはIDがある場合はマップから取得
            const lChildren = lParentId === null ? [] : (localChildrenMap.get(lParentId ?? 'root') || []);
            const rChildren = rParentId === null ? [] : (remoteChildrenMap.get(rParentId ?? 'root') || []);
            
-           // この階層にある全タスク名
            const names = new Set([...lChildren.map(t => t.name), ...rChildren.map(t => t.name)]);
            
            names.forEach(name => {
@@ -159,30 +176,28 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                    if (lTask) visitedLocalIds.add(lTask.id);
                    if (rTask) visitedRemoteIds.add(rTask.id);
 
-                   // キーの重複を防ぐためのロジック
-                   // Localタスクがある場合はLocalのIDをキーとする。
-                   // LocalがなくRemoteのみの場合、Localの別のタスクのIDと重複する可能性があるためプレフィックスを付与する。
                    let rowKey = lTask ? lTask.id : rTask!.id;
                    if (!lTask && rTask) {
                        rowKey = `remote_${rTask.id}`;
                    }
                    
+                   const isIdentical = !!(lTask && rTask && isContentEqual(lTask, rTask));
+
                    newRows.push({
                        key: rowKey,
                        local: lTask,
                        remote: rTask,
                        action: decideAction(lTask, rTask),
                        displayName: name,
-                       resolvedParentKey: parentRowKey
+                       resolvedParentKey: parentRowKey,
+                       isIdentical
                    });
                    
-                   // 子階層へ再帰
                    traverseMatching(lTask ? lTask.id : null, rTask ? rTask.id : null, rowKey);
                }
            });
       };
       
-      // トップレベルから開始
       traverseMatching(undefined, undefined, undefined);
     }
     
@@ -190,12 +205,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   }, [mergeMode, priority, localData, incomingData]);
 
 
-  // 階層構造の計算（表示用）
+  // 階層構造の計算（表示用）とフィルタリング
   const displayedRows = useMemo(() => {
     const childrenMap = new Map<string, ComparisonRow[]>();
     const roots: ComparisonRow[] = [];
     
-    // resolvedParentKey を使って親子関係を構築
     rows.forEach(r => {
         if (r.resolvedParentKey) {
             if (!childrenMap.has(r.resolvedParentKey)) childrenMap.set(r.resolvedParentKey, []);
@@ -204,6 +218,27 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             roots.push(r);
         }
     });
+
+    // フィルタリングのための可視性判定マップ
+    // キー: 行のkey, 値: 表示するかどうか
+    const visibilityMap = new Map<string, boolean>();
+
+    const checkVisibility = (row: ComparisonRow): boolean => {
+        if (visibilityMap.has(row.key)) return visibilityMap.get(row.key)!;
+        
+        // 1. 差分がある（一致していない）場合は必ず表示
+        if (!row.isIdentical) {
+            visibilityMap.set(row.key, true);
+            return true;
+        }
+
+        // 2. 一致している場合でも、子孫に表示すべき行があれば表示（階層維持のため）
+        const children = childrenMap.get(row.key) || [];
+        const hasVisibleChild = children.some(child => checkVisibility(child));
+        
+        visibilityMap.set(row.key, hasVisibleChild);
+        return hasVisibleChild;
+    };
 
     const result: HierarchicalRow[] = [];
     
@@ -217,9 +252,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         });
 
         nodes.forEach(node => {
-            result.push({ ...node, depth });
-            const children = childrenMap.get(node.key);
-            if (children) traverse(children, depth + 1);
+            // 可視と判定された場合のみリストに追加
+            if (checkVisibility(node)) {
+                result.push({ ...node, depth });
+                const children = childrenMap.get(node.key);
+                if (children) traverse(children, depth + 1);
+            }
         });
     };
 
@@ -336,91 +374,105 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}>
-                            <th style={{ padding: '8px' }}>Local</th>
-                            <th style={{ padding: '8px', width: '150px' }}>アクション</th>
-                            <th style={{ padding: '8px' }}>Remote</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {displayedRows.map((row) => {
-                            const localDate = row.local ? getDeadlineDisplay(row.local, localData.projectStartDate) : '';
-                            const remoteDate = row.remote ? getDeadlineDisplay(row.remote, incomingData.projectStartDate) : '';
-                            
-                            return (
-                                <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
-                                    <td style={{ 
-                                        padding: '8px', 
-                                        paddingLeft: `${8 + row.depth * 24}px`,
-                                        color: row.local ? '#fff' : '#666' 
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                            {row.local ? (
-                                                <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.local.id}`}>
-                                                    <StatusBadge status={row.local.status} />
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span>{breakText(row.local.name)}</span>
-                                                        {localDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({localDate})</span>}
-                                                    </div>
-                                                </div>
-                                            ) : '(なし)'}
-                                        </div>
-                                    </td>
-                                    
-                                    <td style={{ padding: '8px' }}>
-                                        <select 
-                                            value={row.action} 
-                                            onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)}
-                                            style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
-                                        >
-                                            {row.local && row.remote && (
-                                                <>
-                                                    <option value="USE_LOCAL">Local優先</option>
-                                                    <option value="USE_REMOTE">Remote優先</option>
-                                                    <option value="DELETE">差分を削除</option>
-                                                </>
-                                            )}
-                                            {row.local && !row.remote && (
-                                                <>
-                                                    <option value="USE_LOCAL">Local維持</option>
-                                                    <option value="DELETE">差分を削除</option>
-                                                </>
-                                            )}
-                                            {!row.local && row.remote && (
-                                                <>
-                                                    <option value="ADD_REMOTE">追加</option>
-                                                    <option value="DELETE">差分を削除</option>
-                                                </>
-                                            )}
-                                        </select>
-                                    </td>
+                {displayedRows.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+                        差分はありません。すべてのタスクが一致しています。
+                    </div>
+                ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}>
+                                <th style={{ padding: '8px' }}>Local</th>
+                                <th style={{ padding: '8px', width: '150px' }}>アクション</th>
+                                <th style={{ padding: '8px' }}>Remote</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {displayedRows.map((row) => {
+                                const localDate = row.local ? getDeadlineDisplay(row.local, localData.projectStartDate) : '';
+                                const remoteDate = row.remote ? getDeadlineDisplay(row.remote, incomingData.projectStartDate) : '';
+                                
+                                // 一致しているが子孫のために表示されている行は少し薄くするなどのスタイル
+                                const isContextRow = row.isIdentical;
+                                const rowOpacity = isContextRow ? 0.6 : 1;
 
-                                    <td style={{ 
-                                        padding: '8px', 
-                                        paddingLeft: `${8 + row.depth * 24}px`,
-                                        color: row.remote ? '#fff' : '#666' 
-                                    }}>
-                                        {row.remote && (
+                                return (
+                                    <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
+                                        <td style={{ 
+                                            padding: '8px', 
+                                            paddingLeft: `${8 + row.depth * 24}px`,
+                                            color: row.local ? `rgba(255,255,255,${rowOpacity})` : '#666' 
+                                        }}>
                                             <div style={{ display: 'flex', alignItems: 'center' }}>
                                                 {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
-                                                <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.remote.id}`}>
-                                                    <StatusBadge status={row.remote.status} />
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span>{breakText(row.remote.name)}</span>
-                                                        {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
+                                                {row.local ? (
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.local.id}`}>
+                                                        <StatusBadge status={row.local.status} />
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span>{breakText(row.local.name)}</span>
+                                                            {localDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({localDate})</span>}
+                                                        </div>
+                                                    </div>
+                                                ) : '(なし)'}
+                                            </div>
+                                        </td>
+                                        
+                                        <td style={{ padding: '8px', opacity: rowOpacity }}>
+                                            {isContextRow ? (
+                                                <span style={{ color: '#888', fontSize: '0.85em' }}>（一致）</span>
+                                            ) : (
+                                                <select 
+                                                    value={row.action} 
+                                                    onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)}
+                                                    style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
+                                                >
+                                                    {row.local && row.remote && (
+                                                        <>
+                                                            <option value="USE_LOCAL">Local優先</option>
+                                                            <option value="USE_REMOTE">Remote優先</option>
+                                                            <option value="DELETE">差分を削除</option>
+                                                        </>
+                                                    )}
+                                                    {row.local && !row.remote && (
+                                                        <>
+                                                            <option value="USE_LOCAL">Local維持</option>
+                                                            <option value="DELETE">差分を削除</option>
+                                                        </>
+                                                    )}
+                                                    {!row.local && row.remote && (
+                                                        <>
+                                                            <option value="ADD_REMOTE">追加</option>
+                                                            <option value="DELETE">差分を削除</option>
+                                                        </>
+                                                    )}
+                                                </select>
+                                            )}
+                                        </td>
+
+                                        <td style={{ 
+                                            padding: '8px', 
+                                            paddingLeft: `${8 + row.depth * 24}px`,
+                                            color: row.remote ? `rgba(255,255,255,${rowOpacity})` : '#666' 
+                                        }}>
+                                            {row.remote && (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555', userSelect: 'none' }}>└</span>}
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start' }} title={`ID: ${row.remote.id}`}>
+                                                        <StatusBadge status={row.remote.status} />
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span>{breakText(row.remote.name)}</span>
+                                                            {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     </div>
