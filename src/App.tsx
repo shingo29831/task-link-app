@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { 
   DndContext, 
@@ -8,6 +8,8 @@ import {
   TouchSensor, 
   useSensor, 
   useSensors, 
+  pointerWithin,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -50,6 +52,10 @@ function App() {
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
 
+  // 移動方向判定用のRef
+  const lastPointerX = useRef<number | null>(null);
+  const moveDirection = useRef<'left' | 'right' | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
         activationConstraint: { distance: 5 },
@@ -61,6 +67,70 @@ function App() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // カスタム衝突判定
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const { pointerCoordinates } = args;
+
+    // 1. 移動方向の判定
+    if (pointerCoordinates) {
+      if (lastPointerX.current !== null) {
+        const diff = pointerCoordinates.x - lastPointerX.current;
+        if (diff > 0) moveDirection.current = 'right';
+        else if (diff < 0) moveDirection.current = 'left';
+      }
+      lastPointerX.current = pointerCoordinates.x;
+    }
+
+    // 2. ポインタ直下の衝突(重なり)を取得
+    const pointerCollisions = pointerWithin(args);
+    
+    // 3. ネスト領域 (nest-xxx) があれば最優先で返す
+    const nestCollisions = pointerCollisions.filter((collision) => 
+      String(collision.id).startsWith('nest-')
+    );
+    if (nestCollisions.length > 0) {
+      return nestCollisions;
+    }
+
+    // 4. トップレベルの並び替え制御
+    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
+
+    if (sortableCollisions.length > 0) {
+      const target = sortableCollisions[0];
+      const targetData = target.data?.droppableContainer?.data?.current;
+
+      // トップレベルタスク(depth === 0)の場合のみ、特殊な判定を行う
+      if (targetData && targetData.depth === 0) {
+        const rect = target.data?.droppableContainer?.rect?.current;
+        
+        if (rect && pointerCoordinates) {
+            // 左端からの相対位置(0.0 ~ 1.0)
+            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
+            const direction = moveDirection.current;
+
+            // 右へ移動中: ターゲットの左端〜中央(〜66%)にいる間は並び替えをブロック
+            // (右端の33%ゾーンに入って初めてスワップ)
+            if (direction === 'right') {
+                if (relativeX < 0.80) {
+                    return [];
+                }
+            }
+            // 左へ移動中: ターゲットの右端〜中央(33%〜)にいる間は並び替えをブロック
+            // (左端の33%ゾーンに入って初めてスワップ)
+            else if (direction === 'left') {
+                if (relativeX > 0.20) {
+                    return [];
+                }
+            }
+        }
+        return sortableCollisions;
+      }
+    }
+
+    // 5. それ以外は標準のclosestCenterを使用
+    return closestCenter(args);
+  }, []);
 
   const debugInfo = useMemo(() => {
     if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
@@ -180,10 +250,10 @@ function App() {
       >
         {nodes.map(n => (
           <React.Fragment key={n.id}>
-            <SortableTaskItem id={n.id}>
+            <SortableTaskItem id={n.id} depth={depth}>
                 <TaskItem 
                   task={n}
-                  tasks={data.tasks} // ★ 追加: tasksを渡す
+                  tasks={data.tasks} 
                   projectStartDate={data.projectStartDate} 
                   depth={depth} 
                   hasChildren={n.children.length > 0}
@@ -211,7 +281,7 @@ function App() {
   return (
     <DndContext 
       sensors={sensors} 
-      collisionDetection={closestCenter} 
+      collisionDetection={customCollisionDetection} 
       onDragEnd={handleDragEnd}
     >
         <div style={{ 
@@ -368,7 +438,7 @@ function App() {
                   {rootNodes.map(root => {
                       const colWidth = calculateColumnWidth(root);
                       return (
-                        <SortableTaskItem key={root.id} id={root.id}>
+                        <SortableTaskItem key={root.id} id={root.id} depth={0}>
                           <div style={{ 
                               minWidth: `${colWidth}px`, 
                               maxWidth: `${colWidth}px`, 
@@ -384,7 +454,7 @@ function App() {
                               <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
                                   <TaskItem 
                                       task={root}
-                                      tasks={data.tasks} // ★ 追加: tasksを渡す
+                                      tasks={data.tasks} 
                                       projectStartDate={data.projectStartDate} 
                                       depth={0} 
                                       hasChildren={root.children.length > 0}

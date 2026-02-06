@@ -4,10 +4,11 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface Props {
   id: string;
+  depth?: number;
   children: React.ReactNode;
 }
 
-export const SortableTaskItem: React.FC<Props> = ({ id, children }) => {
+export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) => {
   const {
     attributes,
     listeners,
@@ -15,16 +16,20 @@ export const SortableTaskItem: React.FC<Props> = ({ id, children }) => {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({ 
+    id,
+    data: { 
+      type: 'task', 
+      depth 
+    } 
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    // タッチデバイスでのスクロール干渉を防ぐ
     touchAction: 'none', 
     position: 'relative',
-    // ドラッグ中は他の要素の上に表示
     zIndex: isDragging ? 999 : 'auto', 
   };
 
