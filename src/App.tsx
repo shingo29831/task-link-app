@@ -26,7 +26,7 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-import { getIntermediateJson, compressData } from './utils/compression';
+import { compressData, getIntermediateJson } from './utils/compression'; // 追加
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 
@@ -199,11 +199,31 @@ function App() {
     return collisions;
   }, []);
 
+  // デバッグ情報の計算
   const debugInfo = useMemo(() => {
-    if (!data) return { before: "", after: "", beforeLen: 0, afterLen: 0 };
-    const before = getIntermediateJson(data);
-    const after = compressData(data);
-    return { before, after, beforeLen: before.length, afterLen: after.length };
+    if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0 };
+    
+    // 1. 通常のJSON文字列
+    const normal = JSON.stringify(data);
+
+    // 2. 中間データ (Base185 + Swap)
+    const intermediate = getIntermediateJson(data);
+    
+    // 3. 圧縮後の文字列 (LZ)
+    const compressed = compressData(data);
+    
+    // 圧縮率計算 (圧縮後 / 元サイズ * 100)
+    const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
+    
+    return { 
+      normal, 
+      intermediate,
+      compressed, 
+      normalLen: normal.length, 
+      intermediateLen: intermediate.length,
+      compressedLen: compressed.length, 
+      rate 
+    };
   }, [data]);
 
   const projectProgress = useMemo(() => {
@@ -509,12 +529,54 @@ function App() {
               {showDebug && (
                 <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
                   <p><b>プロジェクト名:</b> {data.projectName}</p>
-                  <p><b>1. 圧縮直前データ:</b></p>
-                  <code style={{ wordBreak: 'break-all', color: '#888' }}>
-                    {debugInfo.before.replace(/[\u0080-\u00FF]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}
-                  </code>
-                  <p style={{ marginTop: '20px' }}><b>2. LZ 圧縮後:</b></p>
-                  <code style={{ wordBreak: 'break-all', color: '#646cff' }}>{debugInfo.after}</code>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 20px', margin: '10px 0', alignItems: 'center' }}>
+                    <span style={{ color: '#888' }}>変換なしJSON:</span>
+                    <span style={{ fontSize: '1.1em' }}>{debugInfo.normalLen.toLocaleString()} 文字</span>
+
+                    <span style={{ color: '#aaa' }}>圧縮直前(Base185+Swap):</span>
+                    <span style={{ fontSize: '1.1em' }}>{debugInfo.intermediateLen.toLocaleString()} 文字</span>
+                    
+                    <span style={{ color: '#646cff' }}>最終圧縮後(LZ):</span>
+                    <span style={{ fontSize: '1.1em', fontWeight: 'bold', color: '#646cff' }}>{debugInfo.compressedLen.toLocaleString()} 文字</span>
+                    
+                    <span>圧縮率:</span>
+                    <span>
+                      <b>{debugInfo.rate.toFixed(1)}%</b> 
+                      <span style={{ marginLeft: '8px', color: '#888', fontSize: '0.9em' }}>
+                        ( {(100 - debugInfo.rate).toFixed(1)}% 削減 )
+                      </span>
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <div>
+                      <p style={{ margin: '0 0 5px 0', color: '#888' }}><b>1. 変換なしJSON (Raw):</b></p>
+                      <div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}>
+                        <code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>
+                          {debugInfo.normal}
+                        </code>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p style={{ margin: '0 0 5px 0', color: '#aaa' }}><b>2. 圧縮直前データ (Base185 + Swap):</b></p>
+                      <div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}>
+                        <code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>
+                          {debugInfo.intermediate}
+                        </code>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p style={{ margin: '0 0 5px 0', color: '#646cff' }}><b>3. 最終圧縮データ (LZ):</b></p>
+                      <div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}>
+                        <code style={{ wordBreak: 'break-all', color: '#646cff', fontFamily: 'monospace' }}>
+                          {debugInfo.compressed}
+                        </code>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
