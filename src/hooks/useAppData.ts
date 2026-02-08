@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { AppData } from '../types';
+import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 
 const STORAGE_KEY = 'progress_app_v2';
@@ -16,6 +16,23 @@ const createDefaultProject = (): AppData => ({
   tasks: [],
   lastSynced: Date.now()
 });
+
+// 比較関数: URLからのデータは更新日時が分単位に丸められているため、分単位での一致を確認する
+const isTaskEqual = (local: Task, incoming: Task): boolean => {
+  if (local.id !== incoming.id) return false;
+  if (local.name !== incoming.name) return false;
+  if (local.status !== incoming.status) return false;
+  if (local.parentId !== incoming.parentId) return false;
+  if (local.deadlineOffset !== incoming.deadlineOffset) return false;
+  if (local.isDeleted !== incoming.isDeleted) return false;
+  if ((local.order ?? 0) !== (incoming.order ?? 0)) return false;
+
+  // 更新日時の比較 (分単位に切り捨てて比較)
+  const localMin = Math.floor(local.lastUpdated / 60000);
+  const incomingMin = Math.floor(incoming.lastUpdated / 60000);
+  
+  return localMin === incomingMin;
+};
 
 export const useAppData = () => {
   const [projects, setProjects] = useState<AppData[]>([]);
@@ -75,14 +92,25 @@ export const useAppData = () => {
 
           if (sameNameProject) {
             initialActiveId = sameNameProject.id;
-            // --- 追加: タスクの完全一致チェック ---
-            // 名前が同じプロジェクトがある場合、中身（タスクリスト）を比較
-            const incomingTasksJson = JSON.stringify(incoming.tasks);
-            const existingTasksJson = JSON.stringify(sameNameProject.tasks);
             
-            if (incomingTasksJson === existingTasksJson) {
-              isIdenticalToExisting = true;
+            // --- 修正: タスクの厳密な比較（分単位丸めを考慮） ---
+            // 削除済みでないタスクのリスト同士を比較
+            const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
+            const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
+
+            if (localActive.length === incomingActive.length) {
+                // 長さが同じ場合、内容を1つずつチェック
+                // (compression.tsの仕様上、順序は維持されている前提)
+                const allMatch = localActive.every((localTask, index) => {
+                    const incomingTask = incomingActive[index];
+                    return isTaskEqual(localTask, incomingTask);
+                });
+
+                if (allMatch) {
+                    isIdenticalToExisting = true;
+                }
             }
+
           } else {
             const currentTarget = loadedProjects.find(p => p.id === initialActiveId);
             const hasActiveTasks = currentTarget && currentTarget.tasks.some(t => !t.isDeleted);

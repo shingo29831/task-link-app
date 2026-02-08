@@ -66,7 +66,8 @@ export const from185 = (str: string): number => {
   let num = 0;
   for (let i = 0; i < s.length; i++) {
     const charIndex = BASE185_CHARS.indexOf(s[i]);
-    if (charIndex === -1) return 0;
+    // 修正: 含まれない文字がある場合は NaN を返す（誤判定防止）
+    if (charIndex === -1) return NaN;
     num = num * BASE_LEN + charIndex;
   }
   return num * sign;
@@ -208,9 +209,9 @@ export const getIntermediateJson = (data: AppData): string => {
   ].join(',');
 
   const tasksStr = data.tasks
-    .filter(t => !t.isDeleted) // Ver.1: 削除済みタスクは保存しない
+    .filter(t => !t.isDeleted)
     .map((t) => {
-      // Ver.1: IDを含める (36進数文字列 -> 数値 -> 185進数)
+      // IDを含める (36進数文字列 -> 数値 -> 185進数)
       const vId = to185(parseInt(t.id, 36));
       
       const rawName = applyDictionaryAndEscape(t.name);
@@ -219,7 +220,7 @@ export const getIntermediateJson = (data: AppData): string => {
       const vOrder = to185(t.order ?? 0);
       const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN));
       
-      // Ver.1: ParentIDも圧縮 (36進数文字列 -> 数値 -> 185進数)
+      // ParentIDも圧縮
       let vParent = "";
       if (t.parentId && t.parentId !== "0") {
         const pidNum = parseInt(t.parentId, 36);
@@ -233,7 +234,7 @@ export const getIntermediateJson = (data: AppData): string => {
       const vStatus = t.status === 0 ? "" : t.status.toString();
       const vDeadline = (t.deadlineOffset === undefined) ? "" : to185(t.deadlineOffset);
 
-      // Ver.1: [ID, Name, Order, Updated, Parent, Status, Deadline]
+      // [ID, Name, Order, Updated, Parent, Status, Deadline]
       const parts = [vId, vName, vOrder, vUpdated, vParent, vStatus, vDeadline];
       while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
       
@@ -260,8 +261,11 @@ export const decompressData = (compressed: string): AppData | null => {
     const headerParts = headerStr.split(',');
     
     const versionCandidate = from185(headerParts[0]);
+    
+    // 修正: NaNでないことを確認してからバージョン判定を行う
+    // バージョン0も「ID付き構造」として扱う
     const isVer1 = versionCandidate === 1;
-    const isVer0 = versionCandidate === 0;
+    const isVer0 = versionCandidate === 0 && !isNaN(versionCandidate);
 
     let projectName = DEFAULT_PROJECT_NAME;
     let projectStartDate = (0 + EPOCH_2020_MIN) * 60000;
@@ -277,7 +281,7 @@ export const decompressData = (compressed: string): AppData | null => {
         projectStartDate = (from185(headerParts[4]) + EPOCH_2020_MIN) * 60000;
       }
     } else {
-      // Legacy Format
+      // Legacy Format (バージョンヘッダーなし、または不正な文字でNaNになった場合)
       projectName = headerParts[0]; 
       if (headerParts[1]) {
         const val = parseInt(headerParts[1], 36);
@@ -289,8 +293,8 @@ export const decompressData = (compressed: string): AppData | null => {
     if (taskStrings.length > 0 && taskStrings[0] === "") taskStrings.shift();
 
     const tasks = taskStrings.map((tStr: string, index: number) => {
-      // Ver.1 Logic
-      if (isVer1) {
+      // Ver.1 & Ver.0 Logic: どちらもID付き構造として読み込む
+      if (isVer1 || isVer0) {
         const parts = tStr.split(',');
         // IDは先頭 (185進数 -> 数値 -> 36進数文字列)
         const id = from185(parts[0]).toString(36);
@@ -312,35 +316,20 @@ export const decompressData = (compressed: string): AppData | null => {
         return { id, name, status, deadlineOffset, lastUpdated, parentId, order };
       }
 
-      // Ver.0 & Legacy Logic
+      // Legacy Logic (No version header)
       const id = (index + 1).toString(36);
       if (tStr === "") return { id, name: "", status: 0 as const, lastUpdated: 0, isDeleted: true };
       
       const parts = tStr.split(',');
       
-      let name = parts[0];
-      let order = 0;
-      let lastUpdated = 0;
-      let parentId: string | undefined = undefined;
-      let status: 0|1|2|3 = 0;
+      const name = parts[0]; 
+      const order = parts[1] ? parseInt(parts[1], 36) : 0;
+      const updatedVal = parts[2] ? parseInt(parts[2], 36) : 0;
+      const lastUpdated = (updatedVal + EPOCH_2020_MIN) * 60000;
+      const parentId = parts[3] || undefined;
+      const status = (parts[4] ? Number(parts[4]) : 0) as 0|1|2|3;
       let deadlineOffset: number | undefined = undefined;
-
-      if (isVer0) {
-         name = restoreDictionaryAndEscape(swapChars(parts[0], groupId));
-         order = from185(parts[1]);
-         lastUpdated = (from185(parts[2]) + EPOCH_2020_MIN) * 60000;
-         parentId = parts[3] || undefined;
-         status = (parts[4] ? Number(parts[4]) : 0) as 0|1|2|3;
-         deadlineOffset = parts[5] ? from185(parts[5]) : undefined;
-      } else {
-         name = parts[0]; 
-         order = parts[1] ? parseInt(parts[1], 36) : 0;
-         const updatedVal = parts[2] ? parseInt(parts[2], 36) : 0;
-         lastUpdated = (updatedVal + EPOCH_2020_MIN) * 60000;
-         parentId = parts[3] || undefined;
-         status = (parts[4] ? Number(parts[4]) : 0) as 0|1|2|3;
-         if (parts[5]) deadlineOffset = Number(parts[5]);
-      }
+      if (parts[5]) deadlineOffset = Number(parts[5]);
 
       return { id, name, status, deadlineOffset, lastUpdated, parentId, order };
     });
