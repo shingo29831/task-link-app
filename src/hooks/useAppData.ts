@@ -10,7 +10,7 @@ export const useAppData = () => {
   const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
 
-  // 1. 初期ロード処理（変更なし）
+  // 1. 初期ロード処理
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
@@ -20,7 +20,7 @@ export const useAppData = () => {
       const localData: AppData = localJson 
       ? JSON.parse(localJson) 
       : { 
-          projectName: 'マイプロジェクト',
+          projectName: 'マイプロジェクト', // デフォルト名
           projectStartDate: DEFAULT_START, 
           tasks: [], 
           lastSynced: 0 
@@ -32,9 +32,19 @@ export const useAppData = () => {
       if (compressed) {
         const incoming = decompressData(compressed);
         if (incoming) {
-          setIncomingData(incoming);
-          setData(localData);
-          // 読み込み後はURLを一旦クリア（必要に応じて）
+          // ローカルに有効なタスク（未削除）があるか確認
+          const hasActiveTasks = localData.tasks.some(t => !t.isDeleted);
+
+          if (!hasActiveTasks) {
+            // 有効なタスクが無い場合（初回や全削除時）は、確認なしで自動適用
+            setData(incoming);
+          } else {
+            // 有効なタスクがある場合は、マージ候補としてセット（モーダルを表示）
+            setIncomingData(incoming);
+            setData(localData);
+          }
+          
+          // 読み込み後はURLパラメータを一旦クリア
           window.history.replaceState(null, '', window.location.pathname);
           return;
         }
@@ -44,14 +54,14 @@ export const useAppData = () => {
     load();
   }, []);
 
-  // 2. データの変更をURLとLocalStorageに同期する（ここを追加・修正）
+  // 2. データの変更をURLとLocalStorageにリアルタイム同期
   useEffect(() => {
     if (data) {
       // LocalStorageへの保存
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
       // アドレスバーのURLを最新の状態に更新
-      const compressed = compressData(data); //
+      const compressed = compressData(data);
       const newUrl = `${window.location.origin}${window.location.pathname}?d=${compressed}`;
       window.history.replaceState(null, '', newUrl);
     }
