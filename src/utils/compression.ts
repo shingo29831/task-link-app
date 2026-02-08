@@ -2,13 +2,14 @@
 import LZString from 'lz-string';
 import type { AppData } from '../types';
 import { USER_DICTIONARY, DICT_SYMBOLS } from './dictionary';
-import { MAPPING_GROUPS } from './mappingDefinitions';
+// 変更: バージョン0のマッピング定義をインポートし、MAPPING_GROUPSとしてエイリアス設定
+import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './versions/v0';
 
 // ==========================================
 // Constants & Configuration
 // ==========================================
 
-// ★変更点1: バージョンを 0 に設定
+// バージョンを 0 に設定
 const CURRENT_VERSION = 0;
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 const EPOCH_2020_MIN = 26297280;
@@ -126,6 +127,9 @@ const initSwapCache = (groupId: number) => {
   if (SWAP_MAP_CACHE.has(groupId)) return;
   
   const group = MAPPING_GROUPS[groupId];
+  // 安全策: グループ定義が存在しない場合はキャッシュを作成しない
+  if (!group) return;
+
   const map = new Map<string, string>();
   
   // Ensure lengths match (truncate larger one if necessary, though defs should match)
@@ -143,10 +147,15 @@ const initSwapCache = (groupId: number) => {
 
 // Swap characters based on the group (Bi-directional)
 const swapChars = (str: string, groupId: number): string => {
+  // グループIDが範囲外の場合はそのまま返す
+  if (!MAPPING_GROUPS[groupId]) return str;
+
   initSwapCache(groupId);
-  const map = SWAP_MAP_CACHE.get(groupId)!;
-  const group = MAPPING_GROUPS[groupId];
+  const map = SWAP_MAP_CACHE.get(groupId);
   
+  if (!map) return str;
+
+  const group = MAPPING_GROUPS[groupId];
   const allChars = group.primary.substring(0, map.size / 2) + group.secondary.substring(0, map.size / 2);
   const pattern = new RegExp(`[${escapeRegExp(allChars)}]`, 'g');
 
@@ -244,7 +253,6 @@ export const decompressData = (compressed: string): AppData | null => {
     const headerParts = headerStr.split(',');
     const versionCandidate = from185(headerParts[0]);
 
-    // ★変更点2: 判定対象を 1 から 0 に変更
     // versionCandidateが 0 ならば「最新(Ver.0)のデータ」として扱う
     const isVer0 = versionCandidate === 0;
 

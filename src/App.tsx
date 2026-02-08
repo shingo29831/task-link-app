@@ -27,7 +27,7 @@ import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
 import { compressData, getIntermediateJson, from185 } from './utils/compression'; // from185を追加
-import { MAPPING_GROUPS } from './utils/mappingDefinitions'; // 追加
+import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 
