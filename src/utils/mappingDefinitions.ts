@@ -87,29 +87,35 @@ export const MAPPING_GROUPS: MappingGroup[] = [
 const MAX_MAPPING_SIZE = 218;
 
 MAPPING_GROUPS.forEach(group => {
-  // サイズ超過チェック
+  // 1. 最大文字数制限のチェック
   if (group.primary.length > MAX_MAPPING_SIZE) {
-    // 超過している場合は末尾を切り詰める（エラーで止まるよりは動作優先）
-    console.warn(
-      `[MappingDef Warning] Group "${group.name}" primary set length (${group.primary.length}) exceeds ${MAX_MAPPING_SIZE}. Truncating.`
+    throw new Error(
+      `[MappingDef Error] Group "${group.name}" primary set length (${group.primary.length}) exceeds maximum allowed size of ${MAX_MAPPING_SIZE}.`
     );
-    group.primary = group.primary.substring(0, MAX_MAPPING_SIZE);
   }
   
   if (group.secondary.length > MAX_MAPPING_SIZE) {
-    console.warn(
-      `[MappingDef Warning] Group "${group.name}" secondary set length (${group.secondary.length}) exceeds ${MAX_MAPPING_SIZE}. Truncating.`
+    throw new Error(
+      `[MappingDef Error] Group "${group.name}" secondary set length (${group.secondary.length}) exceeds maximum allowed size of ${MAX_MAPPING_SIZE}.`
     );
-    group.secondary = group.secondary.substring(0, MAX_MAPPING_SIZE);
   }
 
-  // 長さ不一致チェック & 調整
+  // 2. primary と secondary の文字数一致チェック
   if (group.primary.length !== group.secondary.length) {
-    console.warn(
-      `[MappingDef Warning] Group "${group.name}" length mismatch: primary(${group.primary.length}) vs secondary(${group.secondary.length}). Adjusting to smaller size.`
+    throw new Error(
+      `[MappingDef Error] Group "${group.name}" has a length mismatch: primary(${group.primary.length}) and secondary(${group.secondary.length}) must be the same length.`
     );
-    const minLen = Math.min(group.primary.length, group.secondary.length);
-    group.primary = group.primary.substring(0, minLen);
-    group.secondary = group.secondary.substring(0, minLen);
   }
+
+  // 3. (オプション) 重複チェック: スワップが正しく行われるよう、文字セット内で文字が重複していないか
+  const checkDuplicate = (str: string, label: string) => {
+    const chars = Array.from(str);
+    const uniqueChars = new Set(chars);
+    if (chars.length !== uniqueChars.size) {
+      throw new Error(`[MappingDef Error] Group "${group.name}" contains duplicate characters in ${label}.`);
+    }
+  };
+  
+  checkDuplicate(group.primary, "primary set");
+  checkDuplicate(group.secondary, "secondary set");
 });
