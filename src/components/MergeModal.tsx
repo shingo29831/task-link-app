@@ -481,7 +481,15 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     <div style={overlayStyle}>
         <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>タスクのマージオプション</h3>
+                <div>
+                    <h3 style={{ margin: '0 0 4px 0' }}>タスクのマージオプション</h3>
+                    <div style={{ fontSize: '0.85em', color: '#aaa' }}>
+                        Remote: <strong style={{ color: '#fff' }}>{incomingData.projectName}</strong>
+                        {' '}➔{' '}
+                        Local: <strong style={{ color: '#fff' }}>{localData.projectName}</strong>
+                    </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <select
                         value={mergeMode}

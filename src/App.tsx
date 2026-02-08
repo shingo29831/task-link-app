@@ -26,7 +26,6 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-// 修正: 誤ったインポート(SXcompressData)を削除し、compressDataをここに統合
 import { compressData, getIntermediateJson, from185 } from './utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
@@ -160,6 +159,23 @@ function App() {
     
     return buildTree(data.tasks);
   }, [data]);
+
+  // マージ対象となるローカルデータを決定する
+  // 現在開いているプロジェクト(data)だけでなく、全プロジェクトリストから探す
+  const targetLocalData = useMemo(() => {
+    if (!incomingData || !projects || !data) return null;
+    
+    // 1. プロジェクト名が一致する既存プロジェクトを探す
+    const sameNameProject = projects.find(p => p.projectName === incomingData.projectName);
+    if (sameNameProject) return sameNameProject;
+
+    // 2. IDが一致する既存プロジェクトを探す（念のため）
+    const sameIdProject = projects.find(p => p.id === incomingData.id);
+    if (sameIdProject) return sameIdProject;
+
+    // 3. どちらもなければ現在開いているプロジェクトと比較（これにより名前変更マージ or 新規作成のフローになる）
+    return data;
+  }, [incomingData, projects, data]);
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { pointerCoordinates } = args;
@@ -400,12 +416,19 @@ function App() {
         }}
         >
           
-          {incomingData && data && (
+          {incomingData && targetLocalData && (
             <MergeModal 
-                localData={data} 
+                localData={targetLocalData} 
                 incomingData={incomingData} 
                 onConfirm={(merged) => {
+                    // setDataはIDベースで更新するため、ターゲットが非アクティブなプロジェクトでも正しく更新される
                     setData(merged);
+                    
+                    // バックグラウンドにあるプロジェクトを更新した場合は、そのプロジェクトに切り替える
+                    if (merged.id !== activeId) {
+                        switchProject(merged.id);
+                    }
+
                     setIncomingData(null);
                     alert('マージが完了しました');
                 }}
