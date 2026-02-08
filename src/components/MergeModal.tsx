@@ -418,9 +418,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         <div style={overlayStyle}>
             <div style={modalStyle}>
                 <h3>プロジェクト名の競合</h3>
-                <p>このプロジェクト名はデータにありません。</p>
-                <p>現在のプロジェクト: <strong>{localData.projectName}</strong></p>
-                <p>インポートするプロジェクト: <strong>{incomingData.projectName}</strong></p>
+                <p>このプロジェクト名はローカルデータにありません。</p>
+                <p>閲覧中: <strong>{localData.projectName}</strong></p>
+                <p>インポート: <strong>{incomingData.projectName}</strong></p>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                     <button 

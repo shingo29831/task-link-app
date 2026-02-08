@@ -26,7 +26,8 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-import { compressData, getIntermediateJson, from185 } from './utils/compression';
+// decompressData を追加インポート
+import { compressData, getIntermediateJson, from185, decompressData } from './utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
@@ -161,7 +162,6 @@ function App() {
   }, [data]);
 
   // マージ対象となるローカルデータを決定する
-  // 現在開いているプロジェクト(data)だけでなく、全プロジェクトリストから探す
   const targetLocalData = useMemo(() => {
     if (!incomingData || !projects || !data) return null;
     
@@ -173,9 +173,34 @@ function App() {
     const sameIdProject = projects.find(p => p.id === incomingData.id);
     if (sameIdProject) return sameIdProject;
 
-    // 3. どちらもなければ現在開いているプロジェクトと比較（これにより名前変更マージ or 新規作成のフローになる）
+    // 3. どちらもなければ現在開いているプロジェクトと比較
     return data;
   }, [incomingData, projects, data]);
+
+  // URLからインポートするハンドラー
+  const handleImportFromUrl = useCallback((urlStr: string) => {
+    try {
+      // 完全なURLでなければ、現在のオリジンを付与して解析を試みる
+      const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
+      const url = new URL(targetUrl);
+      const compressed = url.searchParams.get('d');
+      
+      if (!compressed) {
+        alert('URLに有効なデータ(dパラメータ)が含まれていません。');
+        return;
+      }
+
+      const incoming = decompressData(compressed);
+      if (incoming) {
+        setIncomingData(incoming);
+      } else {
+        alert('データの復元に失敗しました。URLが正しいか確認してください。');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('URLの形式が正しくありません。');
+    }
+  }, [setIncomingData]);
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { pointerCoordinates } = args;
@@ -421,14 +446,10 @@ function App() {
                 localData={targetLocalData} 
                 incomingData={incomingData} 
                 onConfirm={(merged) => {
-                    // setDataはIDベースで更新するため、ターゲットが非アクティブなプロジェクトでも正しく更新される
                     setData(merged);
-                    
-                    // バックグラウンドにあるプロジェクトを更新した場合は、そのプロジェクトに切り替える
                     if (merged.id !== activeId) {
                         switchProject(merged.id);
                     }
-
                     setIncomingData(null);
                     alert('マージが完了しました');
                 }}
@@ -594,6 +615,7 @@ function App() {
                         }; 
                         r.readAsText(f);
                     }}
+                    onImportFromUrl={handleImportFromUrl}
                     onOptimize={optimizeData}
                 />
             </header>
