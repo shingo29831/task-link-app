@@ -56,15 +56,14 @@ export const useAppData = () => {
         loadedProjects = [def];
       }
 
-      // デフォルトのアクティブID（通常は先頭）
       initialActiveId = loadedProjects[0].id;
       
-      // URLからのロード処理
       const params = new URLSearchParams(window.location.search);
       const compressed = params.get('d');
       
       let newIncoming: AppData | null = null;
       let shouldAutoApply = false;
+      let isIdenticalToExisting = false; // 差分チェック用フラグ
 
       if (compressed) {
         const incoming = decompressData(compressed);
@@ -72,25 +71,25 @@ export const useAppData = () => {
           incoming.id = generateProjectId();
           newIncoming = incoming;
           
-          // 1. 同じ名前のプロジェクトがあるか検索
           const sameNameProject = loadedProjects.find(p => p.projectName === incoming.projectName);
 
           if (sameNameProject) {
-            // 同じ名前がある場合: そのプロジェクトを対象にしてマージ（アクティブIDを切り替え）
             initialActiveId = sameNameProject.id;
-            // マージモーダルを表示するためにセット
-            // (名前が一致しているため、モーダルはタスク比較から始まります)
+            // --- 追加: タスクの完全一致チェック ---
+            // 名前が同じプロジェクトがある場合、中身（タスクリスト）を比較
+            const incomingTasksJson = JSON.stringify(incoming.tasks);
+            const existingTasksJson = JSON.stringify(sameNameProject.tasks);
+            
+            if (incomingTasksJson === existingTasksJson) {
+              isIdenticalToExisting = true;
+            }
           } else {
-            // 同じ名前がない場合: 現在の対象（initialActiveId）を確認
             const currentTarget = loadedProjects.find(p => p.id === initialActiveId);
             const hasActiveTasks = currentTarget && currentTarget.tasks.some(t => !t.isDeleted);
 
             if (!hasActiveTasks) {
-              // 空なら自動適用（上書き）
               shouldAutoApply = true;
             } 
-            // タスクがある場合は自動適用せず、下流の処理でincomingDataをセット -> MergeModal表示
-            // MergeModalで「プロジェクト名不一致」が表示され、そこで「新規作成」を選べるようになる
           }
         }
       }
@@ -101,8 +100,12 @@ export const useAppData = () => {
         );
         initialActiveId = newIncoming.id;
         window.history.replaceState(null, '', window.location.pathname);
-      } else if (newIncoming) {
+      } else if (newIncoming && !isIdenticalToExisting) {
+        // 差分がある場合のみセット（モーダル表示のトリガー）
         setIncomingData(newIncoming);
+        window.history.replaceState(null, '', window.location.pathname);
+      } else {
+        // 差分がない場合は URL パラメータを消去して終了
         window.history.replaceState(null, '', window.location.pathname);
       }
 
@@ -112,14 +115,12 @@ export const useAppData = () => {
     load();
   }, []);
 
-  // 2. データの変更をLocalStorageに保存
   useEffect(() => {
     if (projects.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
     }
   }, [projects]);
 
-  // 3. アクティブプロジェクトの変更をURLに反映
   useEffect(() => {
     if (activeData) {
       const compressed = compressData(activeData);
@@ -132,43 +133,30 @@ export const useAppData = () => {
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
 
-  // 新規プロジェクト作成 (連番修正)
   const addProject = () => {
     const newProject = createDefaultProject();
-    
-    // マイプロジェクト, マイプロジェクト 2, マイプロジェクト 3... の順で空いている名前を探す
     let nameCandidate = 'マイプロジェクト';
     let counter = 1;
-
-    // 既存のプロジェクト名リストを取得
     const existingNames = new Set(projects.map(p => p.projectName));
-
-    // 名前が重複している間、カウンタを増やして新しい名前を試す
     while (existingNames.has(nameCandidate)) {
       counter++;
       nameCandidate = `マイプロジェクト ${counter}`;
     }
-
     newProject.projectName = nameCandidate;
-
     setProjects(prev => [...prev, newProject]);
     setActiveId(newProject.id);
   };
 
-  // インポートデータを新規プロジェクトとして追加する関数
   const importNewProject = (data: AppData) => {
-    // 名前重複回避（念のため）
     let name = data.projectName;
     let suffix = 1;
-    // 完全に同名のプロジェクトが既に存在する場合のみサフィックスをつける
     while(projects.some(p => p.projectName === name)) {
        name = `${data.projectName} (${suffix++})`;
     }
-    
     const newProject = { ...data, id: generateProjectId(), projectName: name };
     setProjects(prev => [...prev, newProject]);
     setActiveId(newProject.id);
-    setIncomingData(null); // モーダルを閉じる
+    setIncomingData(null);
   };
 
   const switchProject = (id: string) => {
@@ -183,7 +171,6 @@ export const useAppData = () => {
       return;
     }
     if (!confirm("このプロジェクトを削除しますか？")) return;
-
     const newProjects = projects.filter(p => p.id !== id);
     setProjects(newProjects);
     if (id === activeId) {
@@ -206,7 +193,7 @@ export const useAppData = () => {
     projects,
     activeId,
     addProject,
-    importNewProject, // 追加
+    importNewProject,
     switchProject,
     deleteProject
   };
