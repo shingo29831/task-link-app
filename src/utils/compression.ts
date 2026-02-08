@@ -184,9 +184,15 @@ const analyzeBestGroup = (sampleText: string): number => {
 
 export const getIntermediateJson = (data: AppData): string => {
   const rawProjectName = applyDictionaryAndEscape(data.projectName);
-  const rawTaskNames = data.tasks.map(t => applyDictionaryAndEscape(t.name));
   
-  const sampleText = rawProjectName + rawTaskNames.join('');
+  // マッピングのスコア計算用テキストを作成
+  // 削除されていないタスクのみを対象とする
+  const activeTaskNames = data.tasks
+    .filter(t => !t.isDeleted)
+    .map(t => applyDictionaryAndEscape(t.name))
+    .join('');
+  
+  const sampleText = rawProjectName + activeTaskNames;
   const groupId = analyzeBestGroup(sampleText);
 
   const pName = swapChars(rawProjectName, groupId);
@@ -199,10 +205,13 @@ export const getIntermediateJson = (data: AppData): string => {
     data.projectStartDate ? to185(Math.floor(data.projectStartDate / 60000 - EPOCH_2020_MIN)) : ''
   ].join(',');
 
-  const tasksStr = data.tasks.map((t, i) => {
+  const tasksStr = data.tasks.map((t) => {
     if (t.isDeleted) return "[";
     
-    const vName = swapChars(rawTaskNames[i], groupId);
+    // 削除されていない場合のみ名前の変換処理を行う
+    const rawName = applyDictionaryAndEscape(t.name);
+    const vName = swapChars(rawName, groupId);
+    
     const vOrder = to185(t.order ?? 0);
     const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN));
     const vParent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;

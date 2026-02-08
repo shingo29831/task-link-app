@@ -26,7 +26,8 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-import { compressData, getIntermediateJson } from './utils/compression'; // 追加
+import { compressData, getIntermediateJson, from185 } from './utils/compression'; // from185を追加
+import { MAPPING_GROUPS } from './utils/mappingDefinitions'; // 追加
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 
@@ -201,13 +202,36 @@ function App() {
 
   // デバッグ情報の計算
   const debugInfo = useMemo(() => {
-    if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0 };
+    if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0, mappingInfo: "" };
     
     // 1. 通常のJSON文字列
     const normal = JSON.stringify(data);
 
     // 2. 中間データ (Base185 + Swap)
     const intermediate = getIntermediateJson(data);
+
+    // マッピンググループの特定ロジック
+    let mappingInfo = "Unknown";
+    try {
+      // intermediateは "ver,groupId,name,..." の形式で始まる
+      const headerPart = intermediate.split('[')[0]; // タスクリスト開始前までを取得
+      const parts = headerPart.split(',');
+      if (parts.length >= 2) {
+        const ver = from185(parts[0]);
+        // 現在のバージョン(0)の場合
+        if (ver === 0) {
+          const groupId = from185(parts[1]);
+          const group = MAPPING_GROUPS[groupId];
+          if (group) {
+            mappingInfo = `[ID:${groupId}] ${group.name}`;
+          } else {
+            mappingInfo = `ID:${groupId} (Undefined)`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse mapping group", e);
+    }
     
     // 3. 圧縮後の文字列 (LZ)
     const compressed = compressData(data);
@@ -222,7 +246,8 @@ function App() {
       normalLen: normal.length, 
       intermediateLen: intermediate.length,
       compressedLen: compressed.length, 
-      rate 
+      rate,
+      mappingInfo
     };
   }, [data]);
 
@@ -529,6 +554,7 @@ function App() {
               {showDebug && (
                 <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
                   <p><b>プロジェクト名:</b> {data.projectName}</p>
+                  <p><b>適用マッピング:</b> <span style={{ color: '#8ac' }}>{debugInfo.mappingInfo}</span></p>
                   
                   <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 20px', margin: '10px 0', alignItems: 'center' }}>
                     <span style={{ color: '#888' }}>変換なしJSON:</span>

@@ -32,16 +32,27 @@ export const SWAP_COMBINED = SWAP_ASCII + SWAP_LATIN1;
 export const ALL_HIRA = Array.from({ length: 86 }, (_, i) => String.fromCharCode(0x3041 + i)).join(''); // ぁ-ゖ (86文字)
 export const ALL_KATA = Array.from({ length: 90 }, (_, i) => String.fromCharCode(0x30A1 + i)).join('') + 'ー'; // ァ-ヺ+ー (91文字)
 
-// タスク管理で頻出する漢字・記号 (38文字)
-export const FREQ_KANJI = 
-  "日月火水木金土年時分" +
-  "未着手進行中完了休止" +
-  "要件詳細優先度期限" +
-  "確認修正追加更新削除作保"
-  "";
+export const FREQ_KANJI_41 = 
+  "未中済完了待留急高低要締限始終確認決調考作送受見改写案件問備予自他主続休報連相会議"; //41
+
+
+export const FREQ_KANJI_CULTURE_132 = 
+  "日一十二本人大年三会中" + // 1-11
+  "国長出五時行事生四間上" + // 12-22
+  "分学的手後見下自地部者" + // 23-33
+  "子東円同高社合前立内方" + // 34-44
+  "代場理名家業発小新対月" + // 45-55
+  "定気実力関体回政民動当" + // 56-66
+  "法全明八野用市所通主相" + // 67-77
+  "外文言機山不京作度校多" + // 78-88
+  "道現公無海九問連員化物" + // 89-99
+  "最表水意性教点正木利原" + // 100-110
+  "書田近百先知平六話保万" + // 111-121
+  "元工取今千金私支和売七";  // 122-132
+
 
 // 5. 日本語スーパーセット
-export const JP_SUPER_SET = ALL_HIRA + ALL_KATA + FREQ_KANJI;
+export const JP_SUPER_SET = ALL_HIRA + ALL_KATA + FREQ_KANJI_41;
 
 // 6. Latin-1用バランスセット (128文字)
 // 英語混じりの文章などで、ASCIIを温存したい場合に使用
@@ -76,6 +87,14 @@ export const MAPPING_GROUPS: MappingGroup[] = [
     name: "LATIN1_SAFE",
     primary: JP_BALANCE_128,
     secondary: SWAP_LATIN1
+  },
+  // ★追加 Group 2: CULTURE_FREQ_JP (Max 218 chars)
+  // ひらがな(86) + 頻出漢字(132) = 218文字
+  // カタカナを含まない代わりに、漢字のカバー率を大幅に向上させたセット
+  {
+    name: "CULTURE_FREQ_JP",
+    primary: ALL_HIRA + FREQ_KANJI_CULTURE_132,
+    secondary: SWAP_COMBINED
   }
 ];
 
@@ -110,7 +129,9 @@ MAPPING_GROUPS.forEach(group => {
     const chars = Array.from(str);
     const uniqueChars = new Set(chars);
     if (chars.length !== uniqueChars.size) {
-      throw new Error(`[MappingDef Error] Group "${group.name}" contains duplicate characters in ${label}.`);
+      // 重複文字を特定してエラーメッセージに含める
+      const dup = chars.filter((item, index) => chars.indexOf(item) !== index);
+      throw new Error(`[MappingDef Error] Group "${group.name}" contains duplicate characters in ${label}: ${Array.from(new Set(dup)).join(', ')}`);
     }
   };
   
