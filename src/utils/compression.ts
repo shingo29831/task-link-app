@@ -1,9 +1,10 @@
-// src/utils/compression.ts
 import LZString from 'lz-string';
 import type { AppData } from '../types';
 import { USER_DICTIONARY, DICT_SYMBOLS } from './dictionary';
-// 変更: バージョン0のマッピング定義をインポートし、MAPPING_GROUPSとしてエイリアス設定
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './versions/v0';
+
+// 簡易ID生成関数
+const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 
 // ==========================================
 // Constants & Configuration
@@ -127,27 +128,22 @@ const initSwapCache = (groupId: number) => {
   if (SWAP_MAP_CACHE.has(groupId)) return;
   
   const group = MAPPING_GROUPS[groupId];
-  // 安全策: グループ定義が存在しない場合はキャッシュを作成しない
   if (!group) return;
 
   const map = new Map<string, string>();
   
-  // Ensure lengths match (truncate larger one if necessary, though defs should match)
   const len = Math.min(group.primary.length, group.secondary.length);
 
   for (let i = 0; i < len; i++) {
     const p = group.primary[i];
     const s = group.secondary[i];
-    // Bidirectional mapping
     map.set(p, s);
     map.set(s, p);
   }
   SWAP_MAP_CACHE.set(groupId, map);
 };
 
-// Swap characters based on the group (Bi-directional)
 const swapChars = (str: string, groupId: number): string => {
-  // グループIDが範囲外の場合はそのまま返す
   if (!MAPPING_GROUPS[groupId]) return str;
 
   initSwapCache(groupId);
@@ -194,8 +190,6 @@ const analyzeBestGroup = (sampleText: string): number => {
 export const getIntermediateJson = (data: AppData): string => {
   const rawProjectName = applyDictionaryAndEscape(data.projectName);
   
-  // マッピングのスコア計算用テキストを作成
-  // 削除されていないタスクのみを対象とする
   const activeTaskNames = data.tasks
     .filter(t => !t.isDeleted)
     .map(t => applyDictionaryAndEscape(t.name))
@@ -217,7 +211,6 @@ export const getIntermediateJson = (data: AppData): string => {
   const tasksStr = data.tasks.map((t) => {
     if (t.isDeleted) return "[";
     
-    // 削除されていない場合のみ名前の変換処理を行う
     const rawName = applyDictionaryAndEscape(t.name);
     const vName = swapChars(rawName, groupId);
     
@@ -251,32 +244,29 @@ export const decompressData = (compressed: string): AppData | null => {
     let tasksBody = (firstBracketIdx === -1) ? "" : raw.substring(firstBracketIdx);
 
     const headerParts = headerStr.split(',');
+    
+    // 修正: 正しい変数名に変更
     const versionCandidate = from185(headerParts[0]);
-
-    // versionCandidateが 0 ならば「最新(Ver.0)のデータ」として扱う
     const isVer0 = versionCandidate === 0;
 
     let projectName = DEFAULT_PROJECT_NAME;
+    // 修正: 正しい変数名に変更
     let projectStartDate = (0 + EPOCH_2020_MIN) * 60000;
     let lastSynced = 0;
     let groupId = 0;
 
     if (isVer0) {
-      // Ver.0 Header: Version(0), GroupID, ProjectName, LastSynced, StartDate
       groupId = from185(headerParts[1]);
       projectName = restoreDictionaryAndEscape(swapChars(headerParts[2], groupId));
       
       lastSynced = (from185(headerParts[3]) + EPOCH_2020_MIN) * 60000;
       if (headerParts[4]) {
+        // 修正: 正しい変数名に変更
         projectStartDate = (from185(headerParts[4]) + EPOCH_2020_MIN) * 60000;
       }
     } else {
-      // Legacy Fallback (Ver不明 または 旧形式)
-      // 旧形式のデータヘッダー: ProjectName, LastSynced, StartDate
-      // Base185以前のデータ構造を想定
       projectName = headerParts[0]; 
       if (headerParts[1]) {
-        // 旧データは36進数だったと仮定して復元を試みる（必要に応じて調整）
         const val = parseInt(headerParts[1], 36);
         if (!isNaN(val)) lastSynced = (val +EPOCH_2020_MIN) * 60000;
       }
@@ -299,7 +289,6 @@ export const decompressData = (compressed: string): AppData | null => {
       let deadlineOffset: number | undefined = undefined;
 
       if (isVer0) {
-         // Ver.0 Decoding
          name = restoreDictionaryAndEscape(swapChars(parts[0], groupId));
          order = from185(parts[1]);
          lastUpdated = (from185(parts[2]) + EPOCH_2020_MIN) * 60000;
@@ -307,8 +296,6 @@ export const decompressData = (compressed: string): AppData | null => {
          status = (parts[4] ? Number(parts[4]) : 0) as 0|1|2|3;
          deadlineOffset = parts[5] ? from185(parts[5]) : undefined;
       } else {
-         // Legacy Decoding
-         // 以前の実装に合わせてパース（36進数など）
          name = parts[0]; 
          order = parts[1] ? parseInt(parts[1], 36) : 0;
          const updatedVal = parts[2] ? parseInt(parts[2], 36) : 0;
@@ -321,7 +308,13 @@ export const decompressData = (compressed: string): AppData | null => {
       return { id, name, status, deadlineOffset, lastUpdated, parentId, order };
     });
 
-    return { projectName, projectStartDate, tasks, lastSynced };
+    return { 
+        id: generateProjectId(), // 新規ID
+        projectName, 
+        projectStartDate, 
+        tasks, 
+        lastSynced 
+    };
 
   } catch (e) {
     console.error("Decompression failed", e);

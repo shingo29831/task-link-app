@@ -26,7 +26,8 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-import { compressData, getIntermediateJson, from185 } from './utils/compression'; // from185を追加
+// 修正: 誤ったインポート(SXcompressData)を削除し、compressDataをここに統合
+import { compressData, getIntermediateJson, from185 } from './utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
@@ -67,7 +68,19 @@ const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activ
 };
 
 function App() {
-  const { data, setData, incomingData, setIncomingData, getShareUrl } = useAppData();
+  const { 
+    data, 
+    setData, 
+    incomingData, 
+    setIncomingData, 
+    getShareUrl,
+    projects,
+    activeId,
+    addProject,
+    importNewProject,
+    switchProject,
+    deleteProject
+  } = useAppData();
   
   const { 
     addTask, 
@@ -84,8 +97,11 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [isEditingStartDate, setIsEditingStartDate] = useState(false);
+  
+  // プロジェクト切り替えメニュー用state
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
-  // 開閉状態管理（折りたたまれているIDを保持）
+  // 開閉状態管理
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
 
   const toggleNodeExpansion = useCallback((nodeId: string) => {
@@ -204,21 +220,15 @@ function App() {
   const debugInfo = useMemo(() => {
     if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0, mappingInfo: "" };
     
-    // 1. 通常のJSON文字列
     const normal = JSON.stringify(data);
-
-    // 2. 中間データ (Base185 + Swap)
     const intermediate = getIntermediateJson(data);
 
-    // マッピンググループの特定ロジック
     let mappingInfo = "Unknown";
     try {
-      // intermediateは "ver,groupId,name,..." の形式で始まる
-      const headerPart = intermediate.split('[')[0]; // タスクリスト開始前までを取得
+      const headerPart = intermediate.split('[')[0]; 
       const parts = headerPart.split(',');
       if (parts.length >= 2) {
         const ver = from185(parts[0]);
-        // 現在のバージョン(0)の場合
         if (ver === 0) {
           const groupId = from185(parts[1]);
           const group = MAPPING_GROUPS[groupId];
@@ -233,10 +243,7 @@ function App() {
       console.error("Failed to parse mapping group", e);
     }
     
-    // 3. 圧縮後の文字列 (LZ)
     const compressed = compressData(data);
-    
-    // 圧縮率計算 (圧縮後 / 元サイズ * 100)
     const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
     
     return { 
@@ -267,6 +274,15 @@ function App() {
     if (count === 0) return 0;
     return Math.round(total / count);
   }, [data, activeTasks]);
+
+  // ダブルクリックでプロジェクト名変更
+  const handleProjectNameDoubleClick = () => {
+    if (!data) return;
+    const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
+    if (newName && newName.trim()) {
+        setData({ ...data, projectName: newName, lastSynced: Date.now() });
+    }
+  };
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -308,14 +324,13 @@ function App() {
   };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 220; // 基本幅
+    const BASE_WIDTH = 220;
     const INDENT_WIDTH = 24;
     const CHAR_WIDTH_PX = 12;
-    const DEADLINE_WIDTH = 80; // 期限日表示用の追加幅
+    const DEADLINE_WIDTH = 80;
 
     const len = getStrLen(node.name);
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
-    // 期限日が設定されている場合は幅を追加
     const extraWidth = node.deadlineOffset !== undefined ? DEADLINE_WIDTH : 0;
     
     let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth + extraWidth;
@@ -379,7 +394,11 @@ function App() {
           height: '100vh', 
           boxSizing: 'border-box',
           overflow: 'hidden'
-        }}>
+        }}
+        onClick={() => {
+            if (showProjectMenu) setShowProjectMenu(false);
+        }}
+        >
           
           {incomingData && data && (
             <MergeModal 
@@ -391,6 +410,7 @@ function App() {
                     alert('マージが完了しました');
                 }}
                 onCancel={() => setIncomingData(null)}
+                onCreateNew={importNewProject}
             />
           )}
 
@@ -424,25 +444,88 @@ function App() {
                       📅
                     </button>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '15px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
                             <h1 
-                                style={{ margin: 0, fontSize: '1.5em' }}
-                                title="クリックしてプロジェクト名を変更"
+                                style={{ margin: 0, fontSize: '1.5em', cursor: 'text' }}
+                                onDoubleClick={handleProjectNameDoubleClick}
+                                title="ダブルクリックでプロジェクト名を変更"
                             >
-                                TaskLink:
-                                <span 
-                                  style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
-                                  onClick={() => {
-                                      const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
-                                      if (newName && newName.trim()) {
-                                          setData({ ...data, projectName: newName, lastSynced: Date.now() });
-                                      }
-                                  }}
-                                >
-                                  {data.projectName}
-                                </span> 
+                                TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span>
                             </h1>
-                            <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>
+
+                            {/* プロジェクト切り替えドロップダウン */}
+                            <div style={{ position: 'relative' }}>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowProjectMenu(!showProjectMenu);
+                                    }}
+                                    style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer' }}
+                                >
+                                    ▼
+                                </button>
+                                {showProjectMenu && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        marginTop: '4px',
+                                        backgroundColor: '#333',
+                                        border: '1px solid #555',
+                                        borderRadius: '4px',
+                                        zIndex: 1000,
+                                        minWidth: '200px',
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                                    }}>
+                                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                            {projects.map(p => (
+                                                <div 
+                                                    key={p.id}
+                                                    onClick={() => {
+                                                        switchProject(p.id);
+                                                        setShowProjectMenu(false);
+                                                    }}
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        cursor: 'pointer',
+                                                        backgroundColor: p.id === activeId ? '#444' : 'transparent',
+                                                        borderBottom: '1px solid #444',
+                                                        fontSize: '0.9em'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#555'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = p.id === activeId ? '#444' : 'transparent'}
+                                                >
+                                                    {p.projectName}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div 
+                                            onClick={() => {
+                                                addProject();
+                                                setShowProjectMenu(false);
+                                            }}
+                                            style={{ padding: '8px 12px', cursor: 'pointer', color: '#646cff', borderTop: '1px solid #555', fontSize: '0.9em' }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#444'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                            + 新規プロジェクト
+                                        </div>
+                                        <div 
+                                            onClick={() => {
+                                                deleteProject(activeId);
+                                                setShowProjectMenu(false);
+                                            }}
+                                            style={{ padding: '8px 12px', cursor: 'pointer', color: '#ff6b6b', fontSize: '0.9em' }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#444'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                            🗑️ このプロジェクトを削除
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>
                                 (全進捗: {projectProgress}%)
                             </span>
                         </div>

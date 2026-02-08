@@ -104,6 +104,7 @@ export const mergeAppData = (local: AppData, incoming: AppData): AppData => {
   });
 
   return { 
+    id: local.id, // IDはローカルのものを維持
     projectName: finalProjectName, 
     projectStartDate: newerProjectStart, 
     tasks: Array.from(resultTasksMap.values()), 

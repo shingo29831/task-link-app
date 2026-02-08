@@ -11,7 +11,8 @@ export interface Task {
 }
 
 export interface AppData {
-  projectName: string; // 追加: プロジェクト名
+  id: string; // 追加: プロジェクトID
+  projectName: string; 
   projectStartDate: number; 
   tasks: Task[];
   lastSynced: number;

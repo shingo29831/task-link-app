@@ -7,30 +7,35 @@ interface Props {
   incomingData: AppData;
   onConfirm: (merged: AppData) => void;
   onCancel: () => void;
+  onCreateNew?: (data: AppData) => void;
 }
 
 type MergeMode = 'ID' | 'NAME';
 type ResolveAction = 'USE_LOCAL' | 'USE_REMOTE' | 'DELETE' | 'ADD_REMOTE';
 type Priority = 'LOCAL' | 'REMOTE';
+// ステップ定義を変更
+type MergeStep = 'ACTION_CHOICE' | 'NAME_CHOICE' | 'TASKS';
 
 interface ComparisonRow {
-  key: string; // ID or Name
+  key: string; 
   local?: Task;
   remote?: Task;
   action: ResolveAction;
   displayName: string;
-  resolvedParentKey?: string; // 階層表示用の親キー
-  isIdentical: boolean; // 完全に一致しているかどうかのフラグ
+  resolvedParentKey?: string; 
+  isIdentical: boolean; 
 }
 
 interface HierarchicalRow extends ComparisonRow {
     depth: number;
 }
 
-export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm, onCancel }) => {
-  const [step, setStep] = useState<'PROJECT' | 'TASKS'>(
-    localData.projectName !== incomingData.projectName ? 'PROJECT' : 'TASKS'
+export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm, onCancel, onCreateNew }) => {
+  // 初期ステップの決定ロジック
+  const [step, setStep] = useState<MergeStep>(
+    localData.projectName !== incomingData.projectName ? 'ACTION_CHOICE' : 'TASKS'
   );
+  
   const [projectNameChoice, setProjectNameChoice] = useState<'LOCAL' | 'REMOTE'>('LOCAL');
   
   const [mergeMode, setMergeMode] = useState<MergeMode>('NAME');
@@ -83,7 +88,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     ));
   };
 
-  // タスクの内容が一致しているか判定するヘルパー関数
   const isContentEqual = (a: Task, b: Task) => {
     const deadlineA = a.deadlineOffset ?? null;
     const deadlineB = b.deadlineOffset ?? null;
@@ -199,17 +203,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
 
   // 重複マッピングの計算 (RemoteID -> LocalID)
-  // 階層構造を考慮して、Remoteタスクが既存のLocalタスクの重複（ID違い）であるかを判定
   const duplicateMap = useMemo(() => {
     if (mergeMode !== 'ID') return new Map<string, string>();
 
     const mapping = new Map<string, string>();
     
-    // Helper maps
     const localTasksById = new Map<string, Task>();
     const localChildrenMap = new Map<string, Map<string, string>>(); // ParentID -> Name -> ID
     
-    // Populate Local maps
     rows.forEach(row => {
         if (row.local) {
             localTasksById.set(row.local.id, row.local);
@@ -226,20 +227,16 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
     });
 
-    // Cache for resolved equivalent local ID
     const resolvedLocalIdCache = new Map<string, string | null>();
 
-    // Function to find equivalent Local ID for a Remote ID
     const findEquivalentLocalId = (remoteId: string): string | null => {
         if (resolvedLocalIdCache.has(remoteId)) return resolvedLocalIdCache.get(remoteId)!;
         
-        // 1. Check if Local exists with same ID (ID Match)
         if (localTasksById.has(remoteId)) {
              resolvedLocalIdCache.set(remoteId, remoteId);
              return remoteId;
         }
 
-        // 2. Check if it's a Name Duplicate
         const remoteTask = remoteTasksById.get(remoteId);
         if (!remoteTask) {
             resolvedLocalIdCache.set(remoteId, null);
@@ -250,19 +247,15 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         let localParentId: string = 'root';
 
         if (remoteParentId !== 'root') {
-             // Recursive step: resolve parent
              const resolvedParent = findEquivalentLocalId(remoteParentId);
              if (resolvedParent) {
                  localParentId = resolvedParent;
              } else {
-                 // 親がRemoteにしかなく、かつLocalに相当するものがない場合、
-                 // このタスクもLocalに相当するものがないとみなす
                  resolvedLocalIdCache.set(remoteId, null);
                  return null;
              }
         }
 
-        // Now check if localParentId has a child with this name
         const children = localChildrenMap.get(localParentId);
         if (children && children.has(remoteTask.name)) {
             const equivId = children.get(remoteTask.name)!;
@@ -274,9 +267,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         return null;
     };
 
-    // Iterate all Remote tasks (via rows) to set mapping
     rows.forEach(row => {
-        if (row.remote && !row.local) { // Only check purely remote rows (ID mismatch)
+        if (row.remote && !row.local) { 
              const equivId = findEquivalentLocalId(row.remote.id);
              if (equivId) {
                  mapping.set(row.remote.id, equivId);
@@ -287,7 +279,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     return mapping;
   }, [rows, mergeMode]);
 
-  // duplicateMapから警告メッセージMapを生成
   const duplicateWarnings = useMemo(() => {
       const warnings = new Map<string, string>();
       duplicateMap.forEach((_, key) => {
@@ -316,7 +307,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const checkVisibility = (row: ComparisonRow): boolean => {
         if (visibilityMap.has(row.key)) return visibilityMap.get(row.key)!;
         
-        // 重複警告がある場合は必ず表示
         if (duplicateWarnings.has(row.key)) {
              visibilityMap.set(row.key, true);
              return true;
@@ -376,10 +366,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const generateId = () => { maxIdVal++; return maxIdVal.toString(36); };
 
     rows.forEach(row => {
-        // 重複警告がある場合
         if (duplicateMap.has(row.key)) {
-             // 重複としてスキップされるタスクのIDを、相当するLocalタスクのIDにマッピングする
-             // これにより、このタスクの子タスクが正しくLocal側の親にぶら下がるようになる
              idMap.set(row.key, duplicateMap.get(row.key)!);
              return; 
         }
@@ -417,6 +404,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     });
 
     onConfirm({
+        id: localData.id,
         projectName: projectNameChoice === 'LOCAL' ? localData.projectName : incomingData.projectName,
         projectStartDate: localData.projectStartDate,
         tasks: finalTasks,
@@ -424,18 +412,65 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     });
   };
 
-  if (step === 'PROJECT') {
+  // ステップ1: アクションの選択
+  if (step === 'ACTION_CHOICE') {
     return (
         <div style={overlayStyle}>
             <div style={modalStyle}>
                 <h3>プロジェクト名の競合</h3>
-                <p>プロジェクト名が異なります。</p>
-                <p>Local: {localData.projectName}</p>
-                <p>Remote: {incomingData.projectName}</p>
+                <p>このプロジェクト名はデータにありません。</p>
+                <p>現在のプロジェクト: <strong>{localData.projectName}</strong></p>
+                <p>インポートするプロジェクト: <strong>{incomingData.projectName}</strong></p>
+                
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                    <button onClick={onCancel} style={btnStyle}>マージしない (中止)</button>
-                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>Localのプロジェクト名を適用</button>
-                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>Remoteのプロジェクト名を適用</button>
+                    <button 
+                        onClick={() => setStep('NAME_CHOICE')} 
+                        style={btnStyle}
+                    >
+                        このプロジェクトにマージ
+                    </button>
+                    
+                    {onCreateNew && (
+                        <button 
+                            onClick={() => onCreateNew(incomingData)} 
+                            style={{ ...btnStyle, backgroundColor: '#007bff', borderColor: '#0056b3' }}
+                        >
+                            新規プロジェクトとして作成
+                        </button>
+                    )}
+
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: '#555' }}>キャンセル</button>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  // ステップ2: 名前の選択（マージの場合）
+  if (step === 'NAME_CHOICE') {
+    return (
+        <div style={overlayStyle}>
+            <div style={modalStyle}>
+                <h3>プロジェクト名の選択</h3>
+                <p>どちらのプロジェクト名を使用しますか？</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                    <button 
+                        onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} 
+                        style={btnStyle}
+                    >
+                        ローカルを使用: <strong>{localData.projectName}</strong>
+                    </button>
+                    <button 
+                        onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} 
+                        style={btnStyle}
+                    >
+                        リモートを使用: <strong>{incomingData.projectName}</strong>
+                    </button>
+                    
+                    <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: '#555' }}>
+                        戻る
+                    </button>
                 </div>
             </div>
         </div>
