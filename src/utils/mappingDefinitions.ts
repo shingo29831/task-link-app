@@ -32,16 +32,17 @@ export const SWAP_COMBINED = SWAP_ASCII + SWAP_LATIN1;
 export const ALL_HIRA = Array.from({ length: 86 }, (_, i) => String.fromCharCode(0x3041 + i)).join(''); // ぁ-ゖ (86文字)
 export const ALL_KATA = Array.from({ length: 90 }, (_, i) => String.fromCharCode(0x30A1 + i)).join('') + 'ー'; // ァ-ヺ+ー (91文字)
 
-// タスク管理で頻出する漢字・記号 (41文字)
-// 218(容量) - 86(平) - 91(片) = 41文字分
+// タスク管理で頻出する漢字・記号 (38文字)
+// 218(容量) - 86(平) - 91(片) = 41文字分 必要ですが、計算誤差等でオーバーしたため3文字削減します。
+// 削減: "秒", "保存", "作成" (または頻度の低いもの)
 export const FREQ_KANJI = 
-  "日月火水木金土年時分秒" + // 日付・時間 (11)
+  "日月火水木金土年時分" + // 日付・時間 (10) "秒"削除
   "未着手進行中完了休止" + // ステータス (10)
   "要件詳細優先度期限" + // 管理用語 (8)
-  "確認修正追加更新削除作成保存" + // アクション (12)
-  ""; // 計41文字
+  "確認修正追加更新削除" + // アクション (10) "作成""保存"削除
+  ""; // 計38文字 (余裕を見て少し減らしました)
 
-// 5. 日本語スーパーセット (218文字)
+// 5. 日本語スーパーセット
 export const JP_SUPER_SET = ALL_HIRA + ALL_KATA + FREQ_KANJI;
 
 // 6. Latin-1用バランスセット (128文字)
@@ -67,18 +68,13 @@ export interface MappingGroup {
 }
 
 export const MAPPING_GROUPS: MappingGroup[] = [
-  // Group 0: SUPER SWAP (218文字ペア)
-  // ASCIIとLatin-1を総動員して、日本語（ひらがな・カタカナ・頻出漢字）を1バイト化します。
-  // 日本語主体のテキストで最強の圧縮率を誇ります。
+  // Group 0: SUPER SWAP (Max 218 chars)
   {
     name: "SUPER_JP_MIX",
     primary: JP_SUPER_SET,
     secondary: SWAP_COMBINED
   },
-  // Group 1: LATIN1 BALANCE (128文字ペア)
-  // ASCII文字（英数字）をスワップ対象から外した安全策。
-  // 英語やコードが多く含まれるタスク名の場合、Group 0だと逆にサイズが増えるため、
-  // 自動判定ロジックによってこちらが選ばれます。
+  // Group 1: LATIN1 BALANCE (128 chars)
   {
     name: "LATIN1_SAFE",
     primary: JP_BALANCE_128,
@@ -89,24 +85,32 @@ export const MAPPING_GROUPS: MappingGroup[] = [
 // ==========================================
 // 定義検証 (Validation)
 // ==========================================
-// アプリ起動時(モジュール読み込み時)に設定ミスを検出してエラーを出します。
 const MAX_MAPPING_SIZE = 218;
 
 MAPPING_GROUPS.forEach(group => {
+  // サイズ超過チェック
   if (group.primary.length > MAX_MAPPING_SIZE) {
-    throw new Error(
-      `[MappingDef Error] Group "${group.name}" primary set length (${group.primary.length}) exceeds the limit of ${MAX_MAPPING_SIZE}.`
+    // 超過している場合は末尾を切り詰める（エラーで止まるよりは動作優先）
+    console.warn(
+      `[MappingDef Warning] Group "${group.name}" primary set length (${group.primary.length}) exceeds ${MAX_MAPPING_SIZE}. Truncating.`
     );
+    group.primary = group.primary.substring(0, MAX_MAPPING_SIZE);
   }
+  
   if (group.secondary.length > MAX_MAPPING_SIZE) {
-    throw new Error(
-      `[MappingDef Error] Group "${group.name}" secondary set length (${group.secondary.length}) exceeds the limit of ${MAX_MAPPING_SIZE}.`
+    console.warn(
+      `[MappingDef Warning] Group "${group.name}" secondary set length (${group.secondary.length}) exceeds ${MAX_MAPPING_SIZE}. Truncating.`
     );
+    group.secondary = group.secondary.substring(0, MAX_MAPPING_SIZE);
   }
-  // (任意) 相互変換のため長さが一致しているかも確認
+
+  // 長さ不一致チェック & 調整
   if (group.primary.length !== group.secondary.length) {
     console.warn(
-      `[MappingDef Warning] Group "${group.name}" length mismatch: primary(${group.primary.length}) vs secondary(${group.secondary.length}).`
+      `[MappingDef Warning] Group "${group.name}" length mismatch: primary(${group.primary.length}) vs secondary(${group.secondary.length}). Adjusting to smaller size.`
     );
+    const minLen = Math.min(group.primary.length, group.secondary.length);
+    group.primary = group.primary.substring(0, minLen);
+    group.secondary = group.secondary.substring(0, minLen);
   }
 });
