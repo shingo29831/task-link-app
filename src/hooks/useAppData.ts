@@ -1,4 +1,3 @@
-// src/hooks/useAppData.ts
 import { useState, useEffect, useRef } from 'react';
 import type { AppData } from '../types';
 import { compressData, decompressData } from '../utils/compression';
@@ -11,6 +10,7 @@ export const useAppData = () => {
   const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
 
+  // 1. 初期ロード処理（変更なし）
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
@@ -20,7 +20,7 @@ export const useAppData = () => {
       const localData: AppData = localJson 
       ? JSON.parse(localJson) 
       : { 
-          projectName: 'マイプロジェクト', // デフォルト名
+          projectName: 'マイプロジェクト',
           projectStartDate: DEFAULT_START, 
           tasks: [], 
           lastSynced: 0 
@@ -32,9 +32,9 @@ export const useAppData = () => {
       if (compressed) {
         const incoming = decompressData(compressed);
         if (incoming) {
-          // 自動マージせず、incomingDataにセットしてURLをクリア
           setIncomingData(incoming);
           setData(localData);
+          // 読み込み後はURLを一旦クリア（必要に応じて）
           window.history.replaceState(null, '', window.location.pathname);
           return;
         }
@@ -44,9 +44,16 @@ export const useAppData = () => {
     load();
   }, []);
 
+  // 2. データの変更をURLとLocalStorageに同期する（ここを追加・修正）
   useEffect(() => {
     if (data) {
+      // LocalStorageへの保存
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+      // アドレスバーのURLを最新の状態に更新
+      const compressed = compressData(data); //
+      const newUrl = `${window.location.origin}${window.location.pathname}?d=${compressed}`;
+      window.history.replaceState(null, '', newUrl);
     }
   }, [data]);
 
