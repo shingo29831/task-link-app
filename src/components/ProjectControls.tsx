@@ -5,10 +5,10 @@ interface Props {
   onExport: () => void;
   onImport: (file: File) => void;
   onImportFromUrl: (url: string) => void;
-  onOptimize: () => void;
+  // onOptimize を削除
 }
 
-export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl, onOptimize }) => {
+export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl }) => { // onOptimize を削除
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -48,9 +48,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
           ⬆⬇ 出力 / 読み込み
         </button>
 
-        <button onClick={onOptimize} style={{ backgroundColor: '#d9534f' }} title="削除済みデータを完全消去してIDを整理します">
-          🧹 リンク最適化
-        </button>
+        {/* リンク最適化ボタンを削除 */}
 
         <input 
           type="file" 

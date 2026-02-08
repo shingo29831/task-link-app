@@ -88,7 +88,7 @@ function App() {
     updateTaskStatus, 
     updateTaskDeadline, 
     updateProjectStartDate, 
-    optimizeData, 
+    // optimizeData, // 削除
     handleDragEnd 
   } = useTaskOperations(data, setData);
 
@@ -370,7 +370,8 @@ function App() {
                     onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
                     onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
                     onImport={(f) => { const r = new FileReader(); r.onload = (e) => { try { const incoming = JSON.parse(e.target?.result as string); setIncomingData(incoming); } catch(err) { alert('JSONの読み込みに失敗しました'); } }; r.readAsText(f); }}
-                    onImportFromUrl={handleImportFromUrl} onOptimize={optimizeData}
+                    onImportFromUrl={handleImportFromUrl} 
+                    // onOptimize={optimizeData} // 削除
                 />
             </header>
             <div style={{ marginBottom: '20px' }}>

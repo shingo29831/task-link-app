@@ -10,7 +10,6 @@ const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Da
 // Constants & Configuration
 // ==========================================
 
-// バージョンを 0 に設定
 const CURRENT_VERSION = 0;
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
 const EPOCH_2020_MIN = 26297280;
@@ -208,23 +207,38 @@ export const getIntermediateJson = (data: AppData): string => {
     data.projectStartDate ? to185(Math.floor(data.projectStartDate / 60000 - EPOCH_2020_MIN)) : ''
   ].join(',');
 
-  const tasksStr = data.tasks.map((t) => {
-    if (t.isDeleted) return "[";
-    
-    const rawName = applyDictionaryAndEscape(t.name);
-    const vName = swapChars(rawName, groupId);
-    
-    const vOrder = to185(t.order ?? 0);
-    const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN));
-    const vParent = (t.parentId === "0" || !t.parentId) ? "" : t.parentId;
-    const vStatus = t.status === 0 ? "" : t.status.toString();
-    const vDeadline = (t.deadlineOffset === undefined) ? "" : to185(t.deadlineOffset);
+  const tasksStr = data.tasks
+    .filter(t => !t.isDeleted) // Ver.1: 削除済みタスクは保存しない
+    .map((t) => {
+      // Ver.1: IDを含める (36進数文字列 -> 数値 -> 185進数)
+      const vId = to185(parseInt(t.id, 36));
+      
+      const rawName = applyDictionaryAndEscape(t.name);
+      const vName = swapChars(rawName, groupId);
+      
+      const vOrder = to185(t.order ?? 0);
+      const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN));
+      
+      // Ver.1: ParentIDも圧縮 (36進数文字列 -> 数値 -> 185進数)
+      let vParent = "";
+      if (t.parentId && t.parentId !== "0") {
+        const pidNum = parseInt(t.parentId, 36);
+        if (!isNaN(pidNum)) {
+          vParent = to185(pidNum);
+        } else {
+          vParent = t.parentId; // fallback
+        }
+      }
 
-    const parts = [vName, vOrder, vUpdated, vParent, vStatus, vDeadline];
-    while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
-    
-    return "[" + parts.join(",");
-  }).join('');
+      const vStatus = t.status === 0 ? "" : t.status.toString();
+      const vDeadline = (t.deadlineOffset === undefined) ? "" : to185(t.deadlineOffset);
+
+      // Ver.1: [ID, Name, Order, Updated, Parent, Status, Deadline]
+      const parts = [vId, vName, vOrder, vUpdated, vParent, vStatus, vDeadline];
+      while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
+      
+      return "[" + parts.join(",");
+    }).join('');
 
   return header + tasksStr;
 };
@@ -245,30 +259,29 @@ export const decompressData = (compressed: string): AppData | null => {
 
     const headerParts = headerStr.split(',');
     
-    // 修正: 正しい変数名に変更
     const versionCandidate = from185(headerParts[0]);
+    const isVer1 = versionCandidate === 1;
     const isVer0 = versionCandidate === 0;
 
     let projectName = DEFAULT_PROJECT_NAME;
-    // 修正: 正しい変数名に変更
     let projectStartDate = (0 + EPOCH_2020_MIN) * 60000;
     let lastSynced = 0;
     let groupId = 0;
 
-    if (isVer0) {
+    if (isVer1 || isVer0) {
       groupId = from185(headerParts[1]);
       projectName = restoreDictionaryAndEscape(swapChars(headerParts[2], groupId));
       
       lastSynced = (from185(headerParts[3]) + EPOCH_2020_MIN) * 60000;
       if (headerParts[4]) {
-        // 修正: 正しい変数名に変更
         projectStartDate = (from185(headerParts[4]) + EPOCH_2020_MIN) * 60000;
       }
     } else {
+      // Legacy Format
       projectName = headerParts[0]; 
       if (headerParts[1]) {
         const val = parseInt(headerParts[1], 36);
-        if (!isNaN(val)) lastSynced = (val +EPOCH_2020_MIN) * 60000;
+        if (!isNaN(val)) lastSynced = (val + EPOCH_2020_MIN) * 60000;
       }
     }
 
@@ -276,6 +289,30 @@ export const decompressData = (compressed: string): AppData | null => {
     if (taskStrings.length > 0 && taskStrings[0] === "") taskStrings.shift();
 
     const tasks = taskStrings.map((tStr: string, index: number) => {
+      // Ver.1 Logic
+      if (isVer1) {
+        const parts = tStr.split(',');
+        // IDは先頭 (185進数 -> 数値 -> 36進数文字列)
+        const id = from185(parts[0]).toString(36);
+        
+        const name = restoreDictionaryAndEscape(swapChars(parts[1], groupId));
+        const order = from185(parts[2]);
+        const lastUpdated = (from185(parts[3]) + EPOCH_2020_MIN) * 60000;
+        
+        // ParentID復元
+        let parentId: string | undefined = undefined;
+        if (parts[4]) {
+           const pidNum = from185(parts[4]);
+           parentId = pidNum.toString(36);
+        }
+
+        const status = (parts[5] ? Number(parts[5]) : 0) as 0|1|2|3;
+        const deadlineOffset = parts[6] ? from185(parts[6]) : undefined;
+
+        return { id, name, status, deadlineOffset, lastUpdated, parentId, order };
+      }
+
+      // Ver.0 & Legacy Logic
       const id = (index + 1).toString(36);
       if (tStr === "") return { id, name: "", status: 0 as const, lastUpdated: 0, isDeleted: true };
       
@@ -309,7 +346,7 @@ export const decompressData = (compressed: string): AppData | null => {
     });
 
     return { 
-        id: generateProjectId(), // 新規ID
+        id: generateProjectId(),
         projectName, 
         projectStartDate, 
         tasks, 

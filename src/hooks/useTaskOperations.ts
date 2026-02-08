@@ -208,42 +208,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  const optimizeData = useCallback(() => {
-    if (!data) return;
-
-    if (!confirm('削除情報のキャッシュをクリアします。\nIDがずれる代わりにデータが最適化されます。')) {
-      return;
-    }
-
-    const validTasks = data.tasks.filter(t => !t.isDeleted);
-
-    if (validTasks.length === 0) {
-      setData({ ...data, tasks: [], lastSynced: Date.now() });
-      return;
-    }
-
-    const idMap = new Map<string, string>();
-    validTasks.forEach((t, index) => {
-      idMap.set(t.id, (index + 1).toString(36));
-    });
-
-    const optimizedTasks = validTasks.map(t => {
-      const newId = idMap.get(t.id)!;
-      const newParentId = (t.parentId && idMap.has(t.parentId))
-        ? idMap.get(t.parentId)
-        : undefined;
-
-      return {
-        ...t,
-        id: newId,
-        parentId: newParentId,
-        lastUpdated: Date.now()
-      };
-    });
-
-    setData({ ...data, tasks: optimizedTasks, lastSynced: Date.now() });
-    alert('最適化が完了しました。');
-  }, [data, setData]);
+  // optimizeData 関数を削除
 
   // ドラッグアンドドロップ終了時の処理
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -358,7 +323,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     updateTaskStatus,
     updateTaskDeadline,
     updateProjectStartDate,
-    optimizeData,
+    // optimizeData, // 削除
     handleDragEnd
   };
 };
