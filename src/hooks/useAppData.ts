@@ -134,10 +134,22 @@ export const useAppData = () => {
 
   const addProject = () => {
     const newProject = createDefaultProject();
-    const count = projects.filter(p => p.projectName.startsWith('マイプロジェクト')).length;
-    if (count > 0) {
-        newProject.projectName = `マイプロジェクト ${count + 1}`;
+    
+    // マイプロジェクト, マイプロジェクト 2, マイプロジェクト 3... の順で空いている名前を探す
+    let nameCandidate = 'マイプロジェクト';
+    let counter = 1;
+
+    // 既存のプロジェクト名リストを取得
+    const existingNames = new Set(projects.map(p => p.projectName));
+
+    // 名前が重複している間、カウンタを増やして新しい名前を試す
+    while (existingNames.has(nameCandidate)) {
+      counter++;
+      nameCandidate = `マイプロジェクト ${counter}`;
     }
+
+    newProject.projectName = nameCandidate;
+
     setProjects(prev => [...prev, newProject]);
     setActiveId(newProject.id);
   };

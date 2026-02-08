@@ -321,6 +321,12 @@ function App() {
     if (!data) return;
     const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
     if (newName && newName.trim()) {
+        // 重複チェック (自分自身は除く)
+        const isDuplicate = projects.some(p => p.id !== data.id && p.projectName === newName);
+        if (isDuplicate) {
+            alert('そのプロジェクト名は既に使用されています。別の名前を指定してください。');
+            return;
+        }
         setData({ ...data, projectName: newName, lastSynced: Date.now() });
     }
   };
