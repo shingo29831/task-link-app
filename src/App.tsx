@@ -26,11 +26,11 @@ import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-// decompressData を追加インポート
 import { compressData, getIntermediateJson, from185, decompressData } from './utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
+import { ProjectNameEditModal } from './components/ProjectNameEditModal'; // 追加
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -100,6 +100,9 @@ function App() {
   
   // プロジェクト切り替えメニュー用state
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+
+  // プロジェクト名変更モーダル用state (追加)
+  const [showRenameModal, setShowRenameModal] = useState(false);
 
   // 開閉状態管理
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
@@ -316,19 +319,10 @@ function App() {
     return Math.round(total / count);
   }, [data, activeTasks]);
 
-  // ダブルクリックでプロジェクト名変更
+  // ダブルクリックでモーダル表示 (変更)
   const handleProjectNameDoubleClick = () => {
     if (!data) return;
-    const newName = prompt('プロジェクト名を変更しますか？', data.projectName);
-    if (newName && newName.trim()) {
-        // 重複チェック (自分自身は除く)
-        const isDuplicate = projects.some(p => p.id !== data.id && p.projectName === newName);
-        if (isDuplicate) {
-            alert('そのプロジェクト名は既に使用されています。別の名前を指定してください。');
-            return;
-        }
-        setData({ ...data, projectName: newName, lastSynced: Date.now() });
-    }
+    setShowRenameModal(true);
   };
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
@@ -464,6 +458,20 @@ function App() {
             />
           )}
 
+          {/* プロジェクト名変更モーダル (追加) */}
+          {showRenameModal && data && (
+            <ProjectNameEditModal 
+              currentName={data.projectName}
+              currentId={data.id}
+              projects={projects}
+              onClose={() => setShowRenameModal(false)}
+              onSave={(newName) => {
+                setData({ ...data, projectName: newName, lastSynced: Date.now() });
+                setShowRenameModal(false);
+              }}
+            />
+          )}
+
           <div style={{ 
             flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
             display: 'flex', 
@@ -496,7 +504,7 @@ function App() {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
                             <h1 
-                                style={{ margin: 0, fontSize: '1.5em', cursor: 'text' }}
+                                style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }}
                                 onDoubleClick={handleProjectNameDoubleClick}
                                 title="ダブルクリックでプロジェクト名を変更"
                             >

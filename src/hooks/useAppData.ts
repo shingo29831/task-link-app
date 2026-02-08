@@ -132,6 +132,7 @@ export const useAppData = () => {
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
 
+  // 新規プロジェクト作成 (連番修正)
   const addProject = () => {
     const newProject = createDefaultProject();
     
