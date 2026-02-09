@@ -12,18 +12,18 @@ interface Props {
   hasChildren: boolean;
   onStatusChange: (s: 0 | 1 | 2 | 3) => void;
   onDelete: () => void;
-  onAddSubTask: () => void;
+  // onAddSubTask を削除
   onRename: (newName: string) => void;
   onDeadlineChange: (dateStr: string) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onClick: () => void; // 追加: タスク行クリック時のハンドラ
+  onClick: () => void;
 }
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
-  onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange, 
-  isExpanded, onToggleExpand, onClick // 追加
+  onStatusChange, onDelete, onRename, onDeadlineChange, 
+  isExpanded, onToggleExpand, onClick 
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -138,7 +138,6 @@ export const TaskItem: React.FC<Props> = ({
     <div 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      // 変更: stopPropagationを追加し、バブリングを防止 & 変数eを使用
       onClick={(e) => {
         e.stopPropagation();
         if (isEditing || isEditingDeadline) return;
@@ -218,7 +217,7 @@ export const TaskItem: React.FC<Props> = ({
       
       <div style={{ display: 'flex', gap: '4px', visibility: isHovered || isEditing || isEditingDeadline ? 'visible' : 'hidden' }}>
         <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>📅</button>
-        <button onClick={(e) => { e.stopPropagation(); onAddSubTask(); }} title="子タスク追加" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>＋</button>
+        {/* +ボタンを削除しました */}
         <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
       </div>
     </div>

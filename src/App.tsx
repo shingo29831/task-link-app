@@ -33,7 +33,6 @@ import { ProjectNameEditModal } from './components/ProjectNameEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-// 変更: onBoardClickプロパティを追加
 const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.ReactNode, activeTasks: Task[], onBoardClick: () => void }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
@@ -42,7 +41,6 @@ const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.Re
   return (
     <div 
       ref={setNodeRef}
-      // 変更: 引数 'e' を削除して警告を解消
       onClick={() => {
         onBoardClick();
       }}
@@ -104,7 +102,6 @@ function App() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
 
-  // 追加: 親タスクとしてフォーカスしているタスクが削除された場合、フォーカスを解除する
   useEffect(() => {
     if (parent && data) {
       const exists = data.tasks.some(t => t.id === parent.id && !t.isDeleted);
@@ -114,23 +111,19 @@ function App() {
     }
   }, [data, parent]);
 
-  // キーボードショートカットの実装 (Ctrl+Y 対応)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 入力フォーム操作中は無効化
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
       if (e.metaKey || e.ctrlKey) {
-        // Redo: Ctrl+y (or Cmd+y) または Ctrl+Shift+Z
         if (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) {
           e.preventDefault();
           redo();
           return;
         }
         
-        // Undo: Ctrl+z (Shiftなし)
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
           e.preventDefault();
           undo();
@@ -315,27 +308,21 @@ function App() {
     }
     addTask(inputTaskName, deadline, targetParentId ?? parent?.id);
     
-    // フォーカスを維持するため setParent(null) を削除
     setInputTaskName(''); 
     setInputDateStr(''); 
   };
 
-  const onTaskItemAddClick = (node: TaskNode) => { if (inputTaskName.trim()) handleAddTaskWrapper(node.id); else setParent({ id: node.id, name: node.name }); };
-  
-  // 追加: タスククリック時のハンドラ
+  // onTaskItemAddClick を削除しました
+
   const handleTaskClick = (node: TaskNode) => {
     if (inputTaskName.trim()) {
-      // 入力済みなら即追加
       handleAddTaskWrapper(node.id);
     } else {
-      // 入力なしなら親タスクとして選択
       setParent({ id: node.id, name: node.name });
     }
   };
 
-  // 追加: ボードクリック時のハンドラ
   const handleBoardClick = () => {
-    // 親タスク選択解除 (トップレベルへ)
     setParent(null);
   };
 
@@ -359,10 +346,10 @@ function App() {
             <SortableTaskItem id={n.id} depth={depth}>
                 <TaskItem 
                   task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0}
-                  onStatusChange={(s) => updateTaskStatus(n.id, s)} onDelete={() => deleteTask(n.id)} onAddSubTask={() => onTaskItemAddClick(n)}
-                  onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)}
+                  onStatusChange={(s) => updateTaskStatus(n.id, s)} onDelete={() => deleteTask(n.id)} 
+                  onRename={(newName) => renameTask(n.id, newName)} 
+                  onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} 
                   isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)}
-                  // 変更: ハンドラを渡す
                   onClick={() => handleTaskClick(n)}
                 />
                 {n.children.length > 0 && !collapsedNodeIds.has(n.id) && (
@@ -445,7 +432,8 @@ function App() {
                                   <TaskItem 
                                     task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
                                     onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} 
-                                    onAddSubTask={() => onTaskItemAddClick(root)} onRename={(newName) => renameTask(root.id, newName)} 
+                                    // onAddSubTask を削除
+                                    onRename={(newName) => renameTask(root.id, newName)} 
                                     onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                     isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
                                     // 変更: ハンドラを渡す
