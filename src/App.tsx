@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
-  useDroppable,
+  useDroppable, 
+  // DragStartEvent は未使用のため削除
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -130,7 +131,6 @@ function App() {
   const isDev = import.meta.env.DEV;
 
   // バイブレーション処理
-  // 修正: 引数 'event' は使用しないため削除しました
   const handleDragStart = () => {
     if (navigator.vibrate) {
       navigator.vibrate(50); // 50ms振動
@@ -353,7 +353,7 @@ function App() {
                       title="元に戻す (Ctrl+Z)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
-                      ↪
+                      ↩
                     </button>
                     <button
                       onClick={redo}

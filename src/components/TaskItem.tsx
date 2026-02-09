@@ -143,12 +143,12 @@ export const TaskItem: React.FC<Props> = ({
   const handleItemClick = () => {
       if (isEditing || isEditingDeadline) return;
       
-      // メニューが開いていない場合はメニューを開く（選択状態にする）
+      // 変更: ワンタップで setParent (onClick) を常に実行するように変更
+      onClick();
+
+      // 同時にメニューも開く（まだ開いていない場合）
       if (!isMenuOpen) {
           onToggleMenu();
-      } else {
-          // すでにメニューが開いている状態でタップした場合は本来のクリック動作（詳細/子タスク追加）
-          onClick();
       }
   };
 
