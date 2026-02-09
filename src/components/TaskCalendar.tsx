@@ -6,11 +6,15 @@ import { TaskDetailModal } from './TaskDetailModal';
 
 interface Props {
   tasks: Task[];
+  activeTasks: Task[]; 
+  onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
+  onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
 }
 
-export const TaskCalendar: React.FC<Props> = ({ tasks }) => {
+export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChange, onParentStatusChange }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<{ date: Date, tasks: Task[] } | null>(null);
+  // 修正: タスクデータ自体ではなく、選択された日付のみを保持する
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -52,7 +56,8 @@ export const TaskCalendar: React.FC<Props> = ({ tasks }) => {
                 return (
                     <div 
                         key={kq} 
-                        onClick={() => setSelectedDay({ date: day, tasks: dayTasks })} 
+                        // 修正: 日付のみセットする
+                        onClick={() => setSelectedDate(day)} 
                         style={{ 
                             minHeight: '130px', minWidth: 0,
                             backgroundColor: isCurrentMonth ? '#333' : '#222', 
@@ -107,11 +112,15 @@ export const TaskCalendar: React.FC<Props> = ({ tasks }) => {
             })}
         </div>
 
-        {selectedDay && (
+        {/* 修正: selectedDateがある場合に、その都度getDayTasksで最新のタスクを取得して渡す */}
+        {selectedDate && (
             <TaskDetailModal 
-                date={selectedDay.date} 
-                tasks={selectedDay.tasks} 
-                onClose={() => setSelectedDay(null)} 
+                date={selectedDate} 
+                tasks={getDayTasks(selectedDate)} 
+                activeTasks={activeTasks}
+                onStatusChange={onStatusChange}
+                onParentStatusChange={onParentStatusChange}
+                onClose={() => setSelectedDate(null)} 
             />
         )}
     </div>

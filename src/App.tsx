@@ -235,7 +235,12 @@ function App() {
                     </label>
                 </div>
                 <div style={{ height: 'calc(100% - 40px)', overflowY: 'auto', paddingRight: '5px' }}>
-                    <TaskCalendar tasks={calendarTasks} />
+                    <TaskCalendar 
+                        tasks={calendarTasks} 
+                        activeTasks={activeTasks} // Pass active tasks for context
+                        onStatusChange={updateTaskStatus}
+                        onParentStatusChange={updateParentStatus}
+                    />
                 </div>
             </div>
 

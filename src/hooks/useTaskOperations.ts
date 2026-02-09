@@ -18,7 +18,7 @@ import {
   arrayMove
 } from '@dnd-kit/sortable';
 
-import type { Task } from '../types';
+import type { Task } from '../types'; 
 import { useAppData } from './useAppData';
 import { compressData, getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
@@ -92,7 +92,7 @@ export const useTaskOperations = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
-  const [showAllProjectsInCalendar, setShowAllProjectsInCalendar] = useState(false); // 追加: カレンダー表示切り替え
+  const [showAllProjectsInCalendar, setShowAllProjectsInCalendar] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
@@ -126,12 +126,12 @@ export const useTaskOperations = () => {
       const isCurrentProject = proj.id === data.id;
 
       // カレンダー表示用にデータを加工して追加
-      // - IDの重複を防ぐため、プロジェクトIDをプレフィックスにする
+      // - 現在のプロジェクト: IDそのまま (編集可能にするため)
+      // - 他のプロジェクト: IDにプレフィックス付与 (重複回避)
       const safeTasks = projTasks.map(t => ({
         ...t,
-        id: `${proj.id}_${t.id}`,
-        // nameは変更せず、そのまま表示 (カレンダーのセル内ではプロジェクト名を非表示にするため)
-        // 詳細モーダルで表示するために sourceProjectName を設定する
+        id: isCurrentProject ? t.id : `${proj.id}_${t.id}`,
+        // nameは変更せず、そのまま表示
         sourceProjectName: isCurrentProject ? undefined : proj.projectName
       }));
       
