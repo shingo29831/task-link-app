@@ -304,7 +304,7 @@ function App() {
       deadline = new Date(y, m - 1, d).getTime();
     }
     addTask(inputTaskName, deadline, targetParentId ?? parent?.id);
-    setInputTaskName(''); setInputDateStr(''); setParent(null);
+    setInputTaskName(''); setInputDateStr('');
   };
 
   const onTaskItemAddClick = (node: TaskNode) => { if (inputTaskName.trim()) handleAddTaskWrapper(node.id); else setParent({ id: node.id, name: node.name }); };
