@@ -93,17 +93,16 @@ function App() {
     updateTaskStatus, 
     updateTaskDeadline, 
     handleDragEnd,
-    updateParentStatus // 追加: 親タスクの状態変更用関数
+    updateParentStatus 
   } = useTaskOperations(data, setData);
 
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
 
-  // 開発環境かどうかを判定
   const isDev = import.meta.env.DEV;
 
   useEffect(() => {
@@ -202,6 +201,7 @@ function App() {
     return data;
   }, [incomingData, projects, data]);
 
+  // URLインポート処理
   const handleImportFromUrl = useCallback((urlStr: string) => {
     try {
       const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
@@ -217,6 +217,35 @@ function App() {
           alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
           return;
         }
+
+        // ▼ 修正: マージ先ターゲットの自動判定
+        let targetId = '';
+        const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
+
+        if (sameNameProject) {
+            // 同名プロジェクトがあれば、それが空かチェック
+            if (sameNameProject.tasks.every(t => t.isDeleted)) {
+                targetId = sameNameProject.id;
+            }
+        } else {
+            // 同名がなければ、現在のアクティブプロジェクトが空かチェック
+            if (data && data.tasks.every(t => t.isDeleted)) {
+                targetId = data.id;
+            }
+        }
+
+        if (targetId) {
+           const newData = {
+              ...incoming,
+              id: targetId, // ターゲットのIDを維持（上書き）
+              lastSynced: Date.now()
+           };
+           setData(newData);
+           if (targetId !== activeId) switchProject(targetId);
+           alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
+           return;
+        }
+
         setIncomingData(incoming);
       } else {
         alert('データの復元に失敗しました。');
@@ -225,7 +254,47 @@ function App() {
       console.error(e);
       alert('URLの形式が正しくありません。');
     }
-  }, [data, setIncomingData]);
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
+
+  // ファイルインポート処理
+  const handleFileImport = useCallback((f: File) => {
+      const r = new FileReader();
+      r.onload = (e) => {
+        try {
+          const incoming = JSON.parse(e.target?.result as string);
+          
+          // ▼ 修正: マージ先ターゲットの自動判定
+          let targetId = '';
+          const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
+
+          if (sameNameProject) {
+              if (sameNameProject.tasks.every(t => t.isDeleted)) {
+                  targetId = sameNameProject.id;
+              }
+          } else {
+              if (data && data.tasks.every(t => t.isDeleted)) {
+                  targetId = data.id;
+              }
+          }
+          
+          if (targetId) {
+              const newData = {
+                  ...incoming,
+                  id: targetId,
+                  lastSynced: Date.now()
+              };
+              setData(newData);
+              if (targetId !== activeId) switchProject(targetId);
+              alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
+          } else {
+              setIncomingData(incoming);
+          }
+        } catch(err) {
+          alert('JSONの読み込みに失敗しました');
+        }
+      };
+      r.readAsText(f);
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { pointerCoordinates } = args;
@@ -349,7 +418,7 @@ function App() {
                 <TaskItem 
                   task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0}
                   onStatusChange={(s) => updateTaskStatus(n.id, s)} 
-                  onParentStatusChange={updateParentStatus} // 追加: 親タスクの状態変更ハンドラ
+                  onParentStatusChange={updateParentStatus}
                   onDelete={() => deleteTask(n.id)} 
                   onRename={(newName) => renameTask(n.id, newName)} 
                   onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} 
@@ -416,7 +485,7 @@ function App() {
                 <ProjectControls 
                     onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
                     onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
-                    onImport={(f) => { const r = new FileReader(); r.onload = (e) => { try { const incoming = JSON.parse(e.target?.result as string); setIncomingData(incoming); } catch(err) { alert('JSONの読み込みに失敗しました'); } }; r.readAsText(f); }}
+                    onImport={handleFileImport}
                     onImportFromUrl={handleImportFromUrl} 
                 />
             </header>
@@ -424,7 +493,6 @@ function App() {
               {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
               <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
             </div>
-            {/* 変更: BoardArea に onBoardClick を渡す */}
             <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodes.map(root => {
@@ -436,7 +504,7 @@ function App() {
                                   <TaskItem 
                                     task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
                                     onStatusChange={(s) => updateTaskStatus(root.id, s)} 
-                                    onParentStatusChange={updateParentStatus} // 追加
+                                    onParentStatusChange={updateParentStatus}
                                     onDelete={() => deleteTask(root.id)} 
                                     onRename={(newName) => renameTask(root.id, newName)} 
                                     onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 

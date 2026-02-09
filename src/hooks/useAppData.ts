@@ -23,13 +23,11 @@ const isTaskEqual = (local: Task, incoming: Task): boolean => {
   if (local.status !== incoming.status) return false;
   if (local.parentId !== incoming.parentId) return false;
   
-  // 期限の比較 (undefined同士、または値の一致)
   if (local.deadline !== incoming.deadline) return false;
 
   if (local.isDeleted !== incoming.isDeleted) return false;
   if ((local.order ?? 0) !== (incoming.order ?? 0)) return false;
 
-  // 更新日時の比較 (分単位に切り捨てて比較)
   const localMin = Math.floor(local.lastUpdated / 60000);
   const incomingMin = Math.floor(incoming.lastUpdated / 60000);
   
@@ -37,7 +35,6 @@ const isTaskEqual = (local: Task, incoming: Task): boolean => {
 };
 
 export const useAppData = () => {
-  // 変更: useHistoryを使用
   const { 
     state: projects, 
     setState: setProjects, 
@@ -68,7 +65,6 @@ export const useAppData = () => {
           if (Array.isArray(parsed)) {
             loadedProjects = parsed;
           } else {
-            // マイグレーション対応
             const migrated = { ...parsed, id: parsed.id || generateProjectId() };
             loadedProjects = [migrated];
           }
@@ -94,45 +90,64 @@ export const useAppData = () => {
       if (compressed) {
         const incoming = decompressData(compressed);
         if (incoming) {
+          // まず仮のIDを振るが、後で上書き対象のIDに置き換える可能性がある
           incoming.id = generateProjectId();
-          newIncoming = incoming;
           
           const sameNameProject = loadedProjects.find(p => p.projectName === incoming.projectName);
 
           if (sameNameProject) {
             initialActiveId = sameNameProject.id;
             
-            const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
-            const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
+            // ▼ 修正: 同名プロジェクトが存在しても、タスクが空なら自動適用対象にする
+            const isSameNameEmpty = sameNameProject.tasks.every(t => t.isDeleted);
+            
+            if (isSameNameEmpty) {
+                // 同名の空プロジェクトを上書きターゲットにする
+                incoming.id = sameNameProject.id;
+                newIncoming = incoming;
+                shouldAutoApply = true;
+            } else {
+                // 空でないなら通常のマージ判定
+                newIncoming = incoming; // 新規IDのまま
+                const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
+                const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
 
-            if (localActive.length === incomingActive.length) {
-                const allMatch = localActive.every((localTask, index) => {
-                    const incomingTask = incomingActive[index];
-                    return isTaskEqual(localTask, incomingTask);
-                });
+                if (localActive.length === incomingActive.length) {
+                    const allMatch = localActive.every((localTask, index) => {
+                        const incomingTask = incomingActive[index];
+                        return isTaskEqual(localTask, incomingTask);
+                    });
 
-                if (allMatch) {
-                    isIdenticalToExisting = true;
+                    if (allMatch) {
+                        isIdenticalToExisting = true;
+                    }
                 }
             }
-
           } else {
+            // 同名がない場合、現在の初期プロジェクトが空なら上書き
             const currentTarget = loadedProjects.find(p => p.id === initialActiveId);
             const hasActiveTasks = currentTarget && currentTarget.tasks.some(t => !t.isDeleted);
 
-            if (!hasActiveTasks) {
+            if (!hasActiveTasks && currentTarget) {
+              incoming.id = currentTarget.id;
+              newIncoming = incoming;
               shouldAutoApply = true;
-            } 
+            } else {
+              newIncoming = incoming;
+            }
           }
         }
       }
 
       if (shouldAutoApply && newIncoming) {
+        // 自動適用: ターゲットIDのプロジェクトを差し替える
         loadedProjects = loadedProjects.map(p => 
-            p.id === initialActiveId ? newIncoming! : p
+            p.id === newIncoming!.id ? newIncoming! : p
         );
         initialActiveId = newIncoming.id;
         window.history.replaceState(null, '', window.location.pathname);
+        alert(`プロジェクト名：${newIncoming.projectName} を読み込みました。`);
+
       } else if (newIncoming && !isIdenticalToExisting) {
         setIncomingData(newIncoming);
         window.history.replaceState(null, '', window.location.pathname);
@@ -140,7 +155,6 @@ export const useAppData = () => {
         window.history.replaceState(null, '', window.location.pathname);
       }
 
-      // 変更: 初期ロード時は履歴に残さない resetProjects を使用
       resetProjects(loadedProjects);
       setActiveId(initialActiveId);
     };
@@ -162,7 +176,6 @@ export const useAppData = () => {
   }, [activeData]);
 
   const setActiveData = (newData: AppData) => {
-    // 変更: setProjects (履歴機能付き) を使用
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
 
@@ -229,7 +242,7 @@ export const useAppData = () => {
     importNewProject,
     switchProject,
     deleteProject,
-    undo, // 公開
-    redo  // 公開
+    undo,
+    redo
   };
 };
