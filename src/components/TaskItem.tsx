@@ -17,9 +17,14 @@ interface Props {
   onDeadlineChange: (dateStr: string) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  onClick: () => void; // 追加: タスク行クリック時のハンドラ
 }
 
-export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange, isExpanded, onToggleExpand }) => {
+export const TaskItem: React.FC<Props> = ({ 
+  task, tasks, depth, hasChildren, 
+  onStatusChange, onDelete, onAddSubTask, onRename, onDeadlineChange, 
+  isExpanded, onToggleExpand, onClick // 追加
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [editName, setEditName] = useState(task.name);
@@ -56,7 +61,6 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
     3: { l: '休止', c: '#6f42c1' } 
   }[task.status] as any;
 
-  // 変更: deadlineOffset -> deadline
   const currentDeadlineStr = task.deadline !== undefined
     ? format(task.deadline, 'yyyy-MM-dd')
     : '';
@@ -134,13 +138,20 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
     <div 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      // 変更: stopPropagationを追加し、バブリングを防止 & 変数eを使用
+      onClick={(e) => {
+        e.stopPropagation();
+        if (isEditing || isEditingDeadline) return;
+        onClick();
+      }}
       style={{ 
         display: 'flex', 
         alignItems: 'center', 
         padding: '10px 0', 
         borderBottom: '1px solid #333', 
         marginLeft: `${depth * 24}px`,
-        position: 'relative'
+        position: 'relative',
+        cursor: 'pointer' 
       }}
     >
       {isOver && !isDropDisabled && (
@@ -166,7 +177,7 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
 
       <button 
         disabled={hasChildren} 
-        onClick={() => onStatusChange(((task.status + 1) % 4) as 0|1|2|3)}
+        onClick={(e) => { e.stopPropagation(); onStatusChange(((task.status + 1) % 4) as 0|1|2|3); }}
         style={{ marginRight: '12px', backgroundColor: config.c, color: '#fff', minWidth: '80px', fontSize: '0.75em', cursor: hasChildren ? 'not-allowed' : 'pointer', opacity: hasChildren ? 0.6 : 1, border: hasChildren ? '1px dashed #fff' : 'none', padding: '4px 8px' }}
       >
         {config.l}
@@ -178,12 +189,13 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
         {isEditing ? (
           <input 
             type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus
+            onClick={(e) => e.stopPropagation()} 
             style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #555', padding: '2px 4px', borderRadius: '4px', width: 'calc(100% - 20px)', fontSize: 'inherit' }}
           />
         ) : (
           <>
             <span 
-              onDoubleClick={() => { setEditName(task.name); setIsEditing(true); }} title="ダブルクリックで編集"
+              onDoubleClick={(e) => { e.stopPropagation(); setEditName(task.name); setIsEditing(true); }} title="ダブルクリックで編集"
               style={{ color: isUrgent ? '#ff4d4f' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: 'pointer' }}
             >
               {task.name}
@@ -194,6 +206,7 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
                     type="date" defaultValue={currentDeadlineStr} 
                     onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }}
                     onBlur={() => setIsEditingDeadline(false)} autoFocus
+                    onClick={(e) => e.stopPropagation()}
                     style={{ marginLeft: '8px', padding: '2px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#fff', colorScheme: 'dark' }}
                 />
             ) : (
@@ -204,9 +217,9 @@ export const TaskItem: React.FC<Props> = ({ task, tasks, depth, hasChildren, onS
       </div>
       
       <div style={{ display: 'flex', gap: '4px', visibility: isHovered || isEditing || isEditingDeadline ? 'visible' : 'hidden' }}>
-        <button onClick={() => setIsEditingDeadline(!isEditingDeadline)} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>📅</button>
-        <button onClick={onAddSubTask} title="子タスク追加" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>＋</button>
-        <button onClick={onDelete} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
+        <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>📅</button>
+        <button onClick={(e) => { e.stopPropagation(); onAddSubTask(); }} title="子タスク追加" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>＋</button>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
       </div>
     </div>
   );

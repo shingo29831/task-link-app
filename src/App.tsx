@@ -33,7 +33,8 @@ import { ProjectNameEditModal } from './components/ProjectNameEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activeTasks: Task[] }) => {
+// 変更: onBoardClickプロパティを追加
+const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.ReactNode, activeTasks: Task[], onBoardClick: () => void }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
   });
@@ -41,6 +42,10 @@ const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activ
   return (
     <div 
       ref={setNodeRef}
+      // 変更: 引数 'e' を削除して警告を解消
+      onClick={() => {
+        onBoardClick();
+      }}
       style={{ 
         flex: 1, 
         overflowX: 'auto', 
@@ -54,7 +59,8 @@ const BoardArea = ({ children, activeTasks }: { children: React.ReactNode, activ
         padding: '16px',
         backgroundColor: '#1e1e1e',
         transition: 'border 0.2s',
-        minHeight: '200px'
+        minHeight: '200px',
+        cursor: 'default'
     }}>
       {activeTasks.length === 0 ? (
         <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
@@ -78,8 +84,8 @@ function App() {
     importNewProject,
     switchProject,
     deleteProject,
-    undo, // Undo関数
-    redo  // Redo関数
+    undo, 
+    redo 
   } = useAppData();
   
   const { 
@@ -302,6 +308,24 @@ function App() {
   };
 
   const onTaskItemAddClick = (node: TaskNode) => { if (inputTaskName.trim()) handleAddTaskWrapper(node.id); else setParent({ id: node.id, name: node.name }); };
+  
+  // 追加: タスククリック時のハンドラ
+  const handleTaskClick = (node: TaskNode) => {
+    if (inputTaskName.trim()) {
+      // 入力済みなら即追加
+      handleAddTaskWrapper(node.id);
+    } else {
+      // 入力なしなら親タスクとして選択
+      setParent({ id: node.id, name: node.name });
+    }
+  };
+
+  // 追加: ボードクリック時のハンドラ
+  const handleBoardClick = () => {
+    // 親タスク選択解除 (トップレベルへ)
+    setParent(null);
+  };
+
   const getStrLen = (str: string) => { let len = 0; for (let i = 0; i < str.length; i++) len += (str.charCodeAt(i) < 256) ? 1 : 2; return len; };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
@@ -325,6 +349,8 @@ function App() {
                   onStatusChange={(s) => updateTaskStatus(n.id, s)} onDelete={() => deleteTask(n.id)} onAddSubTask={() => onTaskItemAddClick(n)}
                   onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)}
                   isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)}
+                  // 変更: ハンドラを渡す
+                  onClick={() => handleTaskClick(n)}
                 />
                 {n.children.length > 0 && !collapsedNodeIds.has(n.id) && (
                     <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>
@@ -394,7 +420,8 @@ function App() {
               {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
               <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
             </div>
-            <BoardArea activeTasks={activeTasks}>
+            {/* 変更: BoardArea に onBoardClick を渡す */}
+            <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodes.map(root => {
                       const colWidth = calculateColumnWidth(root);
@@ -402,7 +429,15 @@ function App() {
                         <SortableTaskItem key={root.id} id={root.id} depth={0}>
                           <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: '#2a2a2a', borderRadius: '8px', border: '1px solid #444', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: 'grab' }}>
                               <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                                  <TaskItem task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} onAddSubTask={() => onTaskItemAddClick(root)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} />
+                                  <TaskItem 
+                                    task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
+                                    onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} 
+                                    onAddSubTask={() => onTaskItemAddClick(root)} onRename={(newName) => renameTask(root.id, newName)} 
+                                    onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
+                                    isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
+                                    // 変更: ハンドラを渡す
+                                    onClick={() => handleTaskClick(root)}
+                                  />
                               </div>
                               <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
                           </div>

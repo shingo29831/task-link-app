@@ -55,7 +55,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  // 変更: deadlineOffset ではなく absolute timestamp (number) を受け取る
   const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
     if (!data) return;
 
@@ -73,9 +72,17 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     }
 
     const activeTasks = data.tasks.filter(t => !t.isDeleted);
-    const shouldReset = activeTasks.length === 0;
+    const isResetState = activeTasks.length === 0;
 
-    const newId = shouldReset ? "1" : (data.tasks.length + 1).toString(36);
+    // ID生成: 重複チェックを行いユニークなIDを保証する
+    const existingIds = new Set(data.tasks.map(t => t.id));
+    let candidateNum = isResetState ? 1 : data.tasks.length + 1;
+    let newId = candidateNum.toString(36);
+
+    while (existingIds.has(newId)) {
+        candidateNum++;
+        newId = candidateNum.toString(36);
+    }
 
     const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === parentId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
@@ -87,15 +94,11 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       status: 0,
       deadline: deadline, // 絶対値をセット
       lastUpdated: Date.now(),
-      parentId: shouldReset ? undefined : parentId,
-      order: shouldReset ? 1 : nextOrder
+      parentId: isResetState ? undefined : parentId,
+      order: isResetState ? 1 : nextOrder
     };
 
-    if (shouldReset) {
-      save([newTask]);
-    } else {
-      save([...data.tasks, newTask]);
-    }
+    save([...data.tasks, newTask]);
   }, [data, save]);
 
   const deleteTask = useCallback((taskId: string) => {
@@ -174,8 +177,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     );
     save(newTasks);
   }, [data, save]);
-
-  // updateProjectStartDate を削除
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!data) return;
