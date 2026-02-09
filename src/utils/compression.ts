@@ -201,16 +201,14 @@ const calculateOptimalRefDate = (deadlines: number[]): number => {
         score += to185(diff).length;
       }
 
-      // 累積スコアがすでに最小スコア以上になったら、これ以上計算しても無駄なので打ち切る
-      if (score >= minScore) {
-        break; // ループを脱出
-      }
+      if (score >= minScore) break; //pruning 
     }
     
     if (score < minScore) {
       minScore = score;
       bestRef = ref;
     }
+    if(minScore == 0) break; //pruning
   }
 
   return bestRef;
