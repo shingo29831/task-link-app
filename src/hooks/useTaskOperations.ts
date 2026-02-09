@@ -1,7 +1,29 @@
-import { useCallback } from 'react';
-import { arrayMove } from '@dnd-kit/sortable';
-import type { DragEndEvent } from '@dnd-kit/core';
+// NOTE: App.tsxのロジック部分はこのファイルに記述すること。
+// 今後、ロジックの変更や追加が必要な場合は、App.tsxではなくこのファイルを修正してください。
+
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { 
+  KeyboardSensor, 
+  PointerSensor, 
+  TouchSensor, 
+  useSensor, 
+  useSensors, 
+  pointerWithin,
+  closestCenter,
+  type DragEndEvent,
+  type CollisionDetection,
+} from '@dnd-kit/core';
+import {
+  sortableKeyboardCoordinates,
+  arrayMove
+} from '@dnd-kit/sortable';
+
 import type { AppData, Task } from '../types';
+import { useAppData } from './useAppData';
+import { compressData, getIntermediateJson, from185, decompressData } from '../utils/compression';
+import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
+
+type TaskNode = Task & { children: TaskNode[] };
 
 /**
  * 親タスクのステータスを子タスクの状態に基づいて再計算するヘルパー関数
@@ -44,8 +66,156 @@ const recalculateStatus = (tasks: Task[]): Task[] => {
   return next;
 };
 
-export const useTaskOperations = (data: AppData | null, setData: (data: AppData) => void) => {
-  
+export const useTaskOperations = () => {
+  // AppDataの取得
+  const { 
+    data, 
+    setData, 
+    incomingData, 
+    setIncomingData, 
+    getShareUrl,
+    projects,
+    activeId,
+    addProject,
+    importNewProject,
+    switchProject,
+    deleteProject,
+    undo, 
+    redo 
+  } = useAppData();
+
+  // --------------------------------------------------------------------------
+  // UI State
+  // --------------------------------------------------------------------------
+  const [activeParentId, setActiveParentId] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+  const [inputTaskName, setInputTaskName] = useState('');
+  const [inputDateStr, setInputDateStr] = useState('');
+
+  // Refs for DnD logic
+  const lastPointerX = useRef<number | null>(null);
+  const moveDirection = useRef<'left' | 'right' | null>(null);
+
+  // --------------------------------------------------------------------------
+  // Derived Data
+  // --------------------------------------------------------------------------
+  const activeTasks = useMemo(() => {
+    return data ? data.tasks.filter(t => !t.isDeleted) : [];
+  }, [data]);
+
+  const activeParent = useMemo(() => {
+    if (!data || !activeParentId) return null;
+    return data.tasks.find(t => t.id === activeParentId) || null;
+  }, [data, activeParentId]);
+
+  const rootNodes = useMemo(() => {
+    if (!data) return [];
+    const buildTree = (tasks: Task[]): TaskNode[] => {
+      const map = new Map<string, TaskNode>();
+      tasks.filter(t => !t.isDeleted).forEach(t => map.set(t.id, { ...t, children: [] }));
+      const roots: TaskNode[] = [];
+      tasks.filter(t => !t.isDeleted).forEach(t => {
+        const node = map.get(t.id)!;
+        if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
+        else roots.push(node);
+      });
+      const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
+      map.forEach(node => node.children.sort(sortFn));
+      roots.sort(sortFn);
+      return roots;
+    };
+    return buildTree(data.tasks);
+  }, [data]);
+
+  const targetLocalData = useMemo(() => {
+    if (!incomingData || !projects || !data) return null;
+    const sameNameProject = projects.find(p => p.projectName === incomingData.projectName);
+    if (sameNameProject) return sameNameProject;
+    const sameIdProject = projects.find(p => p.id === incomingData.id);
+    if (sameIdProject) return sameIdProject;
+    return data;
+  }, [incomingData, projects, data]);
+
+  const debugInfo = useMemo(() => {
+    if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0, mappingInfo: "" };
+    const normal = JSON.stringify(data);
+    const intermediate = getIntermediateJson(data);
+    let mappingInfo = "Unknown";
+    try {
+      const headerPart = intermediate.split('[')[0]; 
+      const parts = headerPart.split(',');
+      if (parts.length >= 2) {
+        const ver = from185(parts[0]);
+        if (ver === 0) {
+          const groupId = from185(parts[1]);
+          const group = MAPPING_GROUPS[groupId];
+          if (group) mappingInfo = `[ID:${groupId}] ${group.name}`;
+          else mappingInfo = `ID:${groupId} (Undefined)`;
+        }
+      }
+    } catch (e) { console.error("Failed to parse mapping group", e); }
+    const compressed = compressData(data);
+    const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
+    return { normal, intermediate, compressed, normalLen: normal.length, intermediateLen: intermediate.length, compressedLen: compressed.length, rate, mappingInfo };
+  }, [data]);
+
+  const projectProgress = useMemo(() => {
+    if (!data || activeTasks.length === 0) return 0;
+    const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
+    const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
+    let total = 0, count = 0;
+    leafTasks.forEach(t => {
+      total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
+      count++;
+    });
+    if (count === 0) return 0;
+    return Math.round(total / count);
+  }, [data, activeTasks]);
+
+  // --------------------------------------------------------------------------
+  // Effects
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (activeParentId && data) {
+      const exists = data.tasks.some(t => t.id === activeParentId && !t.isDeleted);
+      if (!exists) {
+        setActiveParentId(null);
+      }
+    }
+  }, [data, activeParentId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) {
+          e.preventDefault();
+          redo();
+          return;
+        }
+        
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+  // --------------------------------------------------------------------------
+  // Task Logic (CRUD & Status)
+  // --------------------------------------------------------------------------
   const save = useCallback((newTasks: Task[]) => {
     if (!data) return;
     setData({
@@ -55,39 +225,33 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  // 追加: 親タスクの状態変更と子タスクへの波及処理
   const updateParentStatus = useCallback((parentId: string, newStatus: 0 | 1 | 2 | 3) => {
     if (!data) return;
     
     let nextTasks = [...data.tasks];
     
-    // 子タスクへの影響反映
-    if (newStatus === 2) { // 完了: 全ての子タスクを完了にする
+    if (newStatus === 2) { 
       nextTasks = nextTasks.map(t => 
         (t.parentId === parentId && !t.isDeleted) 
           ? { ...t, status: 2, lastUpdated: Date.now() } 
           : t
       );
-    } else if (newStatus === 0) { // 未着手: 完了以外の全子タスクを未着手にする
+    } else if (newStatus === 0) { 
       nextTasks = nextTasks.map(t => 
         (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
           ? { ...t, status: 0, lastUpdated: Date.now() } 
           : t
       );
-    } else if (newStatus === 1) { // 進行中: 完了以外の全子タスクを進行中にする
+    } else if (newStatus === 1) { 
       nextTasks = nextTasks.map(t => 
         (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
           ? { ...t, status: 1, lastUpdated: Date.now() } 
           : t
       );
     }
-    // 休止(3)の場合: 子タスクには影響を与えない（親のみ変更）
 
-    // 全体の整合性を再計算（これにより通常は親タスクの状態も子に合わせて上書きされる）
     let calculatedTasks = recalculateStatus(nextTasks);
 
-    // ★親タスクの状態を強制的にユーザー指定のものにする
-    // (recalculateStatusで意図しない状態に戻されるのを防ぐため、最後に上書きする)
     calculatedTasks = calculatedTasks.map(t => 
       t.id === parentId 
         ? { ...t, status: newStatus, lastUpdated: Date.now() } 
@@ -125,11 +289,8 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       return;
     }
 
-    const activeTasks = data.tasks.filter(t => !t.isDeleted);
-    const isResetState = activeTasks.length === 0;
-
     const existingIds = new Set(data.tasks.map(t => t.id));
-    let candidateNum = isResetState ? 1 : data.tasks.length + 1;
+    let candidateNum = activeTasks.length === 0 ? 1 : data.tasks.length + 1;
     let newId = candidateNum.toString(36);
 
     while (existingIds.has(newId)) {
@@ -147,12 +308,12 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       status: 0,
       deadline: deadline,
       lastUpdated: Date.now(),
-      parentId: isResetState ? undefined : targetParentId,
-      order: isResetState ? 1 : nextOrder
+      parentId: activeTasks.length === 0 ? undefined : targetParentId,
+      order: activeTasks.length === 0 ? 1 : nextOrder
     };
 
     save([...data.tasks, newTask]);
-  }, [data, save]);
+  }, [data, activeTasks, save]);
 
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
@@ -235,9 +396,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     if (!data) return;
     const { active, over } = event;
 
-    if (!over) {
-      return;
-    }
+    if (!over) return;
 
     if (over.id === 'root-board') {
         const activeIdStr = String(active.id);
@@ -256,9 +415,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
         return;
     }
 
-    if (active.id === over.id) {
-      return;
-    }
+    if (active.id === over.id) return;
 
     const overIdStr = String(over.id);
     const isNestDrop = overIdStr.startsWith('nest-');
@@ -271,9 +428,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
 
     const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
 
-    if (nextParentId === activeTask.id) {
-      return;
-    }
+    if (nextParentId === activeTask.id) return;
 
     let currentCheckId = nextParentId;
     let isCircular = false;
@@ -286,9 +441,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       currentCheckId = parentTask?.parentId;
     }
 
-    if (isCircular) {
-      return;
-    }
+    if (isCircular) return;
 
     const newTasks = [...data.tasks];
 
@@ -328,13 +481,244 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     save(newTasks);
   }, [data, save]);
 
+  // --------------------------------------------------------------------------
+  // Handlers (Import, UI Interaction)
+  // --------------------------------------------------------------------------
+  const toggleNodeExpansion = useCallback((nodeId: string) => {
+    setCollapsedNodeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleImportFromUrl = useCallback((urlStr: string) => {
+    try {
+      const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
+      const url = new URL(targetUrl);
+      const compressed = url.searchParams.get('d');
+      if (!compressed) {
+        alert('URLに有効なデータ(dパラメータ)が含まれていません。');
+        return;
+      }
+      const incoming = decompressData(compressed);
+      if (incoming) {
+        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) {
+          alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
+          return;
+        }
+
+        let targetId = '';
+        const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
+
+        if (sameNameProject) {
+            if (sameNameProject.tasks.every(t => t.isDeleted)) {
+                targetId = sameNameProject.id;
+            }
+        } else {
+            if (data && data.tasks.every(t => t.isDeleted)) {
+                targetId = data.id;
+            }
+        }
+
+        if (targetId) {
+           const newData = {
+              ...incoming,
+              id: targetId,
+              lastSynced: Date.now()
+           };
+           setData(newData);
+           if (targetId !== activeId) switchProject(targetId);
+           alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
+           return;
+        }
+
+        setIncomingData(incoming);
+      } else {
+        alert('データの復元に失敗しました。');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('URLの形式が正しくありません。');
+    }
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
+
+  const handleFileImport = useCallback((f: File) => {
+      const r = new FileReader();
+      r.onload = (e) => {
+        try {
+          const incoming = JSON.parse(e.target?.result as string);
+          
+          let targetId = '';
+          const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
+
+          if (sameNameProject) {
+              if (sameNameProject.tasks.every(t => t.isDeleted)) {
+                  targetId = sameNameProject.id;
+              }
+          } else {
+              if (data && data.tasks.every(t => t.isDeleted)) {
+                  targetId = data.id;
+              }
+          }
+          
+          if (targetId) {
+              const newData = {
+                  ...incoming,
+                  id: targetId,
+                  lastSynced: Date.now()
+              };
+              setData(newData);
+              if (targetId !== activeId) switchProject(targetId);
+              alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
+          } else {
+              setIncomingData(incoming);
+          }
+        } catch(err) {
+          alert('JSONの読み込みに失敗しました');
+        }
+      };
+      r.readAsText(f);
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
+
+  const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
+    if (!inputTaskName.trim()) return;
+    let deadline: number | undefined;
+    if (inputDateStr) {
+      const [y, m, d] = inputDateStr.split('-').map(Number);
+      deadline = new Date(y, m - 1, d).getTime();
+    }
+    addTask(inputTaskName, deadline, targetParentId ?? activeParentId ?? undefined);
+    
+    setInputTaskName(''); 
+    setInputDateStr(''); 
+  }, [addTask, inputTaskName, inputDateStr, activeParentId]);
+
+  const handleTaskClick = useCallback((node: TaskNode) => {
+    if (inputTaskName.trim()) {
+      handleAddTaskWrapper(node.id);
+    } else {
+      setActiveParentId(node.id);
+    }
+  }, [inputTaskName, handleAddTaskWrapper]);
+
+  const handleBoardClick = useCallback(() => {
+    setActiveParentId(null);
+  }, []);
+
+  const handleProjectNameDoubleClick = useCallback(() => { 
+    if (data) setShowRenameModal(true); 
+  }, [data]);
+
+  // --------------------------------------------------------------------------
+  // Dnd Sensors & Collision
+  // --------------------------------------------------------------------------
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+        activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+        activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const { pointerCoordinates } = args;
+    if (pointerCoordinates) {
+      if (lastPointerX.current !== null) {
+        const diff = pointerCoordinates.x - lastPointerX.current;
+        if (diff > 0) moveDirection.current = 'right';
+        else if (diff < 0) moveDirection.current = 'left';
+      }
+      lastPointerX.current = pointerCoordinates.x;
+    }
+    const pointerCollisions = pointerWithin(args);
+    const nestCollisions = pointerCollisions.filter((collision) => String(collision.id).startsWith('nest-'));
+    if (nestCollisions.length > 0) return nestCollisions;
+    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
+    if (sortableCollisions.length > 0) {
+      const target = sortableCollisions[0];
+      const targetData = target.data?.droppableContainer?.data?.current;
+      if (targetData && targetData.depth === 0) {
+        const rect = target.data?.droppableContainer?.rect?.current;
+        if (rect && pointerCoordinates) {
+            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
+            const direction = moveDirection.current;
+            if (direction === 'right') { if (relativeX < 0.85) return []; }
+            else if (direction === 'left') { if (relativeX > 0.15) return []; }
+        }
+        return sortableCollisions;
+      }
+    }
+    const collisions = closestCenter(args);
+    if (collisions.length === 0) {
+        const board = pointerCollisions.find(c => c.id === 'root-board');
+        if (board) return [board];
+    }
+    return collisions;
+  }, []);
+
   return {
+    // Data & Projects
+    data,
+    setData,
+    incomingData,
+    setIncomingData,
+    targetLocalData,
+    projects,
+    activeId,
+    activeTasks,
+    rootNodes,
+    projectProgress,
+    debugInfo,
+    activeParent,
+
+    // UI State
+    showDebug, setShowDebug,
+    showSidebar, setShowSidebar,
+    showProjectMenu, setShowProjectMenu,
+    showRenameModal, setShowRenameModal,
+    collapsedNodeIds,
+    inputTaskName, setInputTaskName,
+    inputDateStr, setInputDateStr,
+    activeParentId, setActiveParentId,
+
+    // Project Operations
+    addProject,
+    importNewProject,
+    switchProject,
+    deleteProject,
+    getShareUrl,
+    
+    // Task Operations
     addTask,
     deleteTask,
     renameTask,
     updateTaskStatus,
     updateTaskDeadline,
+    updateParentStatus,
+    
+    // Handlers
+    handleImportFromUrl,
+    handleFileImport,
+    handleAddTaskWrapper,
+    handleTaskClick,
+    handleBoardClick,
+    handleProjectNameDoubleClick,
+    toggleNodeExpansion,
+    undo,
+    redo,
+    
+    // Dnd
+    sensors,
     handleDragEnd,
-    updateParentStatus
+    customCollisionDetection,
   };
 };

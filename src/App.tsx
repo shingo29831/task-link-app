@@ -1,32 +1,20 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React from 'react';
 import { 
   DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  TouchSensor, 
-  useSensor, 
-  useSensors, 
-  pointerWithin,
   useDroppable, 
-  type CollisionDetection,
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 
-import { useAppData } from './hooks/useAppData';
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
-import { compressData, getIntermediateJson, from185, decompressData } from './utils/compression';
-import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './utils/versions/v0';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectNameEditModal } from './components/ProjectNameEditModal';
@@ -70,332 +58,63 @@ const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.Re
 };
 
 function App() {
-  const { 
-    data, 
-    setData, 
-    incomingData, 
-    setIncomingData, 
-    getShareUrl,
+  const {
+    // Data & State
+    data,
+    setData,
+    incomingData,
+    setIncomingData,
+    targetLocalData,
     projects,
     activeId,
+    activeTasks,
+    rootNodes,
+    projectProgress,
+    debugInfo,
+    activeParent,
+    // activeParentId, // 未使用のため削除
+    setActiveParentId,
+
+    // UI State
+    showDebug, setShowDebug,
+    showSidebar, setShowSidebar,
+    showProjectMenu, setShowProjectMenu,
+    showRenameModal, setShowRenameModal,
+    collapsedNodeIds,
+    inputTaskName, setInputTaskName,
+    inputDateStr, setInputDateStr,
+
+    // Operations & Handlers
     addProject,
     importNewProject,
     switchProject,
     deleteProject,
-    undo, 
-    redo 
-  } = useAppData();
-  
-  const { 
-    addTask, 
-    deleteTask, 
-    renameTask, 
-    updateTaskStatus, 
-    updateTaskDeadline, 
+    getShareUrl,
+    // addTask, // 未使用のため削除 (handleAddTaskWrapper経由で使用)
+    deleteTask,
+    renameTask,
+    updateTaskStatus,
+    updateTaskDeadline,
+    updateParentStatus,
+    handleImportFromUrl,
+    handleFileImport,
+    handleAddTaskWrapper,
+    handleTaskClick,
+    handleBoardClick,
+    handleProjectNameDoubleClick,
+    toggleNodeExpansion,
+    undo,
+    redo,
+    
+    // Dnd
+    sensors,
     handleDragEnd,
-    updateParentStatus 
-  } = useTaskOperations(data, setData);
-
-  const [activeParentId, setActiveParentId] = useState<string | null>(null);
-  
-  const [showDebug, setShowDebug] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [showProjectMenu, setShowProjectMenu] = useState(false);
-  const [showRenameModal, setShowRenameModal] = useState(false);
-  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+    customCollisionDetection,
+  } = useTaskOperations();
 
   const isDev = import.meta.env.DEV;
 
-  const activeParent = useMemo(() => {
-    if (!data || !activeParentId) return null;
-    return data.tasks.find(t => t.id === activeParentId) || null;
-  }, [data, activeParentId]);
-
-  useEffect(() => {
-    if (activeParentId && data) {
-      const exists = data.tasks.some(t => t.id === activeParentId && !t.isDeleted);
-      if (!exists) {
-        setActiveParentId(null);
-      }
-    }
-  }, [data, activeParentId]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) {
-          e.preventDefault();
-          redo();
-          return;
-        }
-        
-        if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          undo();
-          return;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
-
-  const toggleNodeExpansion = useCallback((nodeId: string) => {
-    setCollapsedNodeIds(prev => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  }, []);
-
-  const [inputTaskName, setInputTaskName] = useState('');
-  const [inputDateStr, setInputDateStr] = useState('');
-
-  const lastPointerX = useRef<number | null>(null);
-  const moveDirection = useRef<'left' | 'right' | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-        activationConstraint: { distance: 5 },
-    }),
-    useSensor(TouchSensor, {
-        activationConstraint: { delay: 250, tolerance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const activeTasks = useMemo(() => {
-    return data ? data.tasks.filter(t => !t.isDeleted) : [];
-  }, [data]);
-
-  const rootNodes = useMemo(() => {
-    if (!data) return [];
-    const buildTree = (tasks: Task[]): TaskNode[] => {
-      const map = new Map<string, TaskNode>();
-      tasks.filter(t => !t.isDeleted).forEach(t => map.set(t.id, { ...t, children: [] }));
-      const roots: TaskNode[] = [];
-      tasks.filter(t => !t.isDeleted).forEach(t => {
-        const node = map.get(t.id)!;
-        if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
-        else roots.push(node);
-      });
-      const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
-      map.forEach(node => node.children.sort(sortFn));
-      roots.sort(sortFn);
-      return roots;
-    };
-    return buildTree(data.tasks);
-  }, [data]);
-
-  const targetLocalData = useMemo(() => {
-    if (!incomingData || !projects || !data) return null;
-    const sameNameProject = projects.find(p => p.projectName === incomingData.projectName);
-    if (sameNameProject) return sameNameProject;
-    const sameIdProject = projects.find(p => p.id === incomingData.id);
-    if (sameIdProject) return sameIdProject;
-    return data;
-  }, [incomingData, projects, data]);
-
-  const handleImportFromUrl = useCallback((urlStr: string) => {
-    try {
-      const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
-      const url = new URL(targetUrl);
-      const compressed = url.searchParams.get('d');
-      if (!compressed) {
-        alert('URLに有効なデータ(dパラメータ)が含まれていません。');
-        return;
-      }
-      const incoming = decompressData(compressed);
-      if (incoming) {
-        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) {
-          alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
-          return;
-        }
-
-        let targetId = '';
-        const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-
-        if (sameNameProject) {
-            if (sameNameProject.tasks.every(t => t.isDeleted)) {
-                targetId = sameNameProject.id;
-            }
-        } else {
-            if (data && data.tasks.every(t => t.isDeleted)) {
-                targetId = data.id;
-            }
-        }
-
-        if (targetId) {
-           const newData = {
-              ...incoming,
-              id: targetId,
-              lastSynced: Date.now()
-           };
-           setData(newData);
-           if (targetId !== activeId) switchProject(targetId);
-           alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
-           return;
-        }
-
-        setIncomingData(incoming);
-      } else {
-        alert('データの復元に失敗しました。');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('URLの形式が正しくありません。');
-    }
-  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
-
-  const handleFileImport = useCallback((f: File) => {
-      const r = new FileReader();
-      r.onload = (e) => {
-        try {
-          const incoming = JSON.parse(e.target?.result as string);
-          
-          let targetId = '';
-          const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-
-          if (sameNameProject) {
-              if (sameNameProject.tasks.every(t => t.isDeleted)) {
-                  targetId = sameNameProject.id;
-              }
-          } else {
-              if (data && data.tasks.every(t => t.isDeleted)) {
-                  targetId = data.id;
-              }
-          }
-          
-          if (targetId) {
-              const newData = {
-                  ...incoming,
-                  id: targetId,
-                  lastSynced: Date.now()
-              };
-              setData(newData);
-              if (targetId !== activeId) switchProject(targetId);
-              alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
-          } else {
-              setIncomingData(incoming);
-          }
-        } catch(err) {
-          alert('JSONの読み込みに失敗しました');
-        }
-      };
-      r.readAsText(f);
-  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
-
-  const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const { pointerCoordinates } = args;
-    if (pointerCoordinates) {
-      if (lastPointerX.current !== null) {
-        const diff = pointerCoordinates.x - lastPointerX.current;
-        if (diff > 0) moveDirection.current = 'right';
-        else if (diff < 0) moveDirection.current = 'left';
-      }
-      lastPointerX.current = pointerCoordinates.x;
-    }
-    const pointerCollisions = pointerWithin(args);
-    const nestCollisions = pointerCollisions.filter((collision) => String(collision.id).startsWith('nest-'));
-    if (nestCollisions.length > 0) return nestCollisions;
-    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
-    if (sortableCollisions.length > 0) {
-      const target = sortableCollisions[0];
-      const targetData = target.data?.droppableContainer?.data?.current;
-      if (targetData && targetData.depth === 0) {
-        const rect = target.data?.droppableContainer?.rect?.current;
-        if (rect && pointerCoordinates) {
-            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
-            const direction = moveDirection.current;
-            if (direction === 'right') { if (relativeX < 0.85) return []; }
-            else if (direction === 'left') { if (relativeX > 0.15) return []; }
-        }
-        return sortableCollisions;
-      }
-    }
-    const collisions = closestCenter(args);
-    if (collisions.length === 0) {
-        const board = pointerCollisions.find(c => c.id === 'root-board');
-        if (board) return [board];
-    }
-    return collisions;
-  }, []);
-
-  const debugInfo = useMemo(() => {
-    if (!data) return { normal: "", intermediate: "", compressed: "", normalLen: 0, intermediateLen: 0, compressedLen: 0, rate: 0, mappingInfo: "" };
-    const normal = JSON.stringify(data);
-    const intermediate = getIntermediateJson(data);
-    let mappingInfo = "Unknown";
-    try {
-      const headerPart = intermediate.split('[')[0]; 
-      const parts = headerPart.split(',');
-      if (parts.length >= 2) {
-        const ver = from185(parts[0]);
-        if (ver === 0) {
-          const groupId = from185(parts[1]);
-          const group = MAPPING_GROUPS[groupId];
-          if (group) mappingInfo = `[ID:${groupId}] ${group.name}`;
-          else mappingInfo = `ID:${groupId} (Undefined)`;
-        }
-      }
-    } catch (e) { console.error("Failed to parse mapping group", e); }
-    const compressed = compressData(data);
-    const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
-    return { normal, intermediate, compressed, normalLen: normal.length, intermediateLen: intermediate.length, compressedLen: compressed.length, rate, mappingInfo };
-  }, [data]);
-
-  const projectProgress = useMemo(() => {
-    if (!data || activeTasks.length === 0) return 0;
-    const parentIds = new Set(activeTasks.map(t => t.parentId).filter(Boolean));
-    const leafTasks = activeTasks.filter(t => !parentIds.has(t.id));
-    let total = 0, count = 0;
-    leafTasks.forEach(t => {
-      total += t.status === 2 ? 100 : t.status === 1 ? 50 : 0;
-      count++;
-    });
-    if (count === 0) return 0;
-    return Math.round(total / count);
-  }, [data, activeTasks]);
-
-  const handleProjectNameDoubleClick = () => { if (data) setShowRenameModal(true); };
-
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
-
-  const handleAddTaskWrapper = (targetParentId?: string) => {
-    if (!inputTaskName.trim()) return;
-    let deadline: number | undefined;
-    if (inputDateStr) {
-      const [y, m, d] = inputDateStr.split('-').map(Number);
-      deadline = new Date(y, m - 1, d).getTime();
-    }
-    addTask(inputTaskName, deadline, targetParentId ?? activeParentId ?? undefined);
-    
-    setInputTaskName(''); 
-    setInputDateStr(''); 
-  };
-
-  const handleTaskClick = (node: TaskNode) => {
-    if (inputTaskName.trim()) {
-      handleAddTaskWrapper(node.id);
-    } else {
-      setActiveParentId(node.id);
-    }
-  };
-
-  const handleBoardClick = () => {
-    setActiveParentId(null);
-  };
 
   const getStrLen = (str: string) => { let len = 0; for (let i = 0; i < str.length; i++) len += (str.charCodeAt(i) < 256) ? 1 : 2; return len; };
 
