@@ -72,7 +72,6 @@ function App() {
     projectProgress,
     debugInfo,
     activeParent,
-    // activeParentId, // 未使用のため削除
     setActiveParentId,
 
     // UI State
@@ -90,7 +89,6 @@ function App() {
     switchProject,
     deleteProject,
     getShareUrl,
-    // addTask, // 未使用のため削除 (handleAddTaskWrapper経由で使用)
     deleteTask,
     renameTask,
     updateTaskStatus,
@@ -156,7 +154,10 @@ function App() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragEnd={handleDragEnd}>
-        <div style={{ maxWidth: '100%', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'row', gap: showSidebar ? '20px' : '0', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+        {/* ルートコンテナ: 縦並び (Header / Body) */}
+        <div style={{ maxWidth: '100%', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+          
+          {/* モーダル類 */}
           {incomingData && targetLocalData && (
             <MergeModal 
                 localData={targetLocalData} incomingData={incomingData} 
@@ -170,134 +171,155 @@ function App() {
               onSave={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowRenameModal(false); }}
             />
           )}
-          <div style={{ flex: showSidebar ? '0 0 33.33%' : '0 0 0px', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'flex 0.3s ease, opacity 0.3s ease', opacity: showSidebar ? 1 : 0, pointerEvents: showSidebar ? 'auto' : 'none', minWidth: showSidebar ? '300px' : '0' }}>
-            <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-                <TaskCalendar tasks={data.tasks} />
-            </div>
-          </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }}>📅</button>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                            <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onDoubleClick={handleProjectNameDoubleClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
-                            <div style={{ position: 'relative' }}>
-                                <button onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer' }}>▼</button>
-                                {showProjectMenu && (
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: '#333', border: '1px solid #555', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
-                                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                            {projects.map(p => (
-                                                <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? '#444' : 'transparent', borderBottom: '1px solid #444', fontSize: '0.9em' }}>{p.projectName}</div>
-                                            ))}
-                                        </div>
-                                        <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#646cff', borderTop: '1px solid #555', fontSize: '0.9em' }}>+ 新規プロジェクト</div>
-                                        <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#ff6b6b', fontSize: '0.9em' }}>🗑️ このプロジェクトを削除</div>
-                                    </div>
-                                )}
-                            </div>
-                            <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
-                        </div>
-                    </div>
-                </div>
-                <ProjectControls 
-                    onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
-                    onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
-                    onImport={handleFileImport}
-                    onImportFromUrl={handleImportFromUrl} 
-                />
-            </header>
-            <div style={{ marginBottom: '0px' }}>
-              <div style={{ height: '24px', marginBottom: '5px', color: '#646cff', fontSize: '0.8em', display: 'flex', alignItems: 'center' }}>
-                {activeParent && (
-                  <>子タスク追加中: [{activeParent.id}] {activeParent.name} <button onClick={() => setActiveParentId(null)} style={{ padding: '2px 6px', fontSize: '0.8em', marginLeft: '8px' }}>取消</button></>
-                )}
-              </div>
-              <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
-            </div>
-            <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
-              <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
-                  {rootNodes.map(root => {
-                      const colWidth = calculateColumnWidth(root);
-                      return (
-                        <SortableTaskItem key={root.id} id={root.id} depth={0}>
-                          <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: '#2a2a2a', borderRadius: '8px', border: '1px solid #444', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: 'grab' }}>
-                              <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                                  <TaskItem 
-                                    task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
-                                    onStatusChange={(s) => updateTaskStatus(root.id, s)} 
-                                    onParentStatusChange={updateParentStatus}
-                                    onDelete={() => deleteTask(root.id)} 
-                                    onRename={(newName) => renameTask(root.id, newName)} 
-                                    onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
-                                    isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
-                                    onClick={() => handleTaskClick(root)}
-                                  />
-                              </div>
-                              <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
-                          </div>
-                        </SortableTaskItem>
-                      );
-                  })}
-              </SortableContext>
-            </BoardArea>
-            <div style={{ marginTop: '10px' }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '30px' }}>
-                {isDev && (
-                  <button 
-                    onClick={() => setShowDebug(!showDebug)} 
-                    style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
-                  </button>
-                )}
 
-                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
-                  <button
-                    onClick={undo}
-                    title="元に戻す (Ctrl+Z)"
-                    style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
-                  >
-                    ↩
-                  </button>
-                  <button
-                    onClick={redo}
-                    title="やり直す (Ctrl+y)"
-                    style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
-                  >
-                    ↪
-                  </button>
-                </div>
+          {/* 1. Header Area */}
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
+                  <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+                          <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onDoubleClick={handleProjectNameDoubleClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                          <div style={{ position: 'relative' }}>
+                              <button onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer' }}>▼</button>
+                              {showProjectMenu && (
+                                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: '#333', border: '1px solid #555', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+                                      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                          {projects.map(p => (
+                                              <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? '#444' : 'transparent', borderBottom: '1px solid #444', fontSize: '0.9em' }}>{p.projectName}</div>
+                                          ))}
+                                      </div>
+                                      <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#646cff', borderTop: '1px solid #555', fontSize: '0.9em' }}>+ 新規プロジェクト</div>
+                                      <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#ff6b6b', fontSize: '0.9em' }}>🗑️ このプロジェクトを削除</div>
+                                  </div>
+                              )}
+                          </div>
+                          <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
+                      </div>
+                  </div>
               </div>
-              {isDev && showDebug && (
-                <div style={{ 
-                  marginTop: '15px', 
-                  padding: '15px', 
-                  background: '#1a1a1a', 
-                  borderRadius: '8px', 
-                  fontSize: '0.75em', 
-                  color: '#ccc',
-                  maxHeight: '400px', 
-                  overflowY: 'auto'
-                }}>
-                  <p><b>プロジェクト名:</b> {data.projectName}</p>
-                  <p><b>適用マッピング:</b> <span style={{ color: '#8ac' }}>{debugInfo.mappingInfo}</span></p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 20px', margin: '10px 0', alignItems: 'center' }}>
-                    <span style={{ color: '#888' }}>変換なしJSON:</span><span style={{ fontSize: '1.1em' }}>{debugInfo.normalLen.toLocaleString()} 文字</span>
-                    <span style={{ color: '#aaa' }}>圧縮直前(Base185+Swap):</span><span style={{ fontSize: '1.1em' }}>{debugInfo.intermediateLen.toLocaleString()} 文字</span>
-                    <span style={{ color: '#646cff' }}>最終圧縮後(LZ):</span><span style={{ fontSize: '1.1em', fontWeight: 'bold', color: '#646cff' }}>{debugInfo.compressedLen.toLocaleString()} 文字</span>
-                    <span>圧縮率:</span><span><b>{debugInfo.rate.toFixed(1)}%</b><span style={{ marginLeft: '8px', color: '#888', fontSize: '0.9em' }}>( {(100 - debugInfo.rate).toFixed(1)}% 削減 )</span></span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div><p style={{ margin: '0 0 5px 0', color: '#888' }}><b>1. 変換なしJSON (Raw):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>{debugInfo.normal}</code></div></div>
-                    <div><p style={{ margin: '0 0 5px 0', color: '#aaa' }}><b>2. 圧縮直前データ (Base185 + Swap):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>{debugInfo.intermediate}</code></div></div>
-                    <div><p style={{ margin: '0 0 5px 0', color: '#646cff' }}><b>3. 最終圧縮データ (LZ):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#646cff', fontFamily: 'monospace' }}>{debugInfo.compressed}</code></div></div>
+              <ProjectControls 
+                  onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
+                  onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
+                  onImport={handleFileImport}
+                  onImportFromUrl={handleImportFromUrl} 
+              />
+          </header>
+
+          {/* 2. Content Body (Sidebar + Main) */}
+          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: showSidebar ? '20px' : '0' }}>
+            
+            {/* Sidebar (Calendar) - 幅を画面幅の1/3 (33.33%) に変更 */}
+            <div style={{ 
+              flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
+              display: 'flex', flexDirection: 'column', 
+              overflow: 'hidden', 
+              transition: 'flex 0.3s ease, opacity 0.3s ease', 
+              opacity: showSidebar ? 1 : 0, 
+              pointerEvents: showSidebar ? 'auto' : 'none', 
+              minWidth: showSidebar ? '300px' : '0' 
+            }}>
+                <div style={{ height: '100%', overflowY: 'auto', paddingRight: '5px' }}>
+                    <TaskCalendar tasks={data.tasks} />
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ marginBottom: '0px', flexShrink: 0 }}>
+                <div style={{ height: '24px', marginBottom: '5px', color: '#646cff', fontSize: '0.8em', display: 'flex', alignItems: 'center' }}>
+                  {activeParent && (
+                    <>子タスク追加中: [{activeParent.id}] {activeParent.name} <button onClick={() => setActiveParentId(null)} style={{ padding: '2px 6px', fontSize: '0.8em', marginLeft: '8px' }}>取消</button></>
+                  )}
+                </div>
+                <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
+              </div>
+
+              <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
+                <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
+                    {rootNodes.map(root => {
+                        const colWidth = calculateColumnWidth(root);
+                        return (
+                          <SortableTaskItem key={root.id} id={root.id} depth={0}>
+                            <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: '#2a2a2a', borderRadius: '8px', border: '1px solid #444', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: 'grab' }}>
+                                <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
+                                    <TaskItem 
+                                      task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
+                                      onStatusChange={(s) => updateTaskStatus(root.id, s)} 
+                                      onParentStatusChange={updateParentStatus}
+                                      onDelete={() => deleteTask(root.id)} 
+                                      onRename={(newName) => renameTask(root.id, newName)} 
+                                      onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
+                                      isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
+                                      onClick={() => handleTaskClick(root)}
+                                    />
+                                </div>
+                                <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
+                            </div>
+                          </SortableTaskItem>
+                        );
+                    })}
+                </SortableContext>
+              </BoardArea>
+
+              {/* Footer / Debug Area */}
+              <div style={{ marginTop: '10px', flexShrink: 0 }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '30px' }}>
+                  {isDev && (
+                    <button 
+                      onClick={() => setShowDebug(!showDebug)} 
+                      style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
+                    </button>
+                  )}
+
+                  <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
+                    <button
+                      onClick={undo}
+                      title="元に戻す (Ctrl+Z)"
+                      style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                    >
+                      ↩
+                    </button>
+                    <button
+                      onClick={redo}
+                      title="やり直す (Ctrl+y)"
+                      style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                    >
+                      ↪
+                    </button>
                   </div>
                 </div>
-              )}
+                {isDev && showDebug && (
+                  <div style={{ 
+                    marginTop: '15px', 
+                    padding: '15px', 
+                    background: '#1a1a1a', 
+                    borderRadius: '8px', 
+                    fontSize: '0.75em', 
+                    color: '#ccc',
+                    maxHeight: '400px', 
+                    overflowY: 'auto'
+                  }}>
+                    <p><b>プロジェクト名:</b> {data.projectName}</p>
+                    <p><b>適用マッピング:</b> <span style={{ color: '#8ac' }}>{debugInfo.mappingInfo}</span></p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 20px', margin: '10px 0', alignItems: 'center' }}>
+                      <span style={{ color: '#888' }}>変換なしJSON:</span><span style={{ fontSize: '1.1em' }}>{debugInfo.normalLen.toLocaleString()} 文字</span>
+                      <span style={{ color: '#aaa' }}>圧縮直前(Base185+Swap):</span><span style={{ fontSize: '1.1em' }}>{debugInfo.intermediateLen.toLocaleString()} 文字</span>
+                      <span style={{ color: '#646cff' }}>最終圧縮後(LZ):</span><span style={{ fontSize: '1.1em', fontWeight: 'bold', color: '#646cff' }}>{debugInfo.compressedLen.toLocaleString()} 文字</span>
+                      <span>圧縮率:</span><span><b>{debugInfo.rate.toFixed(1)}%</b><span style={{ marginLeft: '8px', color: '#888', fontSize: '0.9em' }}>( {(100 - debugInfo.rate).toFixed(1)}% 削減 )</span></span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      <div><p style={{ margin: '0 0 5px 0', color: '#888' }}><b>1. 変換なしJSON (Raw):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>{debugInfo.normal}</code></div></div>
+                      <div><p style={{ margin: '0 0 5px 0', color: '#aaa' }}><b>2. 圧縮直前データ (Base185 + Swap):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#aaa', fontFamily: 'monospace' }}>{debugInfo.intermediate}</code></div></div>
+                      <div><p style={{ margin: '0 0 5px 0', color: '#646cff' }}><b>3. 最終圧縮データ (LZ):</b></p><div style={{ maxHeight: '150px', overflowY: 'auto', background: '#222', padding: '8px', borderRadius: '4px', border: '1px solid #333' }}><code style={{ wordBreak: 'break-all', color: '#646cff', fontFamily: 'monospace' }}>{debugInfo.compressed}</code></div></div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
         </div>
     </DndContext>
   );
