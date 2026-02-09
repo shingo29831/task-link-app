@@ -97,6 +97,9 @@ export const useTaskOperations = () => {
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
+  
+  // 追加: メニューが開いているタスクID（排他制御用）
+  const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
   // Refs for DnD logic
   const lastPointerX = useRef<number | null>(null);
@@ -436,7 +439,11 @@ export const useTaskOperations = () => {
     }
     const newTasks = data.tasks.map(t => idsToDelete.has(t.id) ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t);
     save(newTasks);
-  }, [data, save]);
+    // 削除時にメニューが開いていたら閉じる
+    if (menuOpenTaskId === taskId) {
+      setMenuOpenTaskId(null);
+    }
+  }, [data, save, menuOpenTaskId]);
 
   const renameTask = useCallback((id: string, newName: string) => {
     if (!data || !newName.trim()) return;
@@ -564,7 +571,10 @@ export const useTaskOperations = () => {
     else { setActiveParentId(node.id); }
   }, [inputTaskName, handleAddTaskWrapper]);
 
-  const handleBoardClick = useCallback(() => { setActiveParentId(null); }, []);
+  const handleBoardClick = useCallback(() => { 
+    setActiveParentId(null);
+    setMenuOpenTaskId(null); // ボードの空白クリックでメニューも閉じる
+  }, []);
   const handleProjectNameDoubleClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
 
   // --------------------------------------------------------------------------
@@ -621,6 +631,7 @@ export const useTaskOperations = () => {
   return {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, activeParent, calendarTasks,
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showRenameModal, setShowRenameModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
+    menuOpenTaskId, setMenuOpenTaskId, // 追加
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameDoubleClick, toggleNodeExpansion, undo, redo,

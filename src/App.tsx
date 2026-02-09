@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
-  useDroppable, 
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -84,6 +84,10 @@ function App() {
     collapsedNodeIds,
     inputTaskName, setInputTaskName,
     inputDateStr, setInputDateStr,
+    
+    // 追加: メニュー制御
+    menuOpenTaskId,
+    setMenuOpenTaskId,
 
     // Operations & Handlers
     addProject,
@@ -112,7 +116,26 @@ function App() {
     customCollisionDetection,
   } = useTaskOperations();
 
+  // スマホ表示判定用のState
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const isDev = import.meta.env.DEV;
+
+  // バイブレーション処理
+  // 修正: 引数 'event' は使用しないため削除しました
+  const handleDragStart = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(50); // 50ms振動
+    }
+  };
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -143,6 +166,9 @@ function App() {
                   onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} 
                   isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)}
                   onClick={() => handleTaskClick(n)}
+                  // メニュー制御
+                  isMenuOpen={menuOpenTaskId === n.id}
+                  onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)}
                 />
                 {n.children.length > 0 && !collapsedNodeIds.has(n.id) && (
                     <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>
@@ -155,9 +181,28 @@ function App() {
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragEnd={handleDragEnd}>
-        {/* ルートコンテナ: 縦並び (Header / Body) */}
-        <div style={{ maxWidth: '100%', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+    <DndContext 
+      sensors={sensors} 
+      collisionDetection={customCollisionDetection} 
+      onDragStart={handleDragStart} // バイブレーション発火
+      onDragEnd={handleDragEnd}
+    >
+        {/* ルートコンテナ: セーフエリア対応とパディングを追加 */}
+        <div style={{ 
+            maxWidth: '100%', 
+            margin: '0 auto', 
+            padding: '20px', 
+            // セーフエリア対応 (iPhone X以降)
+            paddingBottom: 'calc(20px + env(safe-area-inset-bottom))', 
+            paddingTop: 'calc(20px + env(safe-area-inset-top))',
+            paddingLeft: 'calc(20px + env(safe-area-inset-left))',
+            paddingRight: 'calc(20px + env(safe-area-inset-right))',
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100vh', 
+            boxSizing: 'border-box', 
+            overflow: 'hidden' 
+        }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
           
           {/* モーダル類 */}
           {incomingData && targetLocalData && (
@@ -208,17 +253,17 @@ function App() {
           </header>
 
           {/* 2. Content Body (Sidebar + Main) */}
-          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: showSidebar ? '20px' : '0' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '20px' : '0' }}>
             
-            {/* Sidebar (Calendar) - 幅を画面幅の35%に変更 */}
+            {/* Sidebar (Calendar) */}
             <div style={{ 
-              flex: showSidebar ? '0 0 35%' : '0 0 0px', 
+              flex: showSidebar ? (isMobile ? '1 0 100%' : '0 0 35%') : '0 0 0px', 
               display: 'flex', flexDirection: 'column', 
               overflow: 'hidden', 
               transition: 'flex 0.3s ease, opacity 0.3s ease', 
               opacity: showSidebar ? 1 : 0, 
               pointerEvents: showSidebar ? 'auto' : 'none', 
-              minWidth: showSidebar ? '300px' : '0' 
+              minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' 
             }}>
                 {/* トグルエリア */}
                 <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -245,7 +290,12 @@ function App() {
             </div>
 
             {/* Main Content */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ 
+              flex: 1, 
+              display: (isMobile && showSidebar) ? 'none' : 'flex', 
+              flexDirection: 'column', 
+              minWidth: 0 
+            }}>
               <div style={{ marginBottom: '0px', flexShrink: 0 }}>
                 <div style={{ height: '24px', marginBottom: '5px', color: '#646cff', fontSize: '0.8em', display: 'flex', alignItems: 'center' }}>
                   {activeParent && (
@@ -272,6 +322,9 @@ function App() {
                                       onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                       isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
                                       onClick={() => handleTaskClick(root)}
+                                      // メニュー制御
+                                      isMenuOpen={menuOpenTaskId === root.id}
+                                      onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)}
                                     />
                                 </div>
                                 <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
@@ -300,7 +353,7 @@ function App() {
                       title="元に戻す (Ctrl+Z)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
-                      ↩
+                      ↪
                     </button>
                     <button
                       onClick={redo}

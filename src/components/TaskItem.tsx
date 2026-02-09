@@ -11,25 +11,29 @@ interface Props {
   depth: number;
   hasChildren: boolean;
   onStatusChange: (s: 0 | 1 | 2 | 3) => void;
-  onParentStatusChange: (id: string, s: 0 | 1 | 2 | 3) => void; // 追加
+  onParentStatusChange: (id: string, s: 0 | 1 | 2 | 3) => void;
   onDelete: () => void;
   onRename: (newName: string) => void;
   onDeadlineChange: (dateStr: string) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onClick: () => void;
+  // 追加: メニュー表示制御用
+  isMenuOpen: boolean;
+  onToggleMenu: () => void;
 }
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
   onStatusChange, onParentStatusChange, onDelete, onRename, onDeadlineChange, 
-  isExpanded, onToggleExpand, onClick 
+  isExpanded, onToggleExpand, onClick,
+  isMenuOpen, onToggleMenu
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [editName, setEditName] = useState(task.name);
   const [isHovered, setIsHovered] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false); // 追加: モーダル表示用
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   const { active } = useDndContext(); 
 
@@ -135,6 +139,19 @@ export const TaskItem: React.FC<Props> = ({
     }
   };
 
+  // タップ（クリック）時の挙動制御
+  const handleItemClick = () => {
+      if (isEditing || isEditingDeadline) return;
+      
+      // メニューが開いていない場合はメニューを開く（選択状態にする）
+      if (!isMenuOpen) {
+          onToggleMenu();
+      } else {
+          // すでにメニューが開いている状態でタップした場合は本来のクリック動作（詳細/子タスク追加）
+          onClick();
+      }
+  };
+
   return (
     <>
       <div 
@@ -142,8 +159,7 @@ export const TaskItem: React.FC<Props> = ({
         onMouseLeave={() => setIsHovered(false)}
         onClick={(e) => {
           e.stopPropagation();
-          if (isEditing || isEditingDeadline) return;
-          onClick();
+          handleItemClick();
         }}
         style={{ 
           display: 'flex', 
@@ -152,7 +168,11 @@ export const TaskItem: React.FC<Props> = ({
           borderBottom: '1px solid #333', 
           marginLeft: `${depth * 24}px`,
           position: 'relative',
-          cursor: 'pointer' 
+          cursor: 'pointer',
+          // メニューが開いているときは背景を少し変えて選択中であることを示す
+          backgroundColor: isMenuOpen ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+          borderRadius: '4px',
+          transition: 'background-color 0.2s'
         }}
       >
         {isOver && !isDropDisabled && (
@@ -177,7 +197,6 @@ export const TaskItem: React.FC<Props> = ({
         </button>
 
         <button 
-          // 変更: 親タスクの場合はモーダルを開く。子タスクを持たない場合は通常通り
           onClick={(e) => { 
             e.stopPropagation(); 
             if (hasChildren) {
@@ -224,9 +243,17 @@ export const TaskItem: React.FC<Props> = ({
           )}
         </div>
         
-        <div style={{ display: 'flex', gap: '4px', visibility: isHovered || isEditing || isEditingDeadline ? 'visible' : 'hidden' }}>
-          <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>📅</button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '2px 8px' }}>✕</button>
+        {/* 操作ボタン: ホバー時 または メニューオープン時に表示 */}
+        <div style={{ 
+            display: 'flex', 
+            gap: '4px', 
+            // 変更: visibilityではなくopacityで制御し、メニューが開いているかホバー時のみ完全表示
+            opacity: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 1 : 0,
+            pointerEvents: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 'auto' : 'none',
+            transition: 'opacity 0.2s',
+        }}>
+          <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '4px 8px' }}>📅</button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '4px 8px' }}>✕</button>
         </div>
       </div>
 
