@@ -71,6 +71,7 @@ export const useTaskOperations = () => {
   const { 
     data, 
     setData, 
+    updateProject, 
     incomingData, 
     setIncomingData, 
     getShareUrl,
@@ -114,26 +115,33 @@ export const useTaskOperations = () => {
     
     // 現在のプロジェクトのみ表示
     if (!showAllProjectsInCalendar) {
-      return activeTasks;
+      // hasChildrenを付与して返す
+      return activeTasks.map(t => ({
+          ...t,
+          hasChildren: activeTasks.some(child => !child.isDeleted && child.parentId === t.id)
+      }));
     }
 
     // 全プロジェクトのタスクを結合
     const allTasks: Task[] = [];
     projects.forEach(proj => {
-      // 削除されていないタスクを抽出
       const projTasks = proj.tasks.filter(t => !t.isDeleted);
-      
       const isCurrentProject = proj.id === data.id;
 
-      // カレンダー表示用にデータを加工して追加
-      // - 現在のプロジェクト: IDそのまま (編集可能にするため)
-      // - 他のプロジェクト: IDにプレフィックス付与 (重複回避)
-      const safeTasks = projTasks.map(t => ({
-        ...t,
-        id: isCurrentProject ? t.id : `${proj.id}_${t.id}`,
-        // nameは変更せず、そのまま表示
-        sourceProjectName: isCurrentProject ? undefined : proj.projectName
-      }));
+      const safeTasks = projTasks.map(t => {
+          // 自分のプロジェクト内で子タスクを持つか判定
+          const hasChildren = projTasks.some(child => !child.isDeleted && child.parentId === t.id);
+
+          return {
+            ...t,
+            // ID: 現在のプロジェクトならそのまま、他なら複合ID
+            id: isCurrentProject ? t.id : `${proj.id}_${t.id}`,
+            // プロジェクト情報
+            sourceProjectName: isCurrentProject ? undefined : proj.projectName,
+            sourceProjectId: isCurrentProject ? undefined : proj.id,
+            hasChildren
+          };
+      });
       
       allTasks.push(...safeTasks);
     });
@@ -259,26 +267,95 @@ export const useTaskOperations = () => {
     });
   }, [data, setData]);
 
-  const updateParentStatus = useCallback((parentId: string, newStatus: 0 | 1 | 2 | 3) => {
-    if (!data) return;
+  const updateExternalProjectTask = useCallback((targetProjId: string, taskId: string, newStatus: 0 | 1 | 2 | 3) => {
+      const targetProject = projects.find(p => p.id === targetProjId);
+      if (!targetProject) return;
+
+      const newTasks = targetProject.tasks.map(t => 
+          t.id === taskId ? { ...t, status: newStatus, lastUpdated: Date.now() } : t
+      );
+      
+      const recalculated = recalculateStatus(newTasks);
+      
+      updateProject({
+          ...targetProject,
+          tasks: recalculated,
+          lastSynced: Date.now()
+      });
+  }, [projects, updateProject]);
+
+  const updateExternalProjectParentStatus = useCallback((targetProjId: string, parentId: string, newStatus: 0 | 1 | 2 | 3) => {
+      const targetProject = projects.find(p => p.id === targetProjId);
+      if (!targetProject) return;
+
+      let nextTasks = [...targetProject.tasks];
     
+      if (newStatus === 2) { 
+        nextTasks = nextTasks.map(t => 
+          (t.parentId === parentId && !t.isDeleted) 
+            ? { ...t, status: 2, lastUpdated: Date.now() } 
+            : t
+        );
+      } else if (newStatus === 0) { 
+        nextTasks = nextTasks.map(t => 
+          (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+            ? { ...t, status: 0, lastUpdated: Date.now() } 
+            : t
+        );
+      } else if (newStatus === 1) { 
+        nextTasks = nextTasks.map(t => 
+          (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+            ? { ...t, status: 1, lastUpdated: Date.now() } 
+            : t
+        );
+      }
+
+      let calculatedTasks = recalculateStatus(nextTasks);
+      calculatedTasks = calculatedTasks.map(t => 
+        t.id === parentId 
+          ? { ...t, status: newStatus, lastUpdated: Date.now() } 
+          : t
+      );
+
+      updateProject({
+          ...targetProject,
+          tasks: calculatedTasks,
+          lastSynced: Date.now()
+      });
+
+  }, [projects, updateProject]);
+
+  const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
+    if (id.includes('_')) {
+        const [projId, realTaskId] = id.split('_');
+        const isCurrent = data?.tasks.some(t => t.id === id);
+        if (!isCurrent) {
+            const targetProj = projects.find(p => p.id === projId);
+            if (targetProj) {
+                updateExternalProjectParentStatus(projId, realTaskId, newStatus);
+                return;
+            }
+        }
+    }
+    
+    if (!data) return;
     let nextTasks = [...data.tasks];
     
     if (newStatus === 2) { 
       nextTasks = nextTasks.map(t => 
-        (t.parentId === parentId && !t.isDeleted) 
+        (t.parentId === id && !t.isDeleted) 
           ? { ...t, status: 2, lastUpdated: Date.now() } 
           : t
       );
     } else if (newStatus === 0) { 
       nextTasks = nextTasks.map(t => 
-        (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+        (t.parentId === id && !t.isDeleted && t.status !== 2) 
           ? { ...t, status: 0, lastUpdated: Date.now() } 
           : t
       );
     } else if (newStatus === 1) { 
       nextTasks = nextTasks.map(t => 
-        (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+        (t.parentId === id && !t.isDeleted && t.status !== 2) 
           ? { ...t, status: 1, lastUpdated: Date.now() } 
           : t
       );
@@ -287,7 +364,7 @@ export const useTaskOperations = () => {
     let calculatedTasks = recalculateStatus(nextTasks);
 
     calculatedTasks = calculatedTasks.map(t => 
-      t.id === parentId 
+      t.id === id 
         ? { ...t, status: newStatus, lastUpdated: Date.now() } 
         : t
     );
@@ -297,288 +374,165 @@ export const useTaskOperations = () => {
       tasks: calculatedTasks,
       lastSynced: Date.now()
     });
-  }, [data, setData]);
+  }, [data, setData, projects, updateExternalProjectParentStatus]);
 
-  const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
-    if (!data) return;
-
-    let targetParentId = parentId;
-    if (targetParentId) {
-        const parentExists = data.tasks.some(t => t.id === targetParentId && !t.isDeleted);
-        if (!parentExists) {
-            targetParentId = undefined;
+  const updateTaskStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
+    if (id.includes('_')) {
+        const [projId, realTaskId] = id.split('_');
+        const isCurrent = data?.tasks.some(t => t.id === id);
+        if (!isCurrent) {
+            const targetProj = projects.find(p => p.id === projId);
+            if (targetProj) {
+                updateExternalProjectTask(projId, realTaskId, newStatus);
+                return;
+            }
         }
     }
 
-    const normalizedName = name;
-    
-    const isDuplicate = data.tasks.some(t =>
-      !t.isDeleted &&
-      t.parentId === targetParentId &&
-      t.name === normalizedName
+    if (!data) return;
+    const newTasks = data.tasks.map(t =>
+      t.id === id ? { ...t, status: newStatus, lastUpdated: Date.now() } : t
     );
+    save(newTasks);
+  }, [data, save, projects, updateExternalProjectTask]);
 
-    if (isDuplicate) {
-      alert('同じ階層に同名のタスクが既に存在します。');
-      return;
+  const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
+    if (!data) return;
+    let targetParentId = parentId;
+    if (targetParentId) {
+        const parentExists = data.tasks.some(t => t.id === targetParentId && !t.isDeleted);
+        if (!parentExists) targetParentId = undefined;
     }
-
+    const normalizedName = name;
+    const isDuplicate = data.tasks.some(t => !t.isDeleted && t.parentId === targetParentId && t.name === normalizedName);
+    if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
     const existingIds = new Set(data.tasks.map(t => t.id));
     let candidateNum = activeTasks.length === 0 ? 1 : data.tasks.length + 1;
     let newId = candidateNum.toString(36);
-
-    while (existingIds.has(newId)) {
-        candidateNum++;
-        newId = candidateNum.toString(36);
-    }
-
+    while (existingIds.has(newId)) { candidateNum++; newId = candidateNum.toString(36); }
     const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === targetParentId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
     const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
-
     const newTask: Task = {
-      id: newId,
-      name: normalizedName,
-      status: 0,
-      deadline: deadline,
-      lastUpdated: Date.now(),
-      parentId: activeTasks.length === 0 ? undefined : targetParentId,
-      order: activeTasks.length === 0 ? 1 : nextOrder
+      id: newId, name: normalizedName, status: 0, deadline: deadline, lastUpdated: Date.now(),
+      parentId: activeTasks.length === 0 ? undefined : targetParentId, order: activeTasks.length === 0 ? 1 : nextOrder
     };
-
     save([...data.tasks, newTask]);
   }, [data, activeTasks, save]);
 
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
-
     const targetTask = data.tasks.find(t => t.id === taskId);
     if (!targetTask) return;
-
     const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
     if (!confirm(message)) return;
-
     const idsToDelete = new Set<string>();
     const stack = [taskId];
-
     while (stack.length > 0) {
       const currentId = stack.pop()!;
       idsToDelete.add(currentId);
       const children = data.tasks.filter(t => !t.isDeleted && t.parentId === currentId);
       children.forEach(c => stack.push(c.id));
     }
-
-    const newTasks = data.tasks.map(t =>
-      idsToDelete.has(t.id)
-        ? { ...t, isDeleted: true, lastUpdated: Date.now() }
-        : t
-    );
-
+    const newTasks = data.tasks.map(t => idsToDelete.has(t.id) ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
 
   const renameTask = useCallback((id: string, newName: string) => {
     if (!data || !newName.trim()) return;
-    
     const targetTask = data.tasks.find(t => t.id === id);
     if (!targetTask) return;
-
-    const isDuplicate = data.tasks.some(t =>
-      !t.isDeleted &&
-      t.id !== id &&
-      t.parentId === targetTask.parentId &&
-      t.name === newName
-    );
-
-    if (isDuplicate) {
-      alert('同じ階層に同名のタスクが既に存在します。');
-      return;
-    }
-
-    const newTasks = data.tasks.map(t =>
-      t.id === id ? { ...t, name: newName, lastUpdated: Date.now() } : t
-    );
-    save(newTasks);
-  }, [data, save]);
-
-  const updateTaskStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
-    if (!data) return;
-    const newTasks = data.tasks.map(t =>
-      t.id === id ? { ...t, status: newStatus, lastUpdated: Date.now() } : t
-    );
+    const isDuplicate = data.tasks.some(t => !t.isDeleted && t.id !== id && t.parentId === targetTask.parentId && t.name === newName);
+    if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
+    const newTasks = data.tasks.map(t => t.id === id ? { ...t, name: newName, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
 
   const updateTaskDeadline = useCallback((id: string, dateStr: string) => {
     if (!data) return;
-
     let newDeadline: number | undefined;
-    if (dateStr) {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      newDeadline = new Date(y, m - 1, d).getTime();
-    } else {
-      newDeadline = undefined;
-    }
-
-    const newTasks = data.tasks.map(t =>
-      t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t
-    );
+    if (dateStr) { const [y, m, d] = dateStr.split('-').map(Number); newDeadline = new Date(y, m - 1, d).getTime(); } 
+    else { newDeadline = undefined; }
+    const newTasks = data.tasks.map(t => t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!data) return;
     const { active, over } = event;
-
     if (!over) return;
-
     if (over.id === 'root-board') {
         const activeIdStr = String(active.id);
         const task = data.tasks.find(t => t.id === activeIdStr);
         if (task && task.parentId !== undefined) {
              const rootTasks = data.tasks.filter(t => !t.isDeleted && !t.parentId);
              const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
-
-             const newTasks = data.tasks.map(t => 
-                t.id === activeIdStr 
-                ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() }
-                : t
-             );
+             const newTasks = data.tasks.map(t => t.id === activeIdStr ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() } : t);
              save(newTasks);
         }
         return;
     }
-
     if (active.id === over.id) return;
-
     const overIdStr = String(over.id);
     const isNestDrop = overIdStr.startsWith('nest-');
     const targetIdRaw = isNestDrop ? overIdStr.replace('nest-', '') : overIdStr;
-
     const activeTask = data.tasks.find(t => t.id === active.id);
     const overTask = data.tasks.find(t => t.id === targetIdRaw);
-
     if (!activeTask || !overTask) return;
-
     const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
-
     if (nextParentId === activeTask.id) return;
-
     let currentCheckId = nextParentId;
     let isCircular = false;
     while (currentCheckId) {
-      if (currentCheckId === activeTask.id) {
-        isCircular = true;
-        break;
-      }
+      if (currentCheckId === activeTask.id) { isCircular = true; break; }
       const parentTask = data.tasks.find(t => t.id === currentCheckId);
       currentCheckId = parentTask?.parentId;
     }
-
     if (isCircular) return;
-
     const newTasks = [...data.tasks];
-
     if (activeTask.parentId !== nextParentId) {
       const taskIndex = newTasks.findIndex(t => t.id === active.id);
       newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: nextParentId };
     }
-
-    const siblings = newTasks
-      .filter(t => !t.isDeleted && t.parentId === nextParentId)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
+    const siblings = newTasks.filter(t => !t.isDeleted && t.parentId === nextParentId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     if (!isNestDrop) {
       const oldIndex = siblings.findIndex(t => t.id === active.id);
       const newIndex = siblings.findIndex(t => t.id === targetIdRaw);
-
       if (oldIndex !== -1 && newIndex !== -1) {
         const reorderedSiblings = arrayMove(siblings, oldIndex, newIndex);
         reorderedSiblings.forEach((t, idx) => {
            const globalIdx = newTasks.findIndex(nt => nt.id === t.id);
-           if (globalIdx > -1) {
-             newTasks[globalIdx] = { ...newTasks[globalIdx], order: idx + 1 };
-           }
+           if (globalIdx > -1) { newTasks[globalIdx] = { ...newTasks[globalIdx], order: idx + 1 }; }
         });
         save(newTasks);
         return;
       }
     }
-
     siblings.forEach((t, index) => {
       const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
-      if (globalIndex !== -1) {
-        newTasks[globalIndex] = { ...newTasks[globalIndex], order: index + 1, lastUpdated: Date.now() };
-      }
+      if (globalIndex !== -1) { newTasks[globalIndex] = { ...newTasks[globalIndex], order: index + 1, lastUpdated: Date.now() }; }
     });
-
     save(newTasks);
   }, [data, save]);
 
-  // --------------------------------------------------------------------------
-  // Handlers (Import, UI Interaction)
-  // --------------------------------------------------------------------------
-  const toggleNodeExpansion = useCallback((nodeId: string) => {
-    setCollapsedNodeIds(prev => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  }, []);
-
+  const toggleNodeExpansion = useCallback((nodeId: string) => { setCollapsedNodeIds(prev => { const next = new Set(prev); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; }); }, []);
   const handleImportFromUrl = useCallback((urlStr: string) => {
     try {
       const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
       const url = new URL(targetUrl);
       const compressed = url.searchParams.get('d');
-      if (!compressed) {
-        alert('URLに有効なデータ(dパラメータ)が含まれていません。');
-        return;
-      }
+      if (!compressed) { alert('URLに有効なデータ(dパラメータ)が含まれていません。'); return; }
       const incoming = decompressData(compressed);
       if (incoming) {
-        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) {
-          alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
-          return;
-        }
-
+        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) { alert('インポートされたデータは現在のプロジェクトと完全に一致しています。'); return; }
         let targetId = '';
         const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-
-        if (sameNameProject) {
-            if (sameNameProject.tasks.every(t => t.isDeleted)) {
-                targetId = sameNameProject.id;
-            }
-        } else {
-            if (data && data.tasks.every(t => t.isDeleted)) {
-                targetId = data.id;
-            }
-        }
-
-        if (targetId) {
-           const newData = {
-              ...incoming,
-              id: targetId,
-              lastSynced: Date.now()
-           };
-           setData(newData);
-           if (targetId !== activeId) switchProject(targetId);
-           alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
-           return;
-        }
-
+        if (sameNameProject) { if (sameNameProject.tasks.every(t => t.isDeleted)) targetId = sameNameProject.id; } 
+        else { if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; }
+        if (targetId) { const newData = { ...incoming, id: targetId, lastSynced: Date.now() }; setData(newData); if (targetId !== activeId) switchProject(targetId); alert(`プロジェクト名：${incoming.projectName} を読み込みました。`); return; }
         setIncomingData(incoming);
-      } else {
-        alert('データの復元に失敗しました。');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('URLの形式が正しくありません。');
-    }
+      } else { alert('データの復元に失敗しました。'); }
+    } catch (e) { console.error(e); alert('URLの形式が正しくありません。'); }
   }, [data, setIncomingData, setData, projects, activeId, switchProject]);
 
   const handleFileImport = useCallback((f: File) => {
@@ -586,35 +540,13 @@ export const useTaskOperations = () => {
       r.onload = (e) => {
         try {
           const incoming = JSON.parse(e.target?.result as string);
-          
           let targetId = '';
           const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-
-          if (sameNameProject) {
-              if (sameNameProject.tasks.every(t => t.isDeleted)) {
-                  targetId = sameNameProject.id;
-              }
-          } else {
-              if (data && data.tasks.every(t => t.isDeleted)) {
-                  targetId = data.id;
-              }
-          }
-          
-          if (targetId) {
-              const newData = {
-                  ...incoming,
-                  id: targetId,
-                  lastSynced: Date.now()
-              };
-              setData(newData);
-              if (targetId !== activeId) switchProject(targetId);
-              alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
-          } else {
-              setIncomingData(incoming);
-          }
-        } catch(err) {
-          alert('JSONの読み込みに失敗しました');
-        }
+          if (sameNameProject) { if (sameNameProject.tasks.every(t => t.isDeleted)) targetId = sameNameProject.id; } 
+          else { if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; }
+          if (targetId) { const newData = { ...incoming, id: targetId, lastSynced: Date.now() }; setData(newData); if (targetId !== activeId) switchProject(targetId); alert(`プロジェクト名：${incoming.projectName} を読み込みました。`); } 
+          else { setIncomingData(incoming); }
+        } catch(err) { alert('JSONの読み込みに失敗しました'); }
       };
       r.readAsText(f);
   }, [data, setIncomingData, setData, projects, activeId, switchProject]);
@@ -622,31 +554,18 @@ export const useTaskOperations = () => {
   const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
     let deadline: number | undefined;
-    if (inputDateStr) {
-      const [y, m, d] = inputDateStr.split('-').map(Number);
-      deadline = new Date(y, m - 1, d).getTime();
-    }
+    if (inputDateStr) { const [y, m, d] = inputDateStr.split('-').map(Number); deadline = new Date(y, m - 1, d).getTime(); }
     addTask(inputTaskName, deadline, targetParentId ?? activeParentId ?? undefined);
-    
-    setInputTaskName(''); 
-    setInputDateStr(''); 
+    setInputTaskName(''); setInputDateStr(''); 
   }, [addTask, inputTaskName, inputDateStr, activeParentId]);
 
   const handleTaskClick = useCallback((node: TaskNode) => {
-    if (inputTaskName.trim()) {
-      handleAddTaskWrapper(node.id);
-    } else {
-      setActiveParentId(node.id);
-    }
+    if (inputTaskName.trim()) { handleAddTaskWrapper(node.id); } 
+    else { setActiveParentId(node.id); }
   }, [inputTaskName, handleAddTaskWrapper]);
 
-  const handleBoardClick = useCallback(() => {
-    setActiveParentId(null);
-  }, []);
-
-  const handleProjectNameDoubleClick = useCallback(() => { 
-    if (data) setShowRenameModal(true); 
-  }, [data]);
+  const handleBoardClick = useCallback(() => { setActiveParentId(null); }, []);
+  const handleProjectNameDoubleClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
 
   // --------------------------------------------------------------------------
   // Dnd Sensors & Collision
@@ -700,61 +619,11 @@ export const useTaskOperations = () => {
   }, []);
 
   return {
-    // Data & Projects
-    data,
-    setData,
-    incomingData,
-    setIncomingData,
-    targetLocalData,
-    projects,
-    activeId,
-    activeTasks,
-    rootNodes,
-    projectProgress,
-    debugInfo,
-    activeParent,
-    calendarTasks, // 追加
-
-    // UI State
-    showDebug, setShowDebug,
-    showSidebar, setShowSidebar,
-    showProjectMenu, setShowProjectMenu,
-    showRenameModal, setShowRenameModal,
-    showAllProjectsInCalendar, setShowAllProjectsInCalendar, // 追加
-    collapsedNodeIds,
-    inputTaskName, setInputTaskName,
-    inputDateStr, setInputDateStr,
-    activeParentId, setActiveParentId,
-
-    // Project Operations
-    addProject,
-    importNewProject,
-    switchProject,
-    deleteProject,
-    getShareUrl,
-    
-    // Task Operations
-    addTask,
-    deleteTask,
-    renameTask,
-    updateTaskStatus,
-    updateTaskDeadline,
-    updateParentStatus,
-    
-    // Handlers
-    handleImportFromUrl,
-    handleFileImport,
-    handleAddTaskWrapper,
-    handleTaskClick,
-    handleBoardClick,
-    handleProjectNameDoubleClick,
-    toggleNodeExpansion,
-    undo,
-    redo,
-    
-    // Dnd
-    sensors,
-    handleDragEnd,
-    customCollisionDetection,
+    data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, activeParent, calendarTasks,
+    showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showRenameModal, setShowRenameModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
+    addProject, importNewProject, switchProject, deleteProject, getShareUrl,
+    addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
+    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameDoubleClick, toggleNodeExpansion, undo, redo,
+    sensors, handleDragEnd, customCollisionDetection,
   };
 };

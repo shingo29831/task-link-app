@@ -73,14 +73,14 @@ function App() {
     debugInfo,
     activeParent,
     setActiveParentId,
-    calendarTasks, // 追加
+    calendarTasks,
 
     // UI State
     showDebug, setShowDebug,
     showSidebar, setShowSidebar,
     showProjectMenu, setShowProjectMenu,
     showRenameModal, setShowRenameModal,
-    showAllProjectsInCalendar, setShowAllProjectsInCalendar, // 追加
+    showAllProjectsInCalendar, setShowAllProjectsInCalendar,
     collapsedNodeIds,
     inputTaskName, setInputTaskName,
     inputDateStr, setInputDateStr,
@@ -210,9 +210,9 @@ function App() {
           {/* 2. Content Body (Sidebar + Main) */}
           <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: showSidebar ? '20px' : '0' }}>
             
-            {/* Sidebar (Calendar) - 幅を画面幅の1/3 (33.33%) に変更 */}
+            {/* Sidebar (Calendar) - 幅を画面幅の35%に変更 */}
             <div style={{ 
-              flex: showSidebar ? '0 0 33.33%' : '0 0 0px', 
+              flex: showSidebar ? '0 0 35%' : '0 0 0px', 
               display: 'flex', flexDirection: 'column', 
               overflow: 'hidden', 
               transition: 'flex 0.3s ease, opacity 0.3s ease', 
@@ -237,7 +237,7 @@ function App() {
                 <div style={{ height: 'calc(100% - 40px)', overflowY: 'auto', paddingRight: '5px' }}>
                     <TaskCalendar 
                         tasks={calendarTasks} 
-                        activeTasks={activeTasks} // Pass active tasks for context
+                        // activeTasks={activeTasks} // 削除
                         onStatusChange={updateTaskStatus}
                         onParentStatusChange={updateParentStatus}
                     />

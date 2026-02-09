@@ -6,14 +6,13 @@ import { TaskDetailModal } from './TaskDetailModal';
 
 interface Props {
   tasks: Task[];
-  activeTasks: Task[]; 
+  // activeTasks: Task[]; // 削除
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
 }
 
-export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChange, onParentStatusChange }) => {
+export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentStatusChange }) => { // activeTasks削除
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  // 修正: タスクデータ自体ではなく、選択された日付のみを保持する
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
@@ -56,7 +55,6 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
                 return (
                     <div 
                         key={kq} 
-                        // 修正: 日付のみセットする
                         onClick={() => setSelectedDate(day)} 
                         style={{ 
                             minHeight: '130px', minWidth: 0,
@@ -112,12 +110,11 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
             })}
         </div>
 
-        {/* 修正: selectedDateがある場合に、その都度getDayTasksで最新のタスクを取得して渡す */}
         {selectedDate && (
             <TaskDetailModal 
                 date={selectedDate} 
                 tasks={getDayTasks(selectedDate)} 
-                activeTasks={activeTasks}
+                // activeTasks={activeTasks} // 削除
                 onStatusChange={onStatusChange}
                 onParentStatusChange={onParentStatusChange}
                 onClose={() => setSelectedDate(null)} 

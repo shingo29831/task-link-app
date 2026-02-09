@@ -6,29 +6,20 @@ import type { Task } from '../types';
 interface Props {
   date: Date;
   tasks: Task[];
-  activeTasks: Task[];
+  // activeTasks は不要になったため削除
   onClose: () => void;
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
 }
 
-export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onClose, onStatusChange, onParentStatusChange }) => {
+export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatusChange, onParentStatusChange }) => {
   const [statusModalTargetId, setStatusModalTargetId] = useState<string | null>(null);
 
-  const getTaskMeta = (task: Task) => {
-      // 現在のプロジェクトのタスクかどうか判定
-      const original = activeTasks.find(t => t.id === task.id);
-      if (!original) return { isCurrent: false, hasChildren: false };
-      
-      const hasChildren = activeTasks.some(t => !t.isDeleted && t.parentId === original.id);
-      return { isCurrent: true, hasChildren };
-  };
-
   const handleStatusClick = (task: Task) => {
-      const { isCurrent, hasChildren } = getTaskMeta(task);
-      if (!isCurrent) return; // 他プロジェクトは編集不可
-
-      if (hasChildren) {
+      // 編集制限を解除: どのプロジェクトのタスクでも変更可能にする
+      
+      // task.hasChildren は useTaskOperations の calendarTasks で付与済み
+      if (task.hasChildren) {
           setStatusModalTargetId(task.id);
       } else {
           const next = ((task.status + 1) % 4) as 0 | 1 | 2 | 3;
@@ -89,7 +80,8 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
             ) : (
               tasks.map(t => {
                 const config = getConfig(t.status);
-                const { isCurrent, hasChildren } = getTaskMeta(t);
+                // 子タスクがあるかどうかは t.hasChildren を参照
+                const hasChildren = !!t.hasChildren;
 
                 return (
                   <div key={t.id} style={{
@@ -102,18 +94,18 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
                     {/* Status Button */}
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleStatusClick(t); }}
-                      disabled={!isCurrent}
                       style={{ 
                         backgroundColor: config.c, 
                         color: '#fff', 
                         minWidth: '80px', 
                         fontSize: '0.9em', 
-                        cursor: isCurrent ? 'pointer' : 'default', 
-                        opacity: isCurrent ? (hasChildren ? 0.9 : 1) : 0.5, 
+                        cursor: 'pointer', // 常にクリック可能
+                        opacity: hasChildren ? 0.9 : 1, 
                         border: hasChildren ? '1px dashed #fff' : 'none', 
                         padding: '6px 12px',
                         flexShrink: 0
                       }}
+                      title={hasChildren ? "親タスクの状態変更 (子タスクも更新)" : "状態を変更"}
                     >
                       {config.l}
                     </button>
@@ -141,7 +133,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
         </div>
       </div>
 
-      {/* Parent Status Modal (Overlay on top of Detail Modal) */}
+      {/* Parent Status Modal */}
       {statusModalTargetId && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 import { useHistory } from './useHistory';
@@ -90,25 +90,20 @@ export const useAppData = () => {
       if (compressed) {
         const incoming = decompressData(compressed);
         if (incoming) {
-          // まず仮のIDを振るが、後で上書き対象のIDに置き換える可能性がある
           incoming.id = generateProjectId();
           
           const sameNameProject = loadedProjects.find(p => p.projectName === incoming.projectName);
 
           if (sameNameProject) {
             initialActiveId = sameNameProject.id;
-            
-            // ▼ 修正: 同名プロジェクトが存在しても、タスクが空なら自動適用対象にする
             const isSameNameEmpty = sameNameProject.tasks.every(t => t.isDeleted);
             
             if (isSameNameEmpty) {
-                // 同名の空プロジェクトを上書きターゲットにする
                 incoming.id = sameNameProject.id;
                 newIncoming = incoming;
                 shouldAutoApply = true;
             } else {
-                // 空でないなら通常のマージ判定
-                newIncoming = incoming; // 新規IDのまま
+                newIncoming = incoming;
                 const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
                 const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
 
@@ -117,14 +112,12 @@ export const useAppData = () => {
                         const incomingTask = incomingActive[index];
                         return isTaskEqual(localTask, incomingTask);
                     });
-
                     if (allMatch) {
                         isIdenticalToExisting = true;
                     }
                 }
             }
           } else {
-            // 同名がない場合、現在の初期プロジェクトが空なら上書き
             const currentTarget = loadedProjects.find(p => p.id === initialActiveId);
             const hasActiveTasks = currentTarget && currentTarget.tasks.some(t => !t.isDeleted);
 
@@ -140,7 +133,6 @@ export const useAppData = () => {
       }
 
       if (shouldAutoApply && newIncoming) {
-        // 自動適用: ターゲットIDのプロジェクトを差し替える
         loadedProjects = loadedProjects.map(p => 
             p.id === newIncoming!.id ? newIncoming! : p
         );
@@ -178,6 +170,11 @@ export const useAppData = () => {
   const setActiveData = (newData: AppData) => {
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
+
+  // 追加: 任意のプロジェクトを更新する関数
+  const updateProject = useCallback((updatedProject: AppData) => {
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+  }, [setProjects]);
 
   const addProject = () => {
     const newProject = createDefaultProject();
@@ -232,7 +229,8 @@ export const useAppData = () => {
 
   return { 
     data: activeData, 
-    setData: setActiveData, 
+    setData: setActiveData,
+    updateProject, // 追加
     incomingData, 
     setIncomingData, 
     getShareUrl,
