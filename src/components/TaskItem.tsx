@@ -44,20 +44,22 @@ export const TaskItem: React.FC<Props> = ({
   }, []);
 
   const isMobile = windowWidth <= 1024;
+  // 日付省略表示の基準 (480px以下)
+  const isNarrowLayout = windowWidth <= 480;
 
   // 画面幅に応じたスタイル定義 (文字サイズを上げつつ、余白を詰める)
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
         return { 
-            fontSize: '13px',      // 前回より大きく (11px -> 13px)
-            indentWidth: 12,       // インデントは詰め気味に
-            itemPadding: '6px 0',  // 上下余白を詰める
+            fontSize: '13px',      
+            indentWidth: 12,       
+            itemPadding: '6px 0',  
             buttonPadding: '2px 6px',
             buttonFontSize: '0.75em' 
         };
     } else if (windowWidth <= 768) {
         return { 
-            fontSize: '14px',      // 前回より大きく (12px -> 14px)
+            fontSize: '14px',      
             indentWidth: 16, 
             itemPadding: '8px 0',
             buttonPadding: '3px 8px',
@@ -65,7 +67,7 @@ export const TaskItem: React.FC<Props> = ({
         };
     } else if (windowWidth <= 1024) {
         return { 
-            fontSize: '15px',      // 前回より大きく (14px -> 15px)
+            fontSize: '15px',      
             indentWidth: 20, 
             itemPadding: '8px 0',
             buttonPadding: '4px 10px',
@@ -194,6 +196,11 @@ export const TaskItem: React.FC<Props> = ({
       }
   };
 
+  // イベント伝播を止めるヘルパー関数
+  const stopPropagation = (e: React.PointerEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <>
       <div 
@@ -274,6 +281,7 @@ export const TaskItem: React.FC<Props> = ({
             <input 
               type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus
               onClick={(e) => e.stopPropagation()} 
+              onPointerDown={stopPropagation}
               style={{ 
                 backgroundColor: '#333', 
                 color: '#fff', 
@@ -303,19 +311,23 @@ export const TaskItem: React.FC<Props> = ({
               {progress !== null && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
               {isEditingDeadline ? (
                   <input 
-                      type="date" defaultValue={currentDeadlineStr} 
+                      type="date" 
+                      defaultValue={currentDeadlineStr} 
+                      className={isNarrowLayout ? "date-input-mobile" : ""} // 480px以下ならクラス付与
                       onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }}
                       onBlur={() => setIsEditingDeadline(false)} autoFocus
                       onClick={(e) => e.stopPropagation()}
+                      onPointerDown={stopPropagation}
                       style={{ 
                         marginLeft: '6px', 
                         padding: isMobile ? '2px' : '2px', 
                         borderRadius: '4px', 
                         border: '1px solid #555', 
                         backgroundColor: '#333', 
-                        color: '#fff', 
+                        color: isNarrowLayout ? 'transparent' : '#fff', // 480px以下なら文字色透明
                         colorScheme: 'dark', 
-                        fontSize: isMobile ? '16px' : 'inherit'
+                        fontSize: isMobile ? '16px' : 'inherit',
+                        width: isNarrowLayout ? '36px' : 'auto' // 480px以下なら幅を狭める
                       }}
                   />
               ) : (
@@ -333,7 +345,27 @@ export const TaskItem: React.FC<Props> = ({
             transition: 'opacity 0.2s',
             marginLeft: '4px'
         }}>
-          <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+          {/* モバイルレイアウト(480px以下)の時は、透明なinputをボタンに重ねて即座にカレンダーを開く */}
+          {isNarrowLayout ? (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <button title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+              <input 
+                type="date" 
+                onChange={(e) => onDeadlineChange(e.target.value)}
+                onPointerDown={stopPropagation}
+                value={currentDeadlineStr}
+                style={{ 
+                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+                  opacity: 0, 
+                  cursor: 'pointer',
+                  zIndex: 2
+                }} 
+              />
+            </div>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+          )}
+          
           <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>✕</button>
         </div>
       </div>
