@@ -96,7 +96,8 @@ function App() {
     updateParentStatus 
   } = useTaskOperations(data, setData);
 
-  const [parent, setParent] = useState<{id: string, name: string} | null>(null);
+  const [activeParentId, setActiveParentId] = useState<string | null>(null);
+  
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -105,14 +106,19 @@ function App() {
 
   const isDev = import.meta.env.DEV;
 
+  const activeParent = useMemo(() => {
+    if (!data || !activeParentId) return null;
+    return data.tasks.find(t => t.id === activeParentId) || null;
+  }, [data, activeParentId]);
+
   useEffect(() => {
-    if (parent && data) {
-      const exists = data.tasks.some(t => t.id === parent.id && !t.isDeleted);
+    if (activeParentId && data) {
+      const exists = data.tasks.some(t => t.id === activeParentId && !t.isDeleted);
       if (!exists) {
-        setParent(null);
+        setActiveParentId(null);
       }
     }
-  }, [data, parent]);
+  }, [data, activeParentId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -201,7 +207,6 @@ function App() {
     return data;
   }, [incomingData, projects, data]);
 
-  // URLインポート処理
   const handleImportFromUrl = useCallback((urlStr: string) => {
     try {
       const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
@@ -218,17 +223,14 @@ function App() {
           return;
         }
 
-        // ▼ 修正: マージ先ターゲットの自動判定
         let targetId = '';
         const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
 
         if (sameNameProject) {
-            // 同名プロジェクトがあれば、それが空かチェック
             if (sameNameProject.tasks.every(t => t.isDeleted)) {
                 targetId = sameNameProject.id;
             }
         } else {
-            // 同名がなければ、現在のアクティブプロジェクトが空かチェック
             if (data && data.tasks.every(t => t.isDeleted)) {
                 targetId = data.id;
             }
@@ -237,7 +239,7 @@ function App() {
         if (targetId) {
            const newData = {
               ...incoming,
-              id: targetId, // ターゲットのIDを維持（上書き）
+              id: targetId,
               lastSynced: Date.now()
            };
            setData(newData);
@@ -256,14 +258,12 @@ function App() {
     }
   }, [data, setIncomingData, setData, projects, activeId, switchProject]);
 
-  // ファイルインポート処理
   const handleFileImport = useCallback((f: File) => {
       const r = new FileReader();
       r.onload = (e) => {
         try {
           const incoming = JSON.parse(e.target?.result as string);
           
-          // ▼ 修正: マージ先ターゲットの自動判定
           let targetId = '';
           const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
 
@@ -379,7 +379,7 @@ function App() {
       const [y, m, d] = inputDateStr.split('-').map(Number);
       deadline = new Date(y, m - 1, d).getTime();
     }
-    addTask(inputTaskName, deadline, targetParentId ?? parent?.id);
+    addTask(inputTaskName, deadline, targetParentId ?? activeParentId ?? undefined);
     
     setInputTaskName(''); 
     setInputDateStr(''); 
@@ -389,12 +389,12 @@ function App() {
     if (inputTaskName.trim()) {
       handleAddTaskWrapper(node.id);
     } else {
-      setParent({ id: node.id, name: node.name });
+      setActiveParentId(node.id);
     }
   };
 
   const handleBoardClick = () => {
-    setParent(null);
+    setActiveParentId(null);
   };
 
   const getStrLen = (str: string) => { let len = 0; for (let i = 0; i < str.length; i++) len += (str.charCodeAt(i) < 256) ? 1 : 2; return len; };
@@ -458,7 +458,7 @@ function App() {
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }}>📅</button>
                     <div>
@@ -489,8 +489,12 @@ function App() {
                     onImportFromUrl={handleImportFromUrl} 
                 />
             </header>
-            <div style={{ marginBottom: '20px' }}>
-              {parent && <div style={{ color: '#646cff', fontSize: '0.8em', marginBottom: '5px' }}>子タスク追加中: [{parent.id}] {parent.name} <button onClick={() => setParent(null)} style={{ padding: '2px 6px', fontSize: '0.8em' }}>取消</button></div>}
+            <div style={{ marginBottom: '0px' }}>
+              <div style={{ height: '24px', marginBottom: '5px', color: '#646cff', fontSize: '0.8em', display: 'flex', alignItems: 'center' }}>
+                {activeParent && (
+                  <>子タスク追加中: [{activeParent.id}] {activeParent.name} <button onClick={() => setActiveParentId(null)} style={{ padding: '2px 6px', fontSize: '0.8em', marginLeft: '8px' }}>取消</button></>
+                )}
+              </div>
               <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
             </div>
             <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
