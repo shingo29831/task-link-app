@@ -18,7 +18,7 @@ import {
   arrayMove
 } from '@dnd-kit/sortable';
 
-import type { AppData, Task } from '../types';
+import type { Task } from '../types'; // AppDataを削除
 import { useAppData } from './useAppData';
 import { compressData, getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
@@ -92,6 +92,7 @@ export const useTaskOperations = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showAllProjectsInCalendar, setShowAllProjectsInCalendar] = useState(false); // 追加: カレンダー表示切り替え
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
@@ -106,6 +107,38 @@ export const useTaskOperations = () => {
   const activeTasks = useMemo(() => {
     return data ? data.tasks.filter(t => !t.isDeleted) : [];
   }, [data]);
+
+  // カレンダー表示用のタスクリストを生成
+  const calendarTasks = useMemo(() => {
+    if (!data) return [];
+    
+    // 現在のプロジェクトのみ表示
+    if (!showAllProjectsInCalendar) {
+      return activeTasks;
+    }
+
+    // 全プロジェクトのタスクを結合
+    const allTasks: Task[] = [];
+    projects.forEach(proj => {
+      // 削除されていないタスクを抽出
+      const projTasks = proj.tasks.filter(t => !t.isDeleted);
+      
+      const isCurrentProject = proj.id === data.id;
+
+      // カレンダー表示用にデータを加工して追加
+      // - IDの重複を防ぐため、プロジェクトIDをプレフィックスにする
+      // - どのプロジェクトのタスクか分かるように名前を修飾する（現在のプロジェクト以外）
+      const safeTasks = projTasks.map(t => ({
+        ...t,
+        id: `${proj.id}_${t.id}`,
+        name: isCurrentProject ? t.name : `[${proj.projectName}] ${t.name}`
+      }));
+      
+      allTasks.push(...safeTasks);
+    });
+
+    return allTasks;
+  }, [data, projects, activeTasks, showAllProjectsInCalendar]);
 
   const activeParent = useMemo(() => {
     if (!data || !activeParentId) return null;
@@ -679,12 +712,14 @@ export const useTaskOperations = () => {
     projectProgress,
     debugInfo,
     activeParent,
+    calendarTasks, // 追加
 
     // UI State
     showDebug, setShowDebug,
     showSidebar, setShowSidebar,
     showProjectMenu, setShowProjectMenu,
     showRenameModal, setShowRenameModal,
+    showAllProjectsInCalendar, setShowAllProjectsInCalendar, // 追加
     collapsedNodeIds,
     inputTaskName, setInputTaskName,
     inputDateStr, setInputDateStr,

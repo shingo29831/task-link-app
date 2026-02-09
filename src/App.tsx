@@ -73,12 +73,14 @@ function App() {
     debugInfo,
     activeParent,
     setActiveParentId,
+    calendarTasks, // 追加
 
     // UI State
     showDebug, setShowDebug,
     showSidebar, setShowSidebar,
     showProjectMenu, setShowProjectMenu,
     showRenameModal, setShowRenameModal,
+    showAllProjectsInCalendar, setShowAllProjectsInCalendar, // 追加
     collapsedNodeIds,
     inputTaskName, setInputTaskName,
     inputDateStr, setInputDateStr,
@@ -218,8 +220,20 @@ function App() {
               pointerEvents: showSidebar ? 'auto' : 'none', 
               minWidth: showSidebar ? '300px' : '0' 
             }}>
-                <div style={{ height: '100%', overflowY: 'auto', paddingRight: '5px' }}>
-                    <TaskCalendar tasks={data.tasks} />
+                {/* トグルエリア */}
+                <div style={{ padding: '0 5px 10px 5px', display: 'flex', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input 
+                            type="checkbox" 
+                            checked={showAllProjectsInCalendar} 
+                            onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)}
+                            style={{ cursor: 'pointer' }}
+                        />
+                        全プロジェクトのタスクを表示
+                    </label>
+                </div>
+                <div style={{ height: 'calc(100% - 30px)', overflowY: 'auto', paddingRight: '5px' }}>
+                    <TaskCalendar tasks={calendarTasks} />
                 </div>
             </div>
 
