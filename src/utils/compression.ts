@@ -2,7 +2,7 @@ import LZString from 'lz-string';
 import type { AppData } from '../types';
 import { USER_DICTIONARY, DICT_SYMBOLS } from './dictionary';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from './versions/v0';
-import { differenceInCalendarDays} from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 
 // 簡易ID生成関数
 const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -13,8 +13,11 @@ const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Da
 
 const CURRENT_VERSION = 0;
 const DEFAULT_PROJECT_NAME = 'マイプロジェクト';
-const EPOCH_2020_MIN = 26297280; // 2020-01-01 in minutes (Base Epoch)
-const EPOCH_2020_DATE = new Date(2020, 0, 1).getTime(); // 2020-01-01 in ms
+
+// 変更: 基準日を2026年1月1日に更新
+// 2026-01-01 00:00:00 UTC = 1767225600 sec = 29453760 min
+const EPOCH_2026_MIN = 29453760; 
+const EPOCH_2026_DATE = new Date(2026, 0, 1).getTime(); 
 
 const BASE185_CHARS = (() => {
   let chars = '';
@@ -167,12 +170,12 @@ const analyzeBestGroup = (sampleText: string): number => {
 // Optimal Reference Date Calculation
 // ==========================================
 
-// 最もバイト数を節約できる基準日（2020-01-01からの日数）を計算
+// 最もバイト数を節約できる基準日（2026-01-01からの日数）を計算
 const calculateOptimalRefDate = (deadlines: number[]): number => {
   if (deadlines.length === 0) return 0; // デフォルト
 
-  // 2020-01-01からの日数リストに変換
-  const daysList = deadlines.map(d => differenceInCalendarDays(d, EPOCH_2020_DATE));
+  // 2026-01-01からの日数リストに変換
+  const daysList = deadlines.map(d => differenceInCalendarDays(d, EPOCH_2026_DATE));
   
   // 候補：タスクが存在する日を基準日の候補とする
   const candidates = Array.from(new Set(daysList));
@@ -231,15 +234,15 @@ export const getIntermediateJson = (data: AppData): string => {
     .map(t => t.deadline)
     .filter((d): d is number => d !== undefined);
   
-  // 2020-01-01からの日数オフセット
+  // 2026-01-01からの日数オフセット
   const refDateDays = calculateOptimalRefDate(deadlines);
 
   const header = [
     to185(CURRENT_VERSION),
     to185(groupId),
     pName,
-    to185(Math.floor(data.lastSynced / 60000 - EPOCH_2020_MIN)),
-    to185(refDateDays) // New: Project Reference Date (Days from 2020)
+    to185(Math.floor(data.lastSynced / 60000 - EPOCH_2026_MIN)),
+    to185(refDateDays) // Project Reference Date (Days from 2026)
   ].join(',');
 
   const tasksStr = activeTasks
@@ -248,7 +251,7 @@ export const getIntermediateJson = (data: AppData): string => {
       const rawName = applyDictionaryAndEscape(t.name);
       const vName = swapChars(rawName, groupId);
       const vOrder = to185(t.order ?? 0);
-      const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2020_MIN));
+      const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2026_MIN));
       
       let vParent = "";
       if (t.parentId && t.parentId !== "0") {
@@ -265,7 +268,7 @@ export const getIntermediateJson = (data: AppData): string => {
       // 期限: 基準日からの差分を保存
       let vDeadline = "";
       if (t.deadline !== undefined) {
-        const dDays = differenceInCalendarDays(t.deadline, EPOCH_2020_DATE);
+        const dDays = differenceInCalendarDays(t.deadline, EPOCH_2026_DATE);
         const diff = dDays - refDateDays;
         vDeadline = to185(diff);
       }
@@ -309,7 +312,7 @@ export const decompressData = (compressed: string): AppData | null => {
       groupId = from185(headerParts[1]);
       projectName = restoreDictionaryAndEscape(swapChars(headerParts[2], groupId));
       
-      lastSynced = (from185(headerParts[3]) + EPOCH_2020_MIN) * 60000;
+      lastSynced = (from185(headerParts[3]) + EPOCH_2026_MIN) * 60000;
       if (headerParts[4]) {
         refDateDays = from185(headerParts[4]);
       }
@@ -318,7 +321,10 @@ export const decompressData = (compressed: string): AppData | null => {
       projectName = headerParts[0]; 
       if (headerParts[1]) {
         const val = parseInt(headerParts[1], 36);
-        if (!isNaN(val)) lastSynced = (val + EPOCH_2020_MIN) * 60000;
+        // 旧Epochとの互換性は失われますが、ここでは新しいEpochで処理するか、
+        // あるいは旧データも2026ベースに変換されたとみなす等の対応になります。
+        // （完全な下位互換が必要な場合は、バージョン番号で分岐して EPOCH_2020_MIN を使う等の処理が必要です）
+        if (!isNaN(val)) lastSynced = (val + EPOCH_2026_MIN) * 60000;
       }
     }
 
@@ -331,7 +337,7 @@ export const decompressData = (compressed: string): AppData | null => {
         const id = from185(parts[0]).toString(36);
         const name = restoreDictionaryAndEscape(swapChars(parts[1], groupId));
         const order = from185(parts[2]);
-        const lastUpdated = (from185(parts[3]) + EPOCH_2020_MIN) * 60000;
+        const lastUpdated = (from185(parts[3]) + EPOCH_2026_MIN) * 60000;
         
         let parentId: string | undefined = undefined;
         if (parts[4]) {
@@ -345,8 +351,8 @@ export const decompressData = (compressed: string): AppData | null => {
         if (parts[6]) {
             const diff = from185(parts[6]);
             const totalDays = refDateDays + diff;
-            // 2020-01-01 + totalDays から絶対時間を復元
-            const d = new Date(EPOCH_2020_DATE);
+            // 2026-01-01 + totalDays から絶対時間を復元
+            const d = new Date(EPOCH_2026_DATE);
             d.setDate(d.getDate() + totalDays);
             deadline = d.getTime();
         }
@@ -354,9 +360,7 @@ export const decompressData = (compressed: string): AppData | null => {
         return { id, name, status, deadline, lastUpdated, parentId, order };
       }
 
-      // Legacy Logic (offset based) - Migration fallback
-      // 古いデータ形式のdeadlineOffsetはprojectStartDate依存だったため、
-      // ここでは正しく復元できない可能性があるが、構造変更のためundefinedとする。
+      // Legacy Logic (offset based)
       const id = (index + 1).toString(36);
       if (tStr === "") return { id, name: "", status: 0 as const, lastUpdated: 0, isDeleted: true };
       
@@ -364,7 +368,7 @@ export const decompressData = (compressed: string): AppData | null => {
       const name = parts[0]; 
       const order = parts[1] ? parseInt(parts[1], 36) : 0;
       const updatedVal = parts[2] ? parseInt(parts[2], 36) : 0;
-      const lastUpdated = (updatedVal + EPOCH_2020_MIN) * 60000;
+      const lastUpdated = (updatedVal + EPOCH_2026_MIN) * 60000;
       const parentId = parts[3] || undefined;
       const status = (parts[4] ? Number(parts[4]) : 0) as 0|1|2|3;
       
