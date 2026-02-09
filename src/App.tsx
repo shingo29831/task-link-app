@@ -119,10 +119,14 @@ function App() {
 
   // スマホ・タブレット表示判定用のState (1024px以下を対象とする)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+  // 画面幅に応じた計算のために幅自体も保持
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 1024);
+      const width = window.innerWidth;
+      setWindowWidth(width);
+      setIsMobile(width <= 1024);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -142,7 +146,30 @@ function App() {
   const getStrLen = (str: string) => { let len = 0; for (let i = 0; i < str.length; i++) len += (str.charCodeAt(i) < 256) ? 1 : 2; return len; };
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
-    const BASE_WIDTH = 220, INDENT_WIDTH = 24, CHAR_WIDTH_PX = 12, DEADLINE_WIDTH = 80;
+    // 画面幅に応じてパラメータを調整
+    let BASE_WIDTH = 220;
+    let INDENT_WIDTH = 24;
+    let CHAR_WIDTH_PX = 12;
+    let DEADLINE_WIDTH = 80;
+
+    if (windowWidth <= 480) { // スマホ縦想定
+        BASE_WIDTH = 140;
+        INDENT_WIDTH = 10;
+        CHAR_WIDTH_PX = 7;
+        DEADLINE_WIDTH = 50;
+    } else if (windowWidth <= 768) { // スマホ横・ミニタブレット想定
+        BASE_WIDTH = 170;
+        INDENT_WIDTH = 16;
+        CHAR_WIDTH_PX = 9;
+        DEADLINE_WIDTH = 60;
+    } else if (windowWidth <= 1024) { // タブレット・PC狭め想定
+        BASE_WIDTH = 200;
+        INDENT_WIDTH = 20;
+        CHAR_WIDTH_PX = 10;
+        DEADLINE_WIDTH = 70;
+    }
+    // 1025px以上はデフォルト値
+
     const len = getStrLen(node.name);
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
     const extraWidth = node.deadline !== undefined ? DEADLINE_WIDTH : 0;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext } from '@dnd-kit/core'; 
 import type { Task } from '../types';
@@ -18,7 +18,6 @@ interface Props {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onClick: () => void;
-  // 追加: メニュー表示制御用
   isMenuOpen: boolean;
   onToggleMenu: () => void;
 }
@@ -34,6 +33,54 @@ export const TaskItem: React.FC<Props> = ({
   const [editName, setEditName] = useState(task.name);
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+
+  // 画面幅監視
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth <= 1024;
+
+  // 画面幅に応じたスタイル定義 (文字サイズを上げつつ、余白を詰める)
+  const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
+    if (windowWidth <= 480) {
+        return { 
+            fontSize: '13px',      // 前回より大きく (11px -> 13px)
+            indentWidth: 12,       // インデントは詰め気味に
+            itemPadding: '6px 0',  // 上下余白を詰める
+            buttonPadding: '2px 6px',
+            buttonFontSize: '0.75em' 
+        };
+    } else if (windowWidth <= 768) {
+        return { 
+            fontSize: '14px',      // 前回より大きく (12px -> 14px)
+            indentWidth: 16, 
+            itemPadding: '8px 0',
+            buttonPadding: '3px 8px',
+            buttonFontSize: '0.8em'
+        };
+    } else if (windowWidth <= 1024) {
+        return { 
+            fontSize: '15px',      // 前回より大きく (14px -> 15px)
+            indentWidth: 20, 
+            itemPadding: '8px 0',
+            buttonPadding: '4px 10px',
+            buttonFontSize: '0.85em'
+        };
+    }
+    // デスクトップ
+    return { 
+        fontSize: '16px', 
+        indentWidth: 24, 
+        itemPadding: '10px 0',
+        buttonPadding: '4px 12px',
+        buttonFontSize: '0.85em'
+    };
+  }, [windowWidth]);
 
   const { active } = useDndContext(); 
 
@@ -95,7 +142,7 @@ export const TaskItem: React.FC<Props> = ({
     else if (daysRemaining === 0) label = '今日まで';
     else label = `あと${daysRemaining}日`;
 
-    return <span style={{ color, fontSize: '0.8em', marginLeft: '8px' }}>{label}</span>;
+    return <span style={{ color, fontSize: '0.85em', marginLeft: '6px', whiteSpace: 'nowrap' }}>{label}</span>;
   };
 
   const calculateProgress = (): number | null => {
@@ -139,14 +186,9 @@ export const TaskItem: React.FC<Props> = ({
     }
   };
 
-  // タップ（クリック）時の挙動制御
   const handleItemClick = () => {
       if (isEditing || isEditingDeadline) return;
-      
-      // 変更: ワンタップで setParent (onClick) を常に実行するように変更
       onClick();
-
-      // 同時にメニューも開く（まだ開いていない場合）
       if (!isMenuOpen) {
           onToggleMenu();
       }
@@ -164,15 +206,15 @@ export const TaskItem: React.FC<Props> = ({
         style={{ 
           display: 'flex', 
           alignItems: 'center', 
-          padding: '10px 0', 
+          padding: itemPadding, // 動的パディング
           borderBottom: '1px solid #333', 
-          marginLeft: `${depth * 24}px`,
+          marginLeft: `${depth * indentWidth}px`, // 動的インデント
           position: 'relative',
           cursor: 'pointer',
-          // メニューが開いているときは背景を少し変えて選択中であることを示す
           backgroundColor: isMenuOpen ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
           borderRadius: '4px',
-          transition: 'background-color 0.2s'
+          transition: 'background-color 0.2s',
+          fontSize: fontSize, // 動的フォントサイズ
         }}
       >
         {isOver && !isDropDisabled && (
@@ -188,8 +230,11 @@ export const TaskItem: React.FC<Props> = ({
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
           style={{
-              background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.8em', padding: '0', marginRight: '6px',
-              color: '#aaa', visibility: hasChildren ? 'visible' : 'hidden', width: '16px', textAlign: 'center', lineHeight: '1'
+              background: 'transparent', border: 'none', cursor: 'pointer', 
+              fontSize: '1em', // 文字サイズに追従
+              padding: '0', marginRight: '2px', // マージン縮小
+              color: '#aaa', visibility: hasChildren ? 'visible' : 'hidden', 
+              width: '1.2em', textAlign: 'center', lineHeight: '1'
           }}
           title={isExpanded ? "折りたたむ" : "展開する"}
         >
@@ -205,7 +250,19 @@ export const TaskItem: React.FC<Props> = ({
               onStatusChange(((task.status + 1) % 4) as 0|1|2|3); 
             }
           }}
-          style={{ marginRight: '12px', backgroundColor: config.c, color: '#fff', minWidth: '80px', fontSize: '0.75em', cursor: 'pointer', opacity: hasChildren ? 0.9 : 1, border: hasChildren ? '1px dashed #fff' : 'none', padding: '4px 8px' }}
+          style={{ 
+            marginRight: '6px', 
+            backgroundColor: config.c, 
+            color: '#fff', 
+            minWidth: isMobile ? 'auto' : '80px', 
+            fontSize: buttonFontSize, 
+            cursor: 'pointer', 
+            opacity: hasChildren ? 0.9 : 1, 
+            border: hasChildren ? '1px dashed #fff' : 'none', 
+            padding: buttonPadding, // 動的パディング
+            lineHeight: '1.2',
+            whiteSpace: 'nowrap'
+          }}
         >
           {config.l}
         </button>
@@ -217,24 +274,49 @@ export const TaskItem: React.FC<Props> = ({
             <input 
               type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus
               onClick={(e) => e.stopPropagation()} 
-              style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #555', padding: '2px 4px', borderRadius: '4px', width: 'calc(100% - 20px)', fontSize: 'inherit' }}
+              style={{ 
+                backgroundColor: '#333', 
+                color: '#fff', 
+                border: '1px solid #555', 
+                padding: isMobile ? '4px' : '2px 4px', // パディング縮小
+                borderRadius: '4px', 
+                width: 'calc(100% - 20px)', 
+                fontSize: isMobile ? '16px' : 'inherit' // モバイル入力時はズーム防止で16px維持
+              }}
             />
           ) : (
             <>
               <span 
                 onDoubleClick={(e) => { e.stopPropagation(); setEditName(task.name); setIsEditing(true); }} title="ダブルクリックで編集"
-                style={{ color: isUrgent ? '#ff4d4f' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: 'pointer' }}
+                style={{ 
+                  color: isUrgent ? '#ff4d4f' : 'inherit', 
+                  fontWeight: hasChildren ? 'bold' : 'normal', 
+                  textDecoration: task.status === 2 ? 'line-through' : 'none', 
+                  opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, 
+                  cursor: 'pointer',
+                  fontSize: 'inherit',
+                  lineHeight: '1.4'
+                }}
               >
                 {task.name}
               </span>
-              {progress !== null && <span style={{ fontSize: '0.8em', color: '#aaa', marginLeft: '8px', fontWeight: 'normal' }}>({progress}%)</span>}
+              {progress !== null && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
               {isEditingDeadline ? (
                   <input 
                       type="date" defaultValue={currentDeadlineStr} 
                       onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }}
                       onBlur={() => setIsEditingDeadline(false)} autoFocus
                       onClick={(e) => e.stopPropagation()}
-                      style={{ marginLeft: '8px', padding: '2px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#fff', colorScheme: 'dark' }}
+                      style={{ 
+                        marginLeft: '6px', 
+                        padding: isMobile ? '2px' : '2px', 
+                        borderRadius: '4px', 
+                        border: '1px solid #555', 
+                        backgroundColor: '#333', 
+                        color: '#fff', 
+                        colorScheme: 'dark', 
+                        fontSize: isMobile ? '16px' : 'inherit'
+                      }}
                   />
               ) : (
                   getDeadline()
@@ -243,21 +325,19 @@ export const TaskItem: React.FC<Props> = ({
           )}
         </div>
         
-        {/* 操作ボタン: ホバー時 または メニューオープン時に表示 */}
         <div style={{ 
             display: 'flex', 
-            gap: '4px', 
-            // 変更: visibilityではなくopacityで制御し、メニューが開いているかホバー時のみ完全表示
+            gap: isMobile ? '6px' : '4px', 
             opacity: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 1 : 0,
             pointerEvents: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 'auto' : 'none',
             transition: 'opacity 0.2s',
+            marginLeft: '4px'
         }}>
-          <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '4px 8px' }}>📅</button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: '4px 8px' }}>✕</button>
+          <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>✕</button>
         </div>
       </div>
 
-      {/* 親タスク用の状態変更モーダル */}
       {showStatusModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
