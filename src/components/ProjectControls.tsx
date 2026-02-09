@@ -37,7 +37,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         padding: '15px', 
         backgroundColor: '#2a2a2a', 
         borderRadius: '8px',
-        marginBottom: '20px'
+        marginBottom: '5px'
       }}>
         <button onClick={onCopyLink} style={{ backgroundColor: '#646cff' }}>
           🔗 リンクをコピー
