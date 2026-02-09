@@ -221,18 +221,20 @@ function App() {
               minWidth: showSidebar ? '300px' : '0' 
             }}>
                 {/* トグルエリア */}
-                <div style={{ padding: '0 5px 10px 5px', display: 'flex', alignItems: 'center' }}>
-                    <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <input 
-                            type="checkbox" 
-                            checked={showAllProjectsInCalendar} 
-                            onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)}
-                            style={{ cursor: 'pointer' }}
-                        />
-                        全プロジェクトのタスクを表示
+                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>全プロジェクトを表示</span>
+                        <div className="toggle-switch">
+                            <input 
+                                type="checkbox" 
+                                checked={showAllProjectsInCalendar} 
+                                onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                        </div>
                     </label>
                 </div>
-                <div style={{ height: 'calc(100% - 30px)', overflowY: 'auto', paddingRight: '5px' }}>
+                <div style={{ height: 'calc(100% - 40px)', overflowY: 'auto', paddingRight: '5px' }}>
                     <TaskCalendar tasks={calendarTasks} />
                 </div>
             </div>

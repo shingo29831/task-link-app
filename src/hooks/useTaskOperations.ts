@@ -18,7 +18,7 @@ import {
   arrayMove
 } from '@dnd-kit/sortable';
 
-import type { Task } from '../types'; // AppDataを削除
+import type { Task } from '../types';
 import { useAppData } from './useAppData';
 import { compressData, getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
@@ -127,11 +127,12 @@ export const useTaskOperations = () => {
 
       // カレンダー表示用にデータを加工して追加
       // - IDの重複を防ぐため、プロジェクトIDをプレフィックスにする
-      // - どのプロジェクトのタスクか分かるように名前を修飾する（現在のプロジェクト以外）
       const safeTasks = projTasks.map(t => ({
         ...t,
         id: `${proj.id}_${t.id}`,
-        name: isCurrentProject ? t.name : `[${proj.projectName}] ${t.name}`
+        // nameは変更せず、そのまま表示 (カレンダーのセル内ではプロジェクト名を非表示にするため)
+        // 詳細モーダルで表示するために sourceProjectName を設定する
+        sourceProjectName: isCurrentProject ? undefined : proj.projectName
       }));
       
       allTasks.push(...safeTasks);

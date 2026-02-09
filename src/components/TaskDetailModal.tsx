@@ -17,24 +17,59 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose }) => {
       alignItems: 'center', zIndex: 1000
     }} onClick={onClose}>
       <div style={{
-        backgroundColor: '#2a2a2a', padding: '20px', borderRadius: '8px',
-        width: '300px', maxWidth: '90%', maxHeight: '80vh', overflowY: 'auto'
+        backgroundColor: '#2a2a2a', 
+        padding: '30px', // パディングを大きく (20px -> 30px)
+        borderRadius: '12px', // 角丸も少し大きく
+        width: '500px', // 幅を大きく (300px -> 500px)
+        maxWidth: '90%', 
+        maxHeight: '85vh', // 高さ制限も少し緩和
+        overflowY: 'auto',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-          <h3 style={{ margin: 0 }}>{format(date, 'M月d日のタスク', { locale: ja })}</h3>
-          <button onClick={onClose} style={{ padding: '2px 8px' }}>✕</button>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '1.5em' }}>{/* タイトル文字サイズ拡大 */}
+            {format(date, 'M月d日のタスク', { locale: ja })}
+          </h3>
+          <button 
+            onClick={onClose} 
+            style={{ 
+              padding: '8px 16px', // ボタンサイズ拡大
+              fontSize: '1.2em', 
+              background: 'transparent', 
+              border: '1px solid #555', 
+              color: '#ccc',
+              cursor: 'pointer',
+              borderRadius: '4px'
+            }}
+          >
+            ✕
+          </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}> {/* gapを拡大 */}
           {tasks.length === 0 ? (
-            <p style={{ color: '#888', fontSize: '0.9em' }}>タスクはありません</p>
+            <p style={{ color: '#888', fontSize: '1.1em', textAlign: 'center', margin: '20px 0' }}> {/* 文字サイズ拡大 */}
+              タスクはありません
+            </p>
           ) : (
             tasks.map(t => (
               <div key={t.id} style={{
-                padding: '8px', borderRadius: '4px', fontSize: '0.85em',
+                padding: '16px', // アイテムのパディング拡大 (8px -> 16px)
+                borderRadius: '6px', 
+                fontSize: '1.1em', // 文字サイズ拡大 (0.85em -> 1.1em)
                 backgroundColor: t.status === 2 ? '#28a745' : t.status === 3 ? '#6f42c1' : '#007bff',
-                color: '#fff', textDecoration: t.status === 2 ? 'line-through' : 'none'
+                color: '#fff', 
+                textDecoration: t.status === 2 ? 'line-through' : 'none',
+                display: 'flex', flexDirection: 'column', gap: '4px'
               }}>
-                {t.name}
+                {/* sourceProjectNameが存在する場合のみ表示 (他プロジェクトのタスク) */}
+                {t.sourceProjectName && (
+                    <span style={{ fontSize: '0.85em', opacity: 0.9, fontWeight: 'bold', marginBottom: '2px' }}>
+                        [{t.sourceProjectName}]
+                    </span>
+                )}
+                <span style={{ lineHeight: 1.4 }}>{t.name}</span>
               </div>
             ))
           )}
