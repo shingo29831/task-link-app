@@ -22,7 +22,8 @@ import { ProjectNameEditModal } from './components/ProjectNameEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.ReactNode, activeTasks: Task[], onBoardClick: () => void }) => {
+// isMobileプロップを追加してスタイルを調整
+const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children: React.ReactNode, activeTasks: Task[], onBoardClick: () => void, isMobile: boolean }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
   });
@@ -38,12 +39,12 @@ const BoardArea = ({ children, activeTasks, onBoardClick }: { children: React.Re
         overflowX: 'auto', 
         overflowY: 'auto',
         display: 'flex', 
-        gap: '16px', 
+        gap: isMobile ? '8px' : '16px', // モバイル時は間隔を詰める
         alignItems: 'flex-start',
         paddingBottom: '20px',
         border: isOver ? '2px dashed #646cff' : '1px solid #333',
         borderRadius: '8px',
-        padding: '16px',
+        padding: isMobile ? '8px' : '16px', // モバイル時は内側余白を減らす
         backgroundColor: '#1e1e1e',
         transition: 'border 0.2s',
         minHeight: '200px',
@@ -133,6 +134,9 @@ function App() {
   }, []);
 
   const isDev = import.meta.env.DEV;
+
+  // 余白を詰める基準 (1080px以下)
+  const isCompactSpacing = windowWidth <= 1080;
 
   // バイブレーション処理
   const handleDragStart = () => {
@@ -236,12 +240,12 @@ function App() {
         <div style={{ 
             maxWidth: '100%', 
             margin: '0 auto', 
-            padding: '20px', 
-            // セーフエリア対応 (iPhone X以降)
-            paddingBottom: 'calc(20px + env(safe-area-inset-bottom))', 
-            paddingTop: 'calc(20px + env(safe-area-inset-top))',
-            paddingLeft: 'calc(20px + env(safe-area-inset-left))',
-            paddingRight: 'calc(20px + env(safe-area-inset-right))',
+            padding: isMobile ? '10px' : '20px', // モバイル時はパディングを減らす
+            // セーフエリア対応 (iPhone X以降) - パディング値も動的に変更
+            paddingBottom: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-bottom))`, 
+            paddingTop: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-top))`,
+            paddingLeft: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-left))`,
+            paddingRight: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-right))`,
             display: 'flex', 
             flexDirection: 'column', 
             height: '100vh', 
@@ -273,7 +277,7 @@ function App() {
               // スマホの場合は上揃え（ProjectControlsの高さと調整）
               alignItems: isMobile ? 'flex-start' : 'center', 
               flexShrink: 0, 
-              marginBottom: '20px',
+              marginBottom: isCompactSpacing ? '5px' : '10px', // 通常時10px, コンパクト時5pxに縮小
               gap: isMobile ? '10px' : '0'
           }}>
               {isMobile ? (
@@ -376,7 +380,18 @@ function App() {
               minWidth: 0 
             }}>
               <div style={{ marginBottom: '0px', flexShrink: 0 }}>
-                <div style={{ height: '24px', marginBottom: '5px', color: '#646cff', fontSize: '0.8em', display: 'flex', alignItems: 'center' }}>
+                {/* アクティブな親タスク表示エリア: 非アクティブならPC/Mobile問わず詰める */}
+                <div style={{ 
+                  height: activeParent ? 'auto' : '0', 
+                  minHeight: activeParent ? '24px' : '0',
+                  marginBottom: activeParent ? '5px' : '0',
+                  color: '#646cff', 
+                  fontSize: '0.8em', 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease'
+                }}>
                   {activeParent && (
                     <>子タスク追加中: [{activeParent.id}] {activeParent.name} <button onClick={() => setActiveParentId(null)} style={{ padding: '2px 6px', fontSize: '0.8em', marginLeft: '8px' }}>取消</button></>
                   )}
@@ -384,7 +399,7 @@ function App() {
                 <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
               </div>
 
-              <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick}>
+              <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile}>
                 <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                     {rootNodes.map(root => {
                         const colWidth = calculateColumnWidth(root);
@@ -401,7 +416,7 @@ function App() {
                                       onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                       isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
                                       onClick={() => handleTaskClick(root)}
-                                      // メニュー制御
+                                      // メニュー制御 (修正済み)
                                       isMenuOpen={menuOpenTaskId === root.id}
                                       onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)}
                                     />
