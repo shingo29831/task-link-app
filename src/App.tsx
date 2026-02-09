@@ -104,6 +104,16 @@ function App() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
 
+  // 追加: 親タスクとしてフォーカスしているタスクが削除された場合、フォーカスを解除する
+  useEffect(() => {
+    if (parent && data) {
+      const exists = data.tasks.some(t => t.id === parent.id && !t.isDeleted);
+      if (!exists) {
+        setParent(null);
+      }
+    }
+  }, [data, parent]);
+
   // キーボードショートカットの実装 (Ctrl+Y 対応)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -304,7 +314,10 @@ function App() {
       deadline = new Date(y, m - 1, d).getTime();
     }
     addTask(inputTaskName, deadline, targetParentId ?? parent?.id);
-    setInputTaskName(''); setInputDateStr('');
+    
+    // フォーカスを維持するため setParent(null) を削除
+    setInputTaskName(''); 
+    setInputDateStr(''); 
   };
 
   const onTaskItemAddClick = (node: TaskNode) => { if (inputTaskName.trim()) handleAddTaskWrapper(node.id); else setParent({ id: node.id, name: node.name }); };

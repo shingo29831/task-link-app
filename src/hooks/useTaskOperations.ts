@@ -58,11 +58,21 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
   const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
     if (!data) return;
 
+    // 1. 親タスクが存在するか確認し、存在しない場合はトップレベル(undefined)に変更する
+    let targetParentId = parentId;
+    if (targetParentId) {
+        const parentExists = data.tasks.some(t => t.id === targetParentId && !t.isDeleted);
+        if (!parentExists) {
+            targetParentId = undefined;
+        }
+    }
+
     const normalizedName = name;
     
+    // 2. 重複チェック (補正後の親IDで行う)
     const isDuplicate = data.tasks.some(t =>
       !t.isDeleted &&
-      t.parentId === parentId &&
+      t.parentId === targetParentId &&
       t.name === normalizedName
     );
 
@@ -84,7 +94,8 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
         newId = candidateNum.toString(36);
     }
 
-    const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === parentId);
+    // 3. 兄弟タスクから順序を計算 (補正後の親IDで行う)
+    const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === targetParentId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
     const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
 
@@ -94,7 +105,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       status: 0,
       deadline: deadline, // 絶対値をセット
       lastUpdated: Date.now(),
-      parentId: isResetState ? undefined : parentId,
+      parentId: isResetState ? undefined : targetParentId,
       order: isResetState ? 1 : nextOrder
     };
 
