@@ -345,11 +345,13 @@ function App() {
               overflow: 'hidden', 
               transition: 'flex 0.3s ease, opacity 0.3s ease', 
               opacity: showSidebar ? 1 : 0, 
-              pointerEvents: showSidebar ? 'auto' : 'none', 
+              pointerEvents: showSidebar ? 'auto' : 'none',
+              // 変更点: 高さを 100% にして親コンテナ(Content Body)に収める
+              height: '100%', 
               minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' 
             }}>
                 {/* トグルエリア */}
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
                     <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>全プロジェクトを表示</span>
                         <div className="toggle-switch">
@@ -362,7 +364,8 @@ function App() {
                         </div>
                     </label>
                 </div>
-                <div style={{ height: 'calc(100% - 40px)', overflowY: 'auto', paddingRight: '5px' }}>
+                {/* カレンダー本体: 高さを100%確保してスクロール可能に */}
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
                     <TaskCalendar 
                         tasks={calendarTasks} 
                         // activeTasks={activeTasks} // 削除
