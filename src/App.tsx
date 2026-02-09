@@ -92,7 +92,8 @@ function App() {
     renameTask, 
     updateTaskStatus, 
     updateTaskDeadline, 
-    handleDragEnd 
+    handleDragEnd,
+    updateParentStatus // 追加: 親タスクの状態変更用関数
   } = useTaskOperations(data, setData);
 
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
@@ -347,7 +348,9 @@ function App() {
             <SortableTaskItem id={n.id} depth={depth}>
                 <TaskItem 
                   task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0}
-                  onStatusChange={(s) => updateTaskStatus(n.id, s)} onDelete={() => deleteTask(n.id)} 
+                  onStatusChange={(s) => updateTaskStatus(n.id, s)} 
+                  onParentStatusChange={updateParentStatus} // 追加: 親タスクの状態変更ハンドラ
+                  onDelete={() => deleteTask(n.id)} 
                   onRename={(newName) => renameTask(n.id, newName)} 
                   onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} 
                   isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)}
@@ -432,11 +435,12 @@ function App() {
                               <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
                                   <TaskItem 
                                     task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
-                                    onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} 
+                                    onStatusChange={(s) => updateTaskStatus(root.id, s)} 
+                                    onParentStatusChange={updateParentStatus} // 追加
+                                    onDelete={() => deleteTask(root.id)} 
                                     onRename={(newName) => renameTask(root.id, newName)} 
                                     onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                     isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
-                                    // 変更: ハンドラを渡す
                                     onClick={() => handleTaskClick(root)}
                                   />
                               </div>
@@ -483,8 +487,8 @@ function App() {
                   borderRadius: '8px', 
                   fontSize: '0.75em', 
                   color: '#ccc',
-                  maxHeight: '400px', // スクロール用の高さ制限
-                  overflowY: 'auto'   // 縦スクロールを有効化
+                  maxHeight: '400px', 
+                  overflowY: 'auto'
                 }}>
                   <p><b>プロジェクト名:</b> {data.projectName}</p>
                   <p><b>適用マッピング:</b> <span style={{ color: '#8ac' }}>{debugInfo.mappingInfo}</span></p>

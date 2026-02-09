@@ -55,10 +55,55 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
+  // 追加: 親タスクの状態変更と子タスクへの波及処理
+  const updateParentStatus = useCallback((parentId: string, newStatus: 0 | 1 | 2 | 3) => {
+    if (!data) return;
+    
+    let nextTasks = [...data.tasks];
+    
+    // 子タスクへの影響反映
+    if (newStatus === 2) { // 完了: 全ての子タスクを完了にする
+      nextTasks = nextTasks.map(t => 
+        (t.parentId === parentId && !t.isDeleted) 
+          ? { ...t, status: 2, lastUpdated: Date.now() } 
+          : t
+      );
+    } else if (newStatus === 0) { // 未着手: 完了以外の全子タスクを未着手にする
+      nextTasks = nextTasks.map(t => 
+        (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+          ? { ...t, status: 0, lastUpdated: Date.now() } 
+          : t
+      );
+    } else if (newStatus === 1) { // 進行中: 完了以外の全子タスクを進行中にする
+      nextTasks = nextTasks.map(t => 
+        (t.parentId === parentId && !t.isDeleted && t.status !== 2) 
+          ? { ...t, status: 1, lastUpdated: Date.now() } 
+          : t
+      );
+    }
+    // 休止(3)の場合: 子タスクには影響を与えない（親のみ変更）
+
+    // 全体の整合性を再計算（これにより通常は親タスクの状態も子に合わせて上書きされる）
+    let calculatedTasks = recalculateStatus(nextTasks);
+
+    // ★親タスクの状態を強制的にユーザー指定のものにする
+    // (recalculateStatusで意図しない状態に戻されるのを防ぐため、最後に上書きする)
+    calculatedTasks = calculatedTasks.map(t => 
+      t.id === parentId 
+        ? { ...t, status: newStatus, lastUpdated: Date.now() } 
+        : t
+    );
+
+    setData({
+      ...data,
+      tasks: calculatedTasks,
+      lastSynced: Date.now()
+    });
+  }, [data, setData]);
+
   const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
     if (!data) return;
 
-    // 1. 親タスクが存在するか確認し、存在しない場合はトップレベル(undefined)に変更する
     let targetParentId = parentId;
     if (targetParentId) {
         const parentExists = data.tasks.some(t => t.id === targetParentId && !t.isDeleted);
@@ -69,7 +114,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
 
     const normalizedName = name;
     
-    // 2. 重複チェック (補正後の親IDで行う)
     const isDuplicate = data.tasks.some(t =>
       !t.isDeleted &&
       t.parentId === targetParentId &&
@@ -84,7 +128,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     const activeTasks = data.tasks.filter(t => !t.isDeleted);
     const isResetState = activeTasks.length === 0;
 
-    // ID生成: 重複チェックを行いユニークなIDを保証する
     const existingIds = new Set(data.tasks.map(t => t.id));
     let candidateNum = isResetState ? 1 : data.tasks.length + 1;
     let newId = candidateNum.toString(36);
@@ -94,7 +137,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
         newId = candidateNum.toString(36);
     }
 
-    // 3. 兄弟タスクから順序を計算 (補正後の親IDで行う)
     const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === targetParentId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
     const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
@@ -103,7 +145,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       id: newId,
       name: normalizedName,
       status: 0,
-      deadline: deadline, // 絶対値をセット
+      deadline: deadline,
       lastUpdated: Date.now(),
       parentId: isResetState ? undefined : targetParentId,
       order: isResetState ? 1 : nextOrder
@@ -292,6 +334,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     renameTask,
     updateTaskStatus,
     updateTaskDeadline,
-    handleDragEnd
+    handleDragEnd,
+    updateParentStatus
   };
 };
