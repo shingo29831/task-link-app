@@ -102,6 +102,9 @@ function App() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
 
+  // 開発環境かどうかを判定
+  const isDev = import.meta.env.DEV;
+
   useEffect(() => {
     if (parent && data) {
       const exists = data.tasks.some(t => t.id === parent.id && !t.isDeleted);
@@ -312,8 +315,6 @@ function App() {
     setInputDateStr(''); 
   };
 
-  // onTaskItemAddClick を削除しました
-
   const handleTaskClick = (node: TaskNode) => {
     if (inputTaskName.trim()) {
       handleAddTaskWrapper(node.id);
@@ -432,7 +433,6 @@ function App() {
                                   <TaskItem 
                                     task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} 
                                     onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} 
-                                    // onAddSubTask を削除
                                     onRename={(newName) => renameTask(root.id, newName)} 
                                     onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                     isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
@@ -449,12 +449,14 @@ function App() {
             </BoardArea>
             <div style={{ marginTop: '10px' }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '30px' }}>
-                <button 
-                  onClick={() => setShowDebug(!showDebug)} 
-                  style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
-                </button>
+                {isDev && (
+                  <button 
+                    onClick={() => setShowDebug(!showDebug)} 
+                    style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
+                  </button>
+                )}
 
                 <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
                   <button
@@ -473,8 +475,17 @@ function App() {
                   </button>
                 </div>
               </div>
-              {showDebug && (
-                <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
+              {isDev && showDebug && (
+                <div style={{ 
+                  marginTop: '15px', 
+                  padding: '15px', 
+                  background: '#1a1a1a', 
+                  borderRadius: '8px', 
+                  fontSize: '0.75em', 
+                  color: '#ccc',
+                  maxHeight: '400px', // スクロール用の高さ制限
+                  overflowY: 'auto'   // 縦スクロールを有効化
+                }}>
                   <p><b>プロジェクト名:</b> {data.projectName}</p>
                   <p><b>適用マッピング:</b> <span style={{ color: '#8ac' }}>{debugInfo.mappingInfo}</span></p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 20px', margin: '10px 0', alignItems: 'center' }}>
