@@ -3,7 +3,7 @@ export interface Task {
   id: string;
   name: string;      
   status: 0 | 1 | 2 | 3; // 0:未着手, 1:進行中, 2:完了, 3:休止
-  deadlineOffset?: number; 
+  deadline?: number; // 変更: 期限日 (Unix Timestamp ms, 00:00:00)
   lastUpdated: number; 
   parentId?: string;   
   isDeleted?: boolean;
@@ -11,9 +11,9 @@ export interface Task {
 }
 
 export interface AppData {
-  id: string; // 追加: プロジェクトID
+  id: string;
   projectName: string; 
-  projectStartDate: number; 
+  // projectStartDate を削除
   tasks: Task[];
   lastSynced: number;
 }

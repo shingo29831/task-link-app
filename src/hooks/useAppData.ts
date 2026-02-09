@@ -3,7 +3,6 @@ import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 
 const STORAGE_KEY = 'progress_app_v2';
-const DEFAULT_START = 1577836800000; // 2020-01-01
 
 // ID生成
 const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -12,18 +11,20 @@ const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Da
 const createDefaultProject = (): AppData => ({
   id: generateProjectId(),
   projectName: 'マイプロジェクト',
-  projectStartDate: DEFAULT_START,
   tasks: [],
   lastSynced: Date.now()
 });
 
-// 比較関数: URLからのデータは更新日時が分単位に丸められているため、分単位での一致を確認する
+// 比較関数
 const isTaskEqual = (local: Task, incoming: Task): boolean => {
   if (local.id !== incoming.id) return false;
   if (local.name !== incoming.name) return false;
   if (local.status !== incoming.status) return false;
   if (local.parentId !== incoming.parentId) return false;
-  if (local.deadlineOffset !== incoming.deadlineOffset) return false;
+  
+  // 期限の比較 (undefined同士、または値の一致)
+  if (local.deadline !== incoming.deadline) return false;
+
   if (local.isDeleted !== incoming.isDeleted) return false;
   if ((local.order ?? 0) !== (incoming.order ?? 0)) return false;
 
@@ -38,9 +39,7 @@ export const useAppData = () => {
   const [projects, setProjects] = useState<AppData[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   
-  // 現在のアクティブプロジェクト（UIで表示するもの）
   const activeData = projects.find(p => p.id === activeId) || null;
-
   const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
 
@@ -60,6 +59,9 @@ export const useAppData = () => {
           if (Array.isArray(parsed)) {
             loadedProjects = parsed;
           } else {
+            // マイグレーション: 古いデータ形式の場合はID付与などを行うが、
+            // projectStartDateの削除は型定義の変更に伴い自然に無視されるか、
+            // 必要ならここで削除処理を入れる。今回はそのまま読み込み。
             const migrated = { ...parsed, id: parsed.id || generateProjectId() };
             loadedProjects = [migrated];
           }
@@ -80,7 +82,7 @@ export const useAppData = () => {
       
       let newIncoming: AppData | null = null;
       let shouldAutoApply = false;
-      let isIdenticalToExisting = false; // 差分チェック用フラグ
+      let isIdenticalToExisting = false; 
 
       if (compressed) {
         const incoming = decompressData(compressed);
@@ -93,14 +95,10 @@ export const useAppData = () => {
           if (sameNameProject) {
             initialActiveId = sameNameProject.id;
             
-            // --- 修正: タスクの厳密な比較（分単位丸めを考慮） ---
-            // 削除済みでないタスクのリスト同士を比較
             const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
             const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
 
             if (localActive.length === incomingActive.length) {
-                // 長さが同じ場合、内容を1つずつチェック
-                // (compression.tsの仕様上、順序は維持されている前提)
                 const allMatch = localActive.every((localTask, index) => {
                     const incomingTask = incomingActive[index];
                     return isTaskEqual(localTask, incomingTask);
@@ -129,11 +127,9 @@ export const useAppData = () => {
         initialActiveId = newIncoming.id;
         window.history.replaceState(null, '', window.location.pathname);
       } else if (newIncoming && !isIdenticalToExisting) {
-        // 差分がある場合のみセット（モーダル表示のトリガー）
         setIncomingData(newIncoming);
         window.history.replaceState(null, '', window.location.pathname);
       } else {
-        // 差分がない場合は URL パラメータを消去して終了
         window.history.replaceState(null, '', window.location.pathname);
       }
 

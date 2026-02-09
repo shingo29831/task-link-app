@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import type { AppData, Task } from '../types';
 import { to185 } from '../utils/compression'; 
 
@@ -38,16 +38,13 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   const [priority, setPriority] = useState<Priority>('LOCAL');
   const [rows, setRows] = useState<ComparisonRow[]>([]);
 
-  // リネーム管理用
   const [renames, setRenames] = useState<Map<string, string>>(new Map());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
 
-  // 無視される可能性のあるリモートタスクの選択管理用
   const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
   const [selectedIgnoredIds, setSelectedIgnoredIds] = useState<Set<string>>(new Set());
 
-  // 差分がない場合に自動で閉じる
   useEffect(() => {
     if (step === 'TASKS' && rows.length > 0) {
       const hasDifferences = rows.some(row => !row.isIdentical);
@@ -69,9 +66,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     );
   };
 
-  const getDeadlineDisplay = (task: Task, startDate: number) => {
-      if (task.deadlineOffset === undefined) return '';
-      return format(addDays(startDate, task.deadlineOffset), 'yyyy-MM-dd');
+  const getDeadlineDisplay = (task: Task) => {
+      if (task.deadline === undefined) return '';
+      return format(task.deadline, 'yyyy-MM-dd');
   };
 
   const breakText = (text: string) => {
@@ -82,8 +79,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   };
 
   const isContentEqual = (a: Task, b: Task) => {
-    const deadlineA = a.deadlineOffset ?? null;
-    const deadlineB = b.deadlineOffset ?? null;
+    const deadlineA = a.deadline ?? null;
+    const deadlineB = b.deadline ?? null;
     const parentA = a.parentId ?? null;
     const parentB = b.parentId ?? null;
     return a.name === b.name && a.status === b.status && deadlineA === deadlineB && parentA === parentB;
@@ -164,16 +161,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     return result;
   }, [rows]);
 
-  // 重複チェックロジック（リアルタイム表示用）
   const duplicateKeys = useMemo(() => {
-    const nameMap = new Map<string, string[]>(); // key: "parentId:name", value: [rowKey1, rowKey2, ...]
+    const nameMap = new Map<string, string[]>(); 
     const duplicates = new Set<string>();
 
     rows.forEach(row => {
         if (row.action === 'DELETE') return;
 
         let name = '';
-        // どのタスクが採用されるか判定
         if (row.action === 'USE_LOCAL' && row.local) {
             name = renames.get(row.key) || row.local.name;
         } else if ((row.action === 'USE_REMOTE' || row.action === 'ADD_REMOTE') && row.remote) {
@@ -182,8 +177,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
         if (!name) return;
 
-        // 親IDの簡易判定 (resolvedParentKeyを使用)
-        // ※ ID変更後の厳密な親ID追従はこの段階では複雑すぎるため、現在の階層構造を基準とする
         const groupKey = `${row.resolvedParentKey || 'root'}:${name}`;
         if (!nameMap.has(groupKey)) {
             nameMap.set(groupKey, []);
@@ -202,7 +195,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const handleRowActionChange = (key: string, act: ResolveAction) => setRows(prev => prev.map(r => r.key === key ? { ...r, action: act } : r));
 
-  // リネーム関連処理
   const handleStartRename = (id: string, currentName: string) => {
       setEditingId(id);
       setTempName(renames.get(id) || currentName);
@@ -224,9 +216,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
       setTempName('');
   };
 
-  // 「実行」ボタンが押されたときの処理
   const handleInitialMerge = () => {
-    // 重複がある場合は実行させない
     if (duplicateKeys.size > 0) {
         alert('名前が重複しているタスクがあります。名前を変更するか、どちらか一方を削除してください。');
         return;
@@ -246,16 +236,13 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     }
   };
 
-  // 最終的なマージ処理
   const finalizeMerge = (idsToResurrect: Set<string>) => {
     const finalTasks: Task[] = [];
     
-    // 1. 全ての使用済みIDを収集 (Local + Remote)
     const usedIds = new Set<string>();
     localData.tasks.forEach(t => usedIds.add(t.id));
     incomingData.tasks.forEach(t => usedIds.add(t.id));
 
-    // ID置換マップ: 旧ID -> 新ID
     const localIdMap = new Map<string, string>();
     let currentIdNum = 0;
 
@@ -279,18 +266,13 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
         let taskToUse: Task | undefined;
 
-        // 特殊処理: 復活対象として選択された行 (Local優先 + Remote追加)
         if (idsToResurrect.has(row.key) && row.local && row.remote) {
-            // A. リモートタスク (元のIDを使用)
-            // リネームは「リモート側」に適用する
             const rTask = { ...row.remote };
             if (renames.has(row.key)) {
                 rTask.name = renames.get(row.key)!;
             }
             finalTasks.push(rTask);
             
-            // B. ローカルタスク (新しいIDを使用)
-            // ローカル側はIDのみ変更し、名前は変更しない（重複を避けるためユーザーがリネームしたのはリモート側とみなす）
             const lTask = { ...row.local };
             lTask.id = localIdMap.get(row.key)!;
             
@@ -302,10 +284,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
             return;
         }
 
-        // 通常処理
         if (row.action === 'USE_LOCAL' && row.local) {
             taskToUse = { ...row.local };
-            // 親が移動している場合への追従
             if (taskToUse.parentId && localIdMap.has(taskToUse.parentId)) {
                 taskToUse.parentId = localIdMap.get(taskToUse.parentId);
             }
@@ -316,7 +296,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
 
         if (taskToUse) {
-            // リネームの適用
             if (renames.has(row.key)) {
                 taskToUse.name = renames.get(row.key)!;
             }
@@ -324,7 +303,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
     });
 
-    // 2. 親子関係の整合性チェック
     const finalIds = new Set(finalTasks.map(t => t.id));
     finalTasks.forEach(t => {
         if (t.parentId && !finalIds.has(t.parentId)) {
@@ -332,13 +310,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         }
     });
 
-    // 同一階層での名前重複チェック（最終確認）
-    // finalizeMerge前の handleInitialMerge でもチェックしているが、
-    // 追加タスク選択(IGNORED_SELECT)を経由した場合のためにここでもチェック
-    // ただし、復活機能でタスクが増える場合、ここで名前が重複する可能性があるため、
-    // 本当は復活タスクの名前も個別に設定できるのがベストだが、今回は簡易的に
-    // 「復活するローカルタスクは元の名前」「リモートタスクはリネーム後の名前」としている。
-    // もしこれらが重複したらアラートを出す。
     const seen = new Set<string>();
     const duplicateNames = new Set<string>();
 
@@ -358,7 +329,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     onConfirm({ 
         id: localData.id, 
         projectName: projectNameChoice === 'LOCAL' ? localData.projectName : incomingData.projectName, 
-        projectStartDate: localData.projectStartDate, 
         tasks: finalTasks, 
         lastSynced: Date.now() 
     });
@@ -485,8 +455,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                         <thead><tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>アクション</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
                         <tbody>
                             {displayedRows.map((row) => {
-                                const localDate = row.local ? getDeadlineDisplay(row.local, localData.projectStartDate) : '';
-                                const remoteDate = row.remote ? getDeadlineDisplay(row.remote, incomingData.projectStartDate) : '';
+                                const localDate = row.local ? getDeadlineDisplay(row.local) : '';
+                                const remoteDate = row.remote ? getDeadlineDisplay(row.remote) : '';
                                 const isContextRow = row.isIdentical;
                                 const rowOpacity = isContextRow ? 0.6 : 1;
                                 
@@ -496,7 +466,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
                                 return (
                                     <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
-                                        {/* Local Column */}
                                         <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.local ? `rgba(255,255,255,${rowOpacity})` : '#666' }}>
                                             <div style={{ display: 'flex', alignItems: 'center' }}>
                                                 {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555' }}>└</span>}
@@ -504,7 +473,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                     <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1 }}>
                                                         <StatusBadge status={row.local.status} />
                                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                            {/* 重複警告表示 */}
                                                             {isDuplicated && row.local && (
                                                                 <div style={{ color: '#ff6b6b', fontSize: '0.75em', marginBottom: '2px' }}>
                                                                     ⚠️ 名前重複
@@ -530,10 +498,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                             </div>
                                         </td>
                                         
-                                        {/* Action Column */}
                                         <td style={{ padding: '8px', opacity: rowOpacity }}>{isContextRow ? <span style={{ color: '#888', fontSize: '0.85em' }}>（一致）</span> : <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}>{row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}{row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}{!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}</select>}</td>
                                         
-                                        {/* Remote Column */}
                                         <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.remote ? `rgba(255,255,255,${rowOpacity})` : '#666' }}>
                                             {row.remote && (
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -542,7 +508,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                         <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1 }}>
                                                             <StatusBadge status={row.remote.status} />
                                                             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                                {/* 重複警告表示 (Remote側) */}
                                                                 {isDuplicated && !row.local && (
                                                                     <div style={{ color: '#ff6b6b', fontSize: '0.75em', marginBottom: '2px' }}>
                                                                         ⚠️ 名前重複
@@ -557,7 +522,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                                 ) : (
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                         <span style={{ color: isRenamed ? '#ffeb3b' : 'inherit' }}>{isRenamed ? currentName : breakText(row.remote.name)}</span>
-                                                                        {/* Localがない場合のみこちらでリネーム可能にする */}
                                                                         {!row.local && (
                                                                             <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#646cff', padding: 0 }} title="名前を変更">✎</button>
                                                                         )}

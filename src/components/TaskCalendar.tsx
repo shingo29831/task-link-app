@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addDays, differenceInCalendarDays } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 
 interface Props {
-  projectStartDate: number;
   tasks: Task[];
 }
 
-export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
+export const TaskCalendar: React.FC<Props> = ({ tasks }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<{ date: Date, tasks: Task[] } | null>(null);
 
@@ -23,15 +22,12 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
 
   const getDayTasks = (day: Date) => {
      return tasks.filter(t => {
-        if (t.isDeleted || t.deadlineOffset === undefined) return false;
-        const deadline = addDays(projectStartDate, t.deadlineOffset);
-        return isSameDay(day, deadline);
+        if (t.isDeleted || t.deadline === undefined) return false;
+        return isSameDay(day, t.deadline);
      });
   };
 
   const MAX_DISPLAY_TASKS = 5;
-
-  // 今日の日付を取得（時間情報は除去）
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -73,20 +69,15 @@ export const TaskCalendar: React.FC<Props> = ({ projectStartDate, tasks }) => {
                         </div>
                         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             {dayTasks.slice(0, MAX_DISPLAY_TASKS).map(t => {
-                                // 期限切れ判定ロジック
-                                const deadline = addDays(projectStartDate, t.deadlineOffset!);
-                                const diffDays = differenceInCalendarDays(deadline, today);
-                                // 完了(2)以外で、期限が明日(1)以下なら強調
+                                const diffDays = differenceInCalendarDays(t.deadline!, today);
                                 const isUrgent = t.status !== 2 && diffDays <= 1;
 
-                                // 背景色決定
-                                let bgColor = '#007bff'; // Default: 進行中など
-                                if (t.status === 2) bgColor = '#28a745'; // 完了
-                                else if (t.status === 3) bgColor = '#6f42c1'; // 休止
+                                let bgColor = '#007bff';
+                                if (t.status === 2) bgColor = '#28a745';
+                                else if (t.status === 3) bgColor = '#6f42c1';
                                 
-                                // 強調表示の場合は赤系（完了以外）
                                 if (isUrgent) {
-                                    bgColor = '#e53935'; // 赤
+                                    bgColor = '#e53935';
                                 }
 
                                 return (

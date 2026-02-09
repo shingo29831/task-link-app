@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { format } from 'date-fns';
 import { 
   DndContext, 
   closestCenter, 
@@ -87,15 +86,12 @@ function App() {
     renameTask, 
     updateTaskStatus, 
     updateTaskDeadline, 
-    updateProjectStartDate, 
-    // optimizeData, // 削除
     handleDragEnd 
   } = useTaskOperations(data, setData);
 
   const [parent, setParent] = useState<{id: string, name: string} | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  const [isEditingStartDate, setIsEditingStartDate] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
@@ -173,7 +169,6 @@ function App() {
       }
       const incoming = decompressData(compressed);
       if (incoming) {
-        // --- ガード: 現在のデータと完全に一致する場合はモーダルを出さない ---
         if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) {
           alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
           return;
@@ -266,17 +261,15 @@ function App() {
 
   const handleAddTaskWrapper = (targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
-    let offset: number | undefined;
+    let deadline: number | undefined;
     if (inputDateStr) {
       const [y, m, d] = inputDateStr.split('-').map(Number);
-      const targetDate = new Date(y, m - 1, d);
-      offset = Math.ceil((targetDate.getTime() - data.projectStartDate) / 86400000);
+      deadline = new Date(y, m - 1, d).getTime();
     }
-    addTask(inputTaskName, offset, targetParentId ?? parent?.id);
+    addTask(inputTaskName, deadline, targetParentId ?? parent?.id);
     setInputTaskName(''); setInputDateStr(''); setParent(null);
   };
 
-  const handleUpdateStartDateWrapper = (dateStr: string) => { updateProjectStartDate(dateStr); setIsEditingStartDate(false); };
   const onTaskItemAddClick = (node: TaskNode) => { if (inputTaskName.trim()) handleAddTaskWrapper(node.id); else setParent({ id: node.id, name: node.name }); };
   const getStrLen = (str: string) => { let len = 0; for (let i = 0; i < str.length; i++) len += (str.charCodeAt(i) < 256) ? 1 : 2; return len; };
 
@@ -284,7 +277,7 @@ function App() {
     const BASE_WIDTH = 220, INDENT_WIDTH = 24, CHAR_WIDTH_PX = 12, DEADLINE_WIDTH = 80;
     const len = getStrLen(node.name);
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;
-    const extraWidth = node.deadlineOffset !== undefined ? DEADLINE_WIDTH : 0;
+    const extraWidth = node.deadline !== undefined ? DEADLINE_WIDTH : 0;
     let max = BASE_WIDTH + (depth * INDENT_WIDTH) + textWidth + extraWidth;
     if (node.children) { for (const child of node.children) max = Math.max(max, calculateColumnWidth(child, depth + 1)); }
     return max;
@@ -297,7 +290,7 @@ function App() {
           <React.Fragment key={n.id}>
             <SortableTaskItem id={n.id} depth={depth}>
                 <TaskItem 
-                  task={n} tasks={data.tasks} projectStartDate={data.projectStartDate} depth={depth} hasChildren={n.children.length > 0}
+                  task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0}
                   onStatusChange={(s) => updateTaskStatus(n.id, s)} onDelete={() => deleteTask(n.id)} onAddSubTask={() => onTaskItemAddClick(n)}
                   onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)}
                   isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)}
@@ -331,7 +324,7 @@ function App() {
           <div style={{ flex: showSidebar ? '0 0 33.33%' : '0 0 0px', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'flex 0.3s ease, opacity 0.3s ease', opacity: showSidebar ? 1 : 0, pointerEvents: showSidebar ? 'auto' : 'none', minWidth: showSidebar ? '300px' : '0' }}>
             <h2 style={{ fontSize: '1.2em', textAlign: 'center', marginBottom: '10px', whiteSpace: 'nowrap' }}>期限カレンダー</h2>
             <div style={{ flex: 1, overflowY: 'auto' }}>
-                <TaskCalendar tasks={data.tasks} projectStartDate={data.projectStartDate} />
+                <TaskCalendar tasks={data.tasks} />
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -357,13 +350,6 @@ function App() {
                             </div>
                             <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                          {isEditingStartDate ? (
-                            <input type="date" value={format(data.projectStartDate, 'yyyy-MM-dd')} onChange={(e) => handleUpdateStartDateWrapper(e.target.value)} onBlur={() => setIsEditingStartDate(false)} autoFocus style={{ fontSize: '0.8em', color: '#888', background: 'transparent', border: '1px solid #555', borderRadius: '4px', colorScheme: 'dark' }} />
-                          ) : (
-                            <span onClick={() => setIsEditingStartDate(true)} style={{ color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline dotted' }}>開始: {new Date(data.projectStartDate).toLocaleDateString()}</span>
-                          )}
-                        </div>
                     </div>
                 </div>
                 <ProjectControls 
@@ -371,7 +357,6 @@ function App() {
                     onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
                     onImport={(f) => { const r = new FileReader(); r.onload = (e) => { try { const incoming = JSON.parse(e.target?.result as string); setIncomingData(incoming); } catch(err) { alert('JSONの読み込みに失敗しました'); } }; r.readAsText(f); }}
                     onImportFromUrl={handleImportFromUrl} 
-                    // onOptimize={optimizeData} // 削除
                 />
             </header>
             <div style={{ marginBottom: '20px' }}>
@@ -386,7 +371,7 @@ function App() {
                         <SortableTaskItem key={root.id} id={root.id} depth={0}>
                           <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: '#2a2a2a', borderRadius: '8px', border: '1px solid #444', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: 'grab' }}>
                               <div style={{ borderBottom: '2px solid #444', marginBottom: '8px', paddingBottom: '4px' }}>
-                                  <TaskItem task={root} tasks={data.tasks} projectStartDate={data.projectStartDate} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} onAddSubTask={() => onTaskItemAddClick(root)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} />
+                                  <TaskItem task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onDelete={() => deleteTask(root.id)} onAddSubTask={() => onTaskItemAddClick(root)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} />
                               </div>
                               <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
                           </div>

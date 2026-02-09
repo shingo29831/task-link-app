@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { differenceInCalendarDays } from 'date-fns';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { AppData, Task } from '../types';
@@ -23,21 +22,15 @@ const recalculateStatus = (tasks: Task[]): Task[] => {
         const hasSuspended = children.some(c => c.status === 3);
         const hasInProgress = children.some(c => c.status === 1);
         
-        // 「子タスクが一つ以上休止中でそれ以外が完了」
-        // => 休止が存在し、かつ全員が(休止 または 完了)であること
         const onlySuspendedAndCompleted = children.every(c => c.status === 3 || c.status === 2);
 
         if (allCompleted) {
-            // 子タスクが全て完了だった場合は親タスクも完了
             newStatus = 2;
         } else if (hasSuspended && onlySuspendedAndCompleted) {
-            // 子タスクが一つ以上休止中でそれ以外が完了であれば親タスクは休止中
             newStatus = 3;
         } else if (hasInProgress) {
-            // 子タスクが一つ以上進行中であれば親タスクは進行中
             newStatus = 1;
         } else {
-            // どれにも当てはまらない場合は未着手
             newStatus = 0;
         }
 
@@ -62,7 +55,8 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     });
   }, [data, setData]);
 
-  const addTask = useCallback((name: string, offset?: number, parentId?: string) => {
+  // 変更: deadlineOffset ではなく absolute timestamp (number) を受け取る
+  const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
     if (!data) return;
 
     const normalizedName = name;
@@ -91,7 +85,7 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       id: newId,
       name: normalizedName,
       status: 0,
-      deadlineOffset: offset || undefined,
+      deadline: deadline, // 絶対値をセット
       lastUpdated: Date.now(),
       parentId: shouldReset ? undefined : parentId,
       order: shouldReset ? 1 : nextOrder
@@ -156,7 +150,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     save(newTasks);
   }, [data, save]);
 
-  // ステータス更新用の関数
   const updateTaskStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
     if (!data) return;
     const newTasks = data.tasks.map(t =>
@@ -168,49 +161,22 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
   const updateTaskDeadline = useCallback((id: string, dateStr: string) => {
     if (!data) return;
 
-    let offset: number | undefined;
+    let newDeadline: number | undefined;
     if (dateStr) {
       const [y, m, d] = dateStr.split('-').map(Number);
-      const targetDate = new Date(y, m - 1, d);
-      offset = differenceInCalendarDays(targetDate, data.projectStartDate);
+      newDeadline = new Date(y, m - 1, d).getTime();
     } else {
-      offset = undefined;
+      newDeadline = undefined;
     }
 
     const newTasks = data.tasks.map(t =>
-      t.id === id ? { ...t, deadlineOffset: offset, lastUpdated: Date.now() } : t
+      t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t
     );
     save(newTasks);
   }, [data, save]);
 
-  const updateProjectStartDate = useCallback((dateStr: string) => {
-    if (!dateStr || !data) return;
-    
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const newStartDate = new Date(y, m - 1, d).getTime();
+  // updateProjectStartDate を削除
 
-    const diffDays = differenceInCalendarDays(newStartDate, data.projectStartDate);
-
-    const newTasks = data.tasks.map(t => {
-      if (t.deadlineOffset === undefined) return t;
-      return {
-        ...t,
-        deadlineOffset: t.deadlineOffset - diffDays,
-        lastUpdated: Date.now()
-      };
-    });
-
-    setData({
-      ...data,
-      projectStartDate: newStartDate,
-      tasks: newTasks,
-      lastSynced: Date.now()
-    });
-  }, [data, setData]);
-
-  // optimizeData 関数を削除
-
-  // ドラッグアンドドロップ終了時の処理
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!data) return;
     const { active, over } = event;
@@ -223,7 +189,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
         const activeIdStr = String(active.id);
         const task = data.tasks.find(t => t.id === activeIdStr);
         if (task && task.parentId !== undefined) {
-             // ルートタスク化
              const rootTasks = data.tasks.filter(t => !t.isDeleted && !t.parentId);
              const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
 
@@ -241,7 +206,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       return;
     }
 
-    // ネスト移動判定
     const overIdStr = String(over.id);
     const isNestDrop = overIdStr.startsWith('nest-');
     const targetIdRaw = isNestDrop ? overIdStr.replace('nest-', '') : overIdStr;
@@ -251,10 +215,8 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
 
     if (!activeTask || !overTask) return;
 
-    // ネストドロップならターゲット自体が親、そうでなければターゲットの親が親
     const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
 
-    // --- 循環参照防止ロジック ---
     if (nextParentId === activeTask.id) {
       return;
     }
@@ -273,17 +235,14 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     if (isCircular) {
       return;
     }
-    // -------------------------
 
     const newTasks = [...data.tasks];
 
-    // 親IDの更新
     if (activeTask.parentId !== nextParentId) {
       const taskIndex = newTasks.findIndex(t => t.id === active.id);
       newTasks[taskIndex] = { ...newTasks[taskIndex], parentId: nextParentId };
     }
 
-    // 順序の並び替え
     const siblings = newTasks
       .filter(t => !t.isDeleted && t.parentId === nextParentId)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -305,7 +264,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
       }
     }
 
-    // order再割り当て
     siblings.forEach((t, index) => {
       const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
       if (globalIndex !== -1) {
@@ -322,8 +280,6 @@ export const useTaskOperations = (data: AppData | null, setData: (data: AppData)
     renameTask,
     updateTaskStatus,
     updateTaskDeadline,
-    updateProjectStartDate,
-    // optimizeData, // 削除
     handleDragEnd
   };
 };
