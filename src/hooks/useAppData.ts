@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
+import { useHistory } from './useHistory';
 
 const STORAGE_KEY = 'progress_app_v2';
 
@@ -36,7 +37,15 @@ const isTaskEqual = (local: Task, incoming: Task): boolean => {
 };
 
 export const useAppData = () => {
-  const [projects, setProjects] = useState<AppData[]>([]);
+  // 変更: useHistoryを使用
+  const { 
+    state: projects, 
+    setState: setProjects, 
+    resetState: resetProjects, 
+    undo, 
+    redo 
+  } = useHistory<AppData[]>([]);
+
   const [activeId, setActiveId] = useState<string>('');
   
   const activeData = projects.find(p => p.id === activeId) || null;
@@ -59,9 +68,7 @@ export const useAppData = () => {
           if (Array.isArray(parsed)) {
             loadedProjects = parsed;
           } else {
-            // マイグレーション: 古いデータ形式の場合はID付与などを行うが、
-            // projectStartDateの削除は型定義の変更に伴い自然に無視されるか、
-            // 必要ならここで削除処理を入れる。今回はそのまま読み込み。
+            // マイグレーション対応
             const migrated = { ...parsed, id: parsed.id || generateProjectId() };
             loadedProjects = [migrated];
           }
@@ -133,7 +140,8 @@ export const useAppData = () => {
         window.history.replaceState(null, '', window.location.pathname);
       }
 
-      setProjects(loadedProjects);
+      // 変更: 初期ロード時は履歴に残さない resetProjects を使用
+      resetProjects(loadedProjects);
       setActiveId(initialActiveId);
     };
     load();
@@ -154,6 +162,7 @@ export const useAppData = () => {
   }, [activeData]);
 
   const setActiveData = (newData: AppData) => {
+    // 変更: setProjects (履歴機能付き) を使用
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
 
@@ -219,6 +228,8 @@ export const useAppData = () => {
     addProject,
     importNewProject,
     switchProject,
-    deleteProject
+    deleteProject,
+    undo, // 公開
+    redo  // 公開
   };
 };

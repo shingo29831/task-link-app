@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -77,7 +77,9 @@ function App() {
     addProject,
     importNewProject,
     switchProject,
-    deleteProject
+    deleteProject,
+    undo, // Undo関数
+    redo  // Redo関数
   } = useAppData();
   
   const { 
@@ -95,6 +97,35 @@ function App() {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+
+  // キーボードショートカットの実装 (Ctrl+Y 対応)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 入力フォーム操作中は無効化
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey) {
+        // Redo: Ctrl+y (or Cmd+y) または Ctrl+Shift+Z
+        if (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) {
+          e.preventDefault();
+          redo();
+          return;
+        }
+        
+        // Undo: Ctrl+z (Shiftなし)
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const toggleNodeExpansion = useCallback((nodeId: string) => {
     setCollapsedNodeIds(prev => {
@@ -381,7 +412,31 @@ function App() {
               </SortableContext>
             </BoardArea>
             <div style={{ marginTop: '10px' }}>
-              <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444' }}>{showDebug ? 'デバッグを隠す' : 'デバッグを表示'}</button>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '30px' }}>
+                <button 
+                  onClick={() => setShowDebug(!showDebug)} 
+                  style={{ fontSize: '0.7em', color: '#888', background: 'transparent', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  {showDebug ? 'デバッグを隠す' : 'デバッグを表示'}
+                </button>
+
+                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
+                  <button
+                    onClick={undo}
+                    title="元に戻す (Ctrl+Z)"
+                    style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                  >
+                    ↩
+                  </button>
+                  <button
+                    onClick={redo}
+                    title="やり直す (Ctrl+y)"
+                    style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                  >
+                    ↪
+                  </button>
+                </div>
+              </div>
               {showDebug && (
                 <div style={{ marginTop: '15px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '0.75em', color: '#ccc' }}>
                   <p><b>プロジェクト名:</b> {data.projectName}</p>
