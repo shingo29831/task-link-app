@@ -52,8 +52,8 @@ input:checked + .slider:before {
   transform: translateX(20px);
 }
 
-/* iOS Input Zoom Prevention */
-@media screen and (max-width: 768px) {
+/* iOS Input Zoom Prevention - Tablet/Mobile */
+@media screen and (max-width: 1024px) {
   input[type="text"],
   input[type="date"],
   input[type="number"],

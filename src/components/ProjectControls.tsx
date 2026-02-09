@@ -1,17 +1,23 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface Props {
   onCopyLink: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
   onImportFromUrl: (url: string) => void;
-  // onOptimize を削除
 }
 
-export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl }) => { // onOptimize を削除
+export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -28,6 +34,21 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
     setShowModal(false);
   };
 
+  // 画面幅の判定
+  const isVeryNarrow = windowWidth < 480;
+
+  // ボタンのテキスト設定 (1024px以下をモバイル/タブレットとして短縮)
+  const getLinkButtonText = () => {
+    if (windowWidth <= 1024) return "🔗 リンク";
+    return "🔗 リンクをコピー";
+  };
+
+  const getIOButtonText = () => {
+    if (windowWidth < 480) return "⬆⬇";
+    if (windowWidth <= 1024) return "⬆⬇ 入出力";
+    return "⬆⬇ 出力 / 読み込み";
+  };
+
   return (
     <>
       <div style={{ 
@@ -37,18 +58,21 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         padding: '15px', 
         backgroundColor: '#2a2a2a', 
         borderRadius: '8px',
-        marginBottom: '5px'
+        marginBottom: '5px',
+        alignItems: 'center',
+        justifyContent: 'flex-end'
       }}>
-        <button onClick={onCopyLink} style={{ backgroundColor: '#646cff' }}>
-          🔗 リンクをコピー
-        </button>
+        {/* 画面幅が狭くない場合のみ、ヘッダーにリンクコピーボタンを表示 */}
+        {!isVeryNarrow && (
+          <button onClick={onCopyLink} style={{ backgroundColor: '#646cff' }} title="リンクをコピー">
+            {getLinkButtonText()}
+          </button>
+        )}
         
-        {/* 統合されたボタン */}
-        <button onClick={() => setShowModal(true)} style={{ backgroundColor: '#333' }}>
-          ⬆⬇ 出力 / 読み込み
+        {/* 入出力ボタン (狭い時はこれだけ表示) */}
+        <button onClick={() => setShowModal(true)} style={{ backgroundColor: '#333' }} title="データの出力 / 読み込み">
+          {getIOButtonText()}
         </button>
-
-        {/* リンク最適化ボタンを削除 */}
 
         <input 
           type="file" 
@@ -72,7 +96,20 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
             display: 'flex', flexDirection: 'column', gap: '20px'
           }} onClick={e => e.stopPropagation()}>
             
-            <h3 style={{ margin: 0, borderBottom: '1px solid #444', paddingBottom: '10px' }}>データの出力 / 読み込み</h3>
+            <h3 style={{ margin: 0, borderBottom: '1px solid #444', paddingBottom: '10px' }}>メニュー</h3>
+
+            {/* 画面幅が狭い場合のみ、モーダル内にリンクコピー機能を表示 */}
+            {isVeryNarrow && (
+              <div>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: '#aaa' }}>共有</h4>
+                <button 
+                  onClick={() => { onCopyLink(); setShowModal(false); }} 
+                  style={{ width: '100%', backgroundColor: '#646cff' }}
+                >
+                  🔗 リンクをコピー
+                </button>
+              </div>
+            )}
 
             {/* ファイル操作セクション */}
             <div>

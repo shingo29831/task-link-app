@@ -117,12 +117,12 @@ function App() {
     customCollisionDetection,
   } = useTaskOperations();
 
-  // スマホ表示判定用のState
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  // スマホ・タブレット表示判定用のState (1024px以下を対象とする)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth <= 1024);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -180,6 +180,24 @@ function App() {
     );
   };
 
+  // プロジェクトメニューのレンダリング（共通化）
+  const renderProjectMenu = () => (
+    <div style={{ position: 'relative' }}>
+        <button onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer' }}>▼</button>
+        {showProjectMenu && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: '#333', border: '1px solid #555', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {projects.map(p => (
+                        <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? '#444' : 'transparent', borderBottom: '1px solid #444', fontSize: '0.9em' }}>{p.projectName}</div>
+                    ))}
+                </div>
+                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#646cff', borderTop: '1px solid #555', fontSize: '0.9em' }}>+ 新規プロジェクト</div>
+                <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#ff6b6b', fontSize: '0.9em' }}>🗑️ このプロジェクトを削除</div>
+            </div>
+        )}
+    </div>
+  );
+
   return (
     <DndContext 
       sensors={sensors} 
@@ -219,37 +237,71 @@ function App() {
             />
           )}
 
-          {/* 1. Header Area */}
-          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
-                  <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                          <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onDoubleClick={handleProjectNameDoubleClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
-                          <div style={{ position: 'relative' }}>
-                              <button onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer' }}>▼</button>
-                              {showProjectMenu && (
-                                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: '#333', border: '1px solid #555', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
-                                      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                          {projects.map(p => (
-                                              <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? '#444' : 'transparent', borderBottom: '1px solid #444', fontSize: '0.9em' }}>{p.projectName}</div>
-                                          ))}
-                                      </div>
-                                      <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#646cff', borderTop: '1px solid #555', fontSize: '0.9em' }}>+ 新規プロジェクト</div>
-                                      <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: '#ff6b6b', fontSize: '0.9em' }}>🗑️ このプロジェクトを削除</div>
-                                  </div>
-                              )}
+          {/* 1. Header Area - スマホとPCでレイアウトを分岐 */}
+          <header style={{ 
+              display: 'flex', 
+              // スマホでも横並び（ProjectControlsを右に置くため）
+              flexDirection: 'row',
+              justifyContent: 'space-between', 
+              // スマホの場合は上揃え（ProjectControlsの高さと調整）
+              alignItems: isMobile ? 'flex-start' : 'center', 
+              flexShrink: 0, 
+              marginBottom: '20px',
+              gap: isMobile ? '10px' : '0'
+          }}>
+              {isMobile ? (
+                  // === スマホ用ヘッダーレイアウト (左側) ===
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {/* TaskLinkラベル (左上端) */}
+                      <div style={{ fontSize: '0.85em', color: '#888' }}>TaskLink:</div>
+                      
+                      {/* カレンダーボタン + プロジェクト情報 */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          {/* カレンダーボタン (ラベルの下) */}
+                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              {/* プロジェクト名 (カレンダーボタンの横) */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span 
+                                    style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer' }} 
+                                    onDoubleClick={handleProjectNameDoubleClick}
+                                  >
+                                    {data.projectName}
+                                  </span>
+                                  {renderProjectMenu()}
+                              </div>
+                              
+                              {/* 進捗 (プロジェクト名の下) */}
+                              <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold', marginTop: '4px' }}>
+                                (全進捗: {projectProgress}%)
+                              </span>
                           </div>
-                          <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
                       </div>
                   </div>
+              ) : (
+                  // === PC用ヘッダーレイアウト (左側) ===
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
+                      <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+                              <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onDoubleClick={handleProjectNameDoubleClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                              {renderProjectMenu()}
+                              <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {/* ProjectControls (右端) - スマホでもPCでも右側に表示 */}
+              <div>
+                <ProjectControls 
+                    onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
+                    onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
+                    onImport={handleFileImport}
+                    onImportFromUrl={handleImportFromUrl} 
+                />
               </div>
-              <ProjectControls 
-                  onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
-                  onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }}
-                  onImport={handleFileImport}
-                  onImportFromUrl={handleImportFromUrl} 
-              />
           </header>
 
           {/* 2. Content Body (Sidebar + Main) */}
@@ -353,6 +405,7 @@ function App() {
                       title="元に戻す (Ctrl+Z)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
+                      {/* 修正: 元に戻す記号 */}
                       ↩
                     </button>
                     <button
