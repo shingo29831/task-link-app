@@ -20,13 +20,15 @@ interface Props {
   onClick: () => void;
   isMenuOpen: boolean;
   onToggleMenu: () => void;
+  isActiveParent?: boolean; // 追加: 親タスク選択中かどうか
 }
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
   onStatusChange, onParentStatusChange, onDelete, onRename, onDeadlineChange, 
   isExpanded, onToggleExpand, onClick,
-  isMenuOpen, onToggleMenu
+  isMenuOpen, onToggleMenu,
+  isActiveParent = false // デフォルトfalse
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -179,8 +181,6 @@ export const TaskItem: React.FC<Props> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 【修正】: イベントの伝播を止め、親要素（SortableTaskItem）のリスナーが
-    // Enterキーを検知してドラッグを開始してしまうのを防ぎます。
     e.stopPropagation();
 
     if (e.key === 'Enter') {
@@ -200,7 +200,6 @@ export const TaskItem: React.FC<Props> = ({
       }
   };
 
-  // イベント伝播を止めるヘルパー関数
   const stopPropagation = (e: React.PointerEvent) => {
     e.stopPropagation();
   };
@@ -217,15 +216,18 @@ export const TaskItem: React.FC<Props> = ({
         style={{ 
           display: 'flex', 
           alignItems: 'center', 
-          padding: itemPadding, // 動的パディング
+          padding: itemPadding,
           borderBottom: '1px solid #333', 
-          marginLeft: `${depth * indentWidth}px`, // 動的インデント
+          marginLeft: `${depth * indentWidth}px`,
           position: 'relative',
           cursor: 'pointer',
-          backgroundColor: isMenuOpen ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+          // 変更: 親タスクとして選択中の場合も背景色を変えたり、枠線をつけたりする
+          backgroundColor: (isMenuOpen || isHovered || isActiveParent) ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
           borderRadius: '4px',
-          transition: 'background-color 0.2s',
-          fontSize: fontSize, // 動的フォントサイズ
+          transition: 'background-color 0.2s, box-shadow 0.2s',
+          fontSize: fontSize,
+          // 追加: 親タスク選択中の強調表示 (内側の枠線)
+          boxShadow: isActiveParent ? '0 0 0 2px #646cff inset' : 'none',
         }}
       >
         {isOver && !isDropDisabled && (
@@ -242,8 +244,8 @@ export const TaskItem: React.FC<Props> = ({
           onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
           style={{
               background: 'transparent', border: 'none', cursor: 'pointer', 
-              fontSize: '1em', // 文字サイズに追従
-              padding: '0', marginRight: '2px', // マージン縮小
+              fontSize: '1em',
+              padding: '0', marginRight: '2px',
               color: '#aaa', visibility: hasChildren ? 'visible' : 'hidden', 
               width: '1.2em', textAlign: 'center', lineHeight: '1'
           }}
@@ -270,7 +272,7 @@ export const TaskItem: React.FC<Props> = ({
             cursor: 'pointer', 
             opacity: hasChildren ? 0.9 : 1, 
             border: hasChildren ? '1px dashed #fff' : 'none', 
-            padding: buttonPadding, // 動的パディング
+            padding: buttonPadding,
             lineHeight: '1.2',
             whiteSpace: 'nowrap'
           }}
@@ -292,10 +294,10 @@ export const TaskItem: React.FC<Props> = ({
                 backgroundColor: '#333', 
                 color: '#fff', 
                 border: '1px solid #555', 
-                padding: isMobile ? '4px' : '2px 4px', // パディング縮小
+                padding: isMobile ? '4px' : '2px 4px',
                 borderRadius: '4px', 
                 width: 'calc(100% - 20px)', 
-                fontSize: isMobile ? '16px' : 'inherit' // モバイル入力時はズーム防止で16px維持
+                fontSize: isMobile ? '16px' : 'inherit'
               }}
             />
           ) : (
@@ -319,7 +321,7 @@ export const TaskItem: React.FC<Props> = ({
                   <input 
                       type="date" 
                       defaultValue={currentDeadlineStr} 
-                      className={isNarrowLayout ? "date-input-mobile" : ""} // 480px以下ならクラス付与
+                      className={isNarrowLayout ? "date-input-mobile" : ""}
                       onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }}
                       onBlur={() => setIsEditingDeadline(false)} autoFocus
                       onClick={(e) => e.stopPropagation()}
@@ -330,10 +332,10 @@ export const TaskItem: React.FC<Props> = ({
                         borderRadius: '4px', 
                         border: '1px solid #555', 
                         backgroundColor: '#333', 
-                        color: isNarrowLayout ? 'transparent' : '#fff', // 480px以下なら文字色透明
+                        color: isNarrowLayout ? 'transparent' : '#fff',
                         colorScheme: 'dark', 
                         fontSize: isMobile ? '16px' : 'inherit',
-                        width: isNarrowLayout ? '36px' : 'auto' // 480px以下なら幅を狭める
+                        width: isNarrowLayout ? '36px' : 'auto'
                       }}
                   />
               ) : (
@@ -351,7 +353,6 @@ export const TaskItem: React.FC<Props> = ({
             transition: 'opacity 0.2s',
             marginLeft: '4px'
         }}>
-          {/* モバイルレイアウト(480px以下)の時は、透明なinputをボタンに重ねて即座にカレンダーを開く */}
           {isNarrowLayout ? (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <button title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>

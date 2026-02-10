@@ -156,8 +156,7 @@ function App() {
     rootNodes,
     projectProgress,
     debugInfo,
-    activeParent,
-    setActiveParentId,
+    activeParentId, // activeParentId を使用
     calendarTasks,
 
     // UI State
@@ -298,6 +297,8 @@ function App() {
                   // メニュー制御
                   isMenuOpen={menuOpenTaskId === n.id}
                   onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)}
+                  // 親タスク選択状態
+                  isActiveParent={activeParentId === n.id}
                 />
                 {n.children.length > 0 && !collapsedNodeIds.has(n.id) && (
                     <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>
@@ -470,22 +471,7 @@ function App() {
               minWidth: 0 
             }}>
               <div style={{ marginBottom: '0px', flexShrink: 0 }}>
-                {/* アクティブな親タスク表示 */}
-                <div style={{ 
-                  height: activeParent ? 'auto' : '0', 
-                  minHeight: activeParent ? '24px' : '0',
-                  marginBottom: activeParent ? '5px' : '0',
-                  color: '#646cff', 
-                  fontSize: '0.8em', 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  overflow: 'hidden',
-                  transition: 'all 0.2s ease'
-                }}>
-                  {activeParent && (
-                    <>子タスク追加中: [{activeParent.id}] {activeParent.name} <button onClick={() => setActiveParentId(null)} style={{ padding: '2px 6px', fontSize: '0.8em', marginLeft: '8px' }}>取消</button></>
-                  )}
-                </div>
+                {/* アクティブな親タスク表示エリアは削除されました */}
                 <TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} />
               </div>
 
@@ -508,6 +494,8 @@ function App() {
                                       onClick={() => handleTaskClick(root)}
                                       isMenuOpen={menuOpenTaskId === root.id}
                                       onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)}
+                                      // 親タスク選択状態
+                                      isActiveParent={activeParentId === root.id}
                                     />
                                 </div>
                                 <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
@@ -536,14 +524,14 @@ function App() {
                       title="元に戻す (Ctrl+Z)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
-                      ↩
+                      ↪
                     </button>
                     <button
                       onClick={redo}
                       title="やり直す (Ctrl+y)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
-                      ↪
+                      ↩
                     </button>
                   </div>
                 </div>
