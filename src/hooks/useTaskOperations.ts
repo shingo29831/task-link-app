@@ -1,7 +1,7 @@
 // NOTE: App.tsxのロジック部分はこのファイルに記述すること。
 // 今後、ロジックの変更や追加が必要な場合は、App.tsxではなくこのファイルを修正してください。
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   KeyboardSensor, 
   PointerSensor, 
@@ -100,10 +100,6 @@ export const useTaskOperations = () => {
   
   // 追加: メニューが開いているタスクID（排他制御用）
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
-
-  // Refs for DnD logic
-  const lastPointerX = useRef<number | null>(null);
-  const moveDirection = useRef<'left' | 'right' | null>(null);
 
   // --------------------------------------------------------------------------
   // Derived Data
@@ -593,67 +589,29 @@ export const useTaskOperations = () => {
   );
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const { pointerCoordinates, collisionRect, droppableContainers } = args;
-    
-    // 移動方向の検知
-    if (pointerCoordinates) {
-      if (lastPointerX.current !== null) {
-        const diff = pointerCoordinates.x - lastPointerX.current;
-        if (diff > 0) moveDirection.current = 'right';
-        else if (diff < 0) moveDirection.current = 'left';
-      }
-      lastPointerX.current = pointerCoordinates.x;
-    }
-
-    // ネスト（階層）へのドロップ判定はポインター位置ベースで優先（既存のまま）
+    // 1. ネスト判定 (nest-xxx) を最優先
+    // マウスカーソルが乗っている要素を確認
     const pointerCollisions = pointerWithin(args);
     const nestCollisions = pointerCollisions.filter((collision) => String(collision.id).startsWith('nest-'));
-    if (nestCollisions.length > 0) return nestCollisions;
-
-    // ルートタスク（横並び）の判定ロジック
-    // 「ドラッグしている要素の先端」が「ターゲット」に触れたら反応するようにする
-    if (collisionRect) {
-      const rootTasks = droppableContainers.filter(c => 
-        c.data.current?.type === 'task' && c.data.current?.depth === 0
-      );
-
-      if (rootTasks.length > 0) {
-        const direction = moveDirection.current;
-        
-        // 判定に使用するX座標：右移動なら右端、左移動なら左端（先端判定）
-        const leadingEdgeX = direction === 'right' 
-          ? collisionRect.left + collisionRect.width 
-          : collisionRect.left;
-        
-        // Y軸の中心（行が合っているか確認用）
-        const centerY = collisionRect.top + (collisionRect.height / 2);
-
-        // 先端が領域内にあるターゲットを探す
-        const hit = rootTasks.find(container => {
-           const rect = container.rect.current;
-           if (!rect) return false;
-           
-           // Y軸の判定（ターゲットの高さの範囲内にあるか）
-           const isYInBounds = centerY >= rect.top && centerY <= rect.bottom;
-           if (!isYInBounds) return false;
-
-           // X軸の判定（先端がターゲットの左右の境界内にあるか）
-           return leadingEdgeX >= rect.left && leadingEdgeX <= rect.right;
-        });
-
-        if (hit) {
-          // 衝突したターゲットを即座に返す
-          return [{ id: hit.id, data: hit.data.current }];
-        }
-      }
+    if (nestCollisions.length > 0) {
+      return nestCollisions;
     }
 
+    // 2. 通常のアイテム判定
+    // 中心が近いアイテムを探す（標準的な挙動）
     const collisions = closestCenter(args);
-    if (collisions.length === 0) {
-        const board = pointerCollisions.find(c => c.id === 'root-board');
-        if (board) return [board];
+    if (collisions.length > 0) {
+      return collisions;
     }
-    return collisions;
+
+    // 3. 最後にボード判定
+    // どのタスクにもヒットしなかった場合、ボード自体（背景）へのドロップを許可
+    const board = pointerCollisions.find(c => c.id === 'root-board');
+    if (board) {
+        return [board];
+    }
+
+    return [];
   }, []);
 
   return {
