@@ -179,6 +179,10 @@ export const TaskItem: React.FC<Props> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 【修正】: イベントの伝播を止め、親要素（SortableTaskItem）のリスナーが
+    // Enterキーを検知してドラッグを開始してしまうのを防ぎます。
+    e.stopPropagation();
+
     if (e.key === 'Enter') {
       handleSave();
     }
@@ -279,7 +283,9 @@ export const TaskItem: React.FC<Props> = ({
 
           {isEditing ? (
             <input 
-              type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus
+              type="text" value={editName} onChange={(e) => setEditName(e.target.value)} 
+              onKeyDown={handleKeyDown} 
+              onBlur={handleSave} autoFocus
               onClick={(e) => e.stopPropagation()} 
               onPointerDown={stopPropagation}
               style={{ 
