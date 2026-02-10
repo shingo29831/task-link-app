@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   DndContext, 
   useDroppable,
-  DragOverlay, // 追加
-  type DragStartEvent, // 追加
+  DragOverlay,
+  useDndMonitor,
+  type DragStartEvent,
   type DragEndEvent
 } from '@dnd-kit/core';
 import {
@@ -24,15 +25,92 @@ import { ProjectNameEditModal } from './components/ProjectNameEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-// isMobileプロップを追加してスタイルを調整
+// isMobileプロップを追加してスタイルを調整 + カスタム自動スクロールロジックを追加
 const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children: React.ReactNode, activeTasks: Task[], onBoardClick: () => void, isMobile: boolean }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
   });
+  
+  // スクロール制御用のRef
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  
+  // setNodeRefとscrollRefを統合
+  const setRef = useCallback((node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    scrollRef.current = node;
+  }, [setNodeRef]);
+
+  // ドラッグ状態とポインター位置の管理
+  const [isDragging, setIsDragging] = useState(false);
+  const pointerRef = useRef({ x: 0, y: 0 });
+
+  // DndMonitorでドラッグ状態を監視 (このコンポーネントはDndContext内部にあるため使用可能)
+  useDndMonitor({
+    onDragStart: () => setIsDragging(true),
+    onDragEnd: () => setIsDragging(false),
+    onDragCancel: () => setIsDragging(false),
+  });
+
+  // カスタム自動スクロールロジック (モバイルのみ有効)
+  useEffect(() => {
+    if (!isDragging || !isMobile) return;
+
+    // ポインター位置の更新
+    const updatePointer = (x: number, y: number) => {
+      pointerRef.current = { x, y };
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        updatePointer(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      updatePointer(e.clientX, e.clientY);
+    };
+
+    // イベントリスナー登録 (passive: true でパフォーマンス確保)
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('pointermove', handlePointerMove);
+
+    let animationFrameId: number;
+    const MAX_SPEED = 15; // 最大スクロール速度 (px/frame)
+
+    const tick = () => {
+      if (scrollRef.current) {
+        const rect = scrollRef.current.getBoundingClientRect();
+        
+        // BoardAreaの中心座標
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // 中心からの距離の比率を計算 (-1.0 〜 1.0)
+        // 端 (width/2) にあるときが 1.0 (100%)
+        const ratioX = (pointerRef.current.x - centerX) / (rect.width / 2);
+        const ratioY = (pointerRef.current.y - centerY) / (rect.height / 2);
+        
+        // スクロール実行
+        // そのまま加算することで、中心(=0)なら停止、離れるほど高速になる
+        scrollRef.current.scrollLeft += ratioX * MAX_SPEED;
+        scrollRef.current.scrollTop += ratioY * MAX_SPEED;
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    };
+
+    // ループ開始
+    tick();
+
+    return () => {
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('pointermove', handlePointerMove);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isDragging, isMobile]);
 
   return (
     <div 
-      ref={setNodeRef}
+      ref={setRef}
       onClick={() => {
         onBoardClick();
       }}
@@ -50,7 +128,10 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
         backgroundColor: '#1e1e1e',
         transition: 'border 0.2s',
         minHeight: '200px',
-        cursor: 'default'
+        cursor: 'default',
+        // 【修正】touchAction: 'none' を削除して通常のスクロール操作を許可する
+        // ドラッグ中はdnd-kitがイベントを専有するため干渉しません
+        position: 'relative' // 座標計算の基準として安定させる
     }}>
       {activeTasks.length === 0 ? (
         <p style={{ color: '#666', margin: 'auto' }}>タスクを追加してください</p>
@@ -250,16 +331,18 @@ function App() {
     <DndContext 
       sensors={sensors} 
       collisionDetection={customCollisionDetection} 
-      onDragStart={handleDragStart} // 変更
-      onDragEnd={handleDragEndWrapper} // 変更
-      onDragCancel={handleDragCancel} // 追加
+      onDragStart={handleDragStart} 
+      onDragEnd={handleDragEndWrapper} 
+      onDragCancel={handleDragCancel} 
+      // モバイル時は標準の自動スクロールを無効化し、カスタムスクロールを優先
+      autoScroll={!isMobile} 
     >
-        {/* ルートコンテナ: セーフエリア対応とパディングを追加 */}
+        {/* ルートコンテナ */}
         <div style={{ 
             maxWidth: '100%', 
             margin: '0 auto', 
-            padding: isMobile ? '10px' : '20px', // モバイル時はパディングを減らす
-            // セーフエリア対応 (iPhone X以降) - パディング値も動的に変更
+            padding: isMobile ? '10px' : '20px',
+            // セーフエリア対応
             paddingBottom: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-bottom))`, 
             paddingTop: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-top))`,
             paddingLeft: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-left))`,
@@ -286,31 +369,23 @@ function App() {
             />
           )}
 
-          {/* 1. Header Area - スマホとPCでレイアウトを分岐 */}
+          {/* 1. Header Area */}
           <header style={{ 
               display: 'flex', 
-              // スマホでも横並び（ProjectControlsを右に置くため）
               flexDirection: 'row',
               justifyContent: 'space-between', 
-              // スマホの場合は上揃え（ProjectControlsの高さと調整）
               alignItems: isMobile ? 'flex-start' : 'center', 
               flexShrink: 0, 
-              marginBottom: isCompactSpacing ? '5px' : '10px', // 通常時10px, コンパクト時5pxに縮小
+              marginBottom: isCompactSpacing ? '5px' : '10px', 
               gap: isMobile ? '10px' : '0'
           }}>
               {isMobile ? (
-                  // === スマホ用ヘッダーレイアウト (左側) ===
+                  // スマホ用ヘッダー
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {/* TaskLinkラベル (左上端) */}
                       <div style={{ fontSize: '0.85em', color: '#888' }}>TaskLink:</div>
-                      
-                      {/* カレンダーボタン + プロジェクト情報 */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          {/* カレンダーボタン (ラベルの下) */}
                           <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
-                          
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              {/* プロジェクト名 (カレンダーボタンの横) */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span 
                                     style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer' }} 
@@ -320,8 +395,6 @@ function App() {
                                   </span>
                                   {renderProjectMenu()}
                               </div>
-                              
-                              {/* 進捗 (プロジェクト名の下) */}
                               <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold', marginTop: '4px' }}>
                                 (全進捗: {projectProgress}%)
                               </span>
@@ -329,7 +402,7 @@ function App() {
                       </div>
                   </div>
               ) : (
-                  // === PC用ヘッダーレイアウト (左側) ===
+                  // PC用ヘッダー
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                       <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
                       <div>
@@ -342,7 +415,7 @@ function App() {
                   </div>
               )}
 
-              {/* ProjectControls (右端) - スマホでもPCでも右側に表示 */}
+              {/* ProjectControls */}
               <div>
                 <ProjectControls 
                     onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))}
@@ -364,11 +437,9 @@ function App() {
               transition: 'flex 0.3s ease, opacity 0.3s ease', 
               opacity: showSidebar ? 1 : 0, 
               pointerEvents: showSidebar ? 'auto' : 'none',
-              // 変更点: 高さを 100% にして親コンテナ(Content Body)に収める
               height: '100%', 
               minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' 
             }}>
-                {/* トグルエリア */}
                 <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
                     <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>全プロジェクト表示</span>
@@ -382,11 +453,9 @@ function App() {
                         </div>
                     </label>
                 </div>
-                {/* カレンダー本体: 高さを100%確保してスクロール可能に */}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}>
                     <TaskCalendar 
                         tasks={calendarTasks} 
-                        // activeTasks={activeTasks} // 削除
                         onStatusChange={updateTaskStatus}
                         onParentStatusChange={updateParentStatus}
                     />
@@ -401,7 +470,7 @@ function App() {
               minWidth: 0 
             }}>
               <div style={{ marginBottom: '0px', flexShrink: 0 }}>
-                {/* アクティブな親タスク表示エリア: 非アクティブならPC/Mobile問わず詰める */}
+                {/* アクティブな親タスク表示 */}
                 <div style={{ 
                   height: activeParent ? 'auto' : '0', 
                   minHeight: activeParent ? '24px' : '0',
@@ -437,7 +506,6 @@ function App() {
                                       onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} 
                                       isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)}
                                       onClick={() => handleTaskClick(root)}
-                                      // メニュー制御 (修正済み)
                                       isMenuOpen={menuOpenTaskId === root.id}
                                       onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)}
                                     />
@@ -468,7 +536,6 @@ function App() {
                       title="元に戻す (Ctrl+Z)"
                       style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
                     >
-                      {/* 修正: 元に戻す記号 */}
                       ↩
                     </button>
                     <button
@@ -487,7 +554,7 @@ function App() {
                     background: '#1a1a1a', 
                     borderRadius: '8px', 
                     fontSize: '0.75em', 
-                    color: '#ccc',
+                    color: '#ccc', 
                     maxHeight: '400px', 
                     overflowY: 'auto'
                   }}>
@@ -523,18 +590,14 @@ function App() {
               boxShadow: '0 5px 15px rgba(0,0,0,0.5)', 
               opacity: 0.9,
               cursor: 'grabbing',
-              // ▼▼▼ 修正箇所 ▼▼▼
-              // width: '220px' を削除または以下のように変更します
-              minWidth: '220px',    // 最低限の幅は確保
-              width: 'max-content', // コンテンツ（タスク名）に合わせて幅を広げる
-              maxWidth: '90vw'      // 画面からはみ出さないように最大幅を制限
-              // ▲▲▲ 修正箇所 ▲▲▲
+              minWidth: '220px',
+              width: 'max-content',
+              maxWidth: '90vw'
             }}>
               <TaskItem 
                 task={activeDragTask} 
                 tasks={data.tasks} 
                 depth={0} 
-                // childrenの有無だけ簡易チェック
                 hasChildren={data.tasks.some(t => t.parentId === activeDragTask.id && !t.isDeleted)}
                 onStatusChange={() => {}} 
                 onParentStatusChange={() => {}}
