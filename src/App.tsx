@@ -523,7 +523,12 @@ function App() {
               boxShadow: '0 5px 15px rgba(0,0,0,0.5)', 
               opacity: 0.9,
               cursor: 'grabbing',
-              width: '220px' // 固定幅（リスト内の計算に合わせても良い）
+              // ▼▼▼ 修正箇所 ▼▼▼
+              // width: '220px' を削除または以下のように変更します
+              minWidth: '220px',    // 最低限の幅は確保
+              width: 'max-content', // コンテンツ（タスク名）に合わせて幅を広げる
+              maxWidth: '90vw'      // 画面からはみ出さないように最大幅を制限
+              // ▲▲▲ 修正箇所 ▲▲▲
             }}>
               <TaskItem 
                 task={activeDragTask} 
