@@ -593,7 +593,9 @@ export const useTaskOperations = () => {
   );
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const { pointerCoordinates } = args;
+    const { pointerCoordinates, collisionRect, droppableContainers } = args;
+    
+    // 移動方向の検知
     if (pointerCoordinates) {
       if (lastPointerX.current !== null) {
         const diff = pointerCoordinates.x - lastPointerX.current;
@@ -602,24 +604,50 @@ export const useTaskOperations = () => {
       }
       lastPointerX.current = pointerCoordinates.x;
     }
+
+    // ネスト（階層）へのドロップ判定はポインター位置ベースで優先（既存のまま）
     const pointerCollisions = pointerWithin(args);
     const nestCollisions = pointerCollisions.filter((collision) => String(collision.id).startsWith('nest-'));
     if (nestCollisions.length > 0) return nestCollisions;
-    const sortableCollisions = pointerCollisions.filter(c => c.data?.droppableContainer?.data?.current?.type === 'task');
-    if (sortableCollisions.length > 0) {
-      const target = sortableCollisions[0];
-      const targetData = target.data?.droppableContainer?.data?.current;
-      if (targetData && targetData.depth === 0) {
-        const rect = target.data?.droppableContainer?.rect?.current;
-        if (rect && pointerCoordinates) {
-            const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
-            const direction = moveDirection.current;
-            if (direction === 'right') { if (relativeX < 0.85) return []; }
-            else if (direction === 'left') { if (relativeX > 0.15) return []; }
+
+    // ルートタスク（横並び）の判定ロジック
+    // 「ドラッグしている要素の先端」が「ターゲット」に触れたら反応するようにする
+    if (collisionRect) {
+      const rootTasks = droppableContainers.filter(c => 
+        c.data.current?.type === 'task' && c.data.current?.depth === 0
+      );
+
+      if (rootTasks.length > 0) {
+        const direction = moveDirection.current;
+        
+        // 判定に使用するX座標：右移動なら右端、左移動なら左端（先端判定）
+        const leadingEdgeX = direction === 'right' 
+          ? collisionRect.left + collisionRect.width 
+          : collisionRect.left;
+        
+        // Y軸の中心（行が合っているか確認用）
+        const centerY = collisionRect.top + (collisionRect.height / 2);
+
+        // 先端が領域内にあるターゲットを探す
+        const hit = rootTasks.find(container => {
+           const rect = container.rect.current;
+           if (!rect) return false;
+           
+           // Y軸の判定（ターゲットの高さの範囲内にあるか）
+           const isYInBounds = centerY >= rect.top && centerY <= rect.bottom;
+           if (!isYInBounds) return false;
+
+           // X軸の判定（先端がターゲットの左右の境界内にあるか）
+           return leadingEdgeX >= rect.left && leadingEdgeX <= rect.right;
+        });
+
+        if (hit) {
+          // 衝突したターゲットを即座に返す
+          return [{ id: hit.id, data: hit.data.current }];
         }
-        return sortableCollisions;
       }
     }
+
     const collisions = closestCenter(args);
     if (collisions.length === 0) {
         const board = pointerCollisions.find(c => c.id === 'root-board');
