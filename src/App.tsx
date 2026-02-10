@@ -482,7 +482,7 @@ function App() {
                           <SortableTaskItem key={root.id} id={root.id} depth={0}>
                             <div style={{ 
                                 minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, 
-                                backgroundColor: 'var(--bg-surface)', 
+                                backgroundColor: 'var(--bg-task)', /* 変更: タスク背景色 */
                                 borderRadius: '8px', 
                                 border: '1px solid var(--border-color)', 
                                 padding: '10px', 
@@ -580,7 +580,7 @@ function App() {
         <DragOverlay dropAnimation={null}>
           {activeDragTask ? (
             <div style={{ 
-              backgroundColor: 'var(--bg-surface)', 
+              backgroundColor: 'var(--bg-task)', /* 変更: タスク背景色 */
               borderRadius: '8px', 
               border: '1px solid var(--color-primary)', 
               padding: '10px', 

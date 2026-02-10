@@ -1,23 +1,24 @@
 :root {
   /* ==========================================
-     Dark Theme (Default)
+     Dark Theme (Base)
      ========================================== */
   --bg-body: #242424;
-  --bg-surface: #2a2a2a;         /* カード、モーダル、サイドバーなど */
-  --bg-surface-hover: #3a3a3a;   /* ホバー時など */
-  --bg-board: #1e1e1e;           /* ボード背景 */
-  --bg-input: #333333;           /* 入力欄、アイテム背景 */
-  --bg-button: #1a1a1a;          /* ボタン背景 */
+  --bg-surface: #2a2a2a;         /* カード、モーダル */
+  --bg-surface-hover: #3a3a3a;
+  --bg-board: #1e1e1e;           /* ボードエリア */
+  --bg-task: #2a2a2a;
+  --bg-input: #333333;           /* 入力欄 */
+  --bg-button: #1a1a1a;          /* ボタン */
   --bg-button-hover: #333333;
   
-  --bg-calendar-day: #333333;
-  --bg-calendar-day-other: #222222;
+  --bg-calendar-day: #333333;    /* カレンダー日付（今月） */
+  --bg-calendar-day-other: #222222; /* カレンダー日付（先月・来月） */
   --bg-item-hover: rgba(255, 255, 255, 0.05);
   
   --text-primary: rgba(255, 255, 255, 0.87);
   --text-secondary: #aaaaaa;
   --text-placeholder: #888888;
-  --text-inverse: #ffffff;       /* 常に白（バッジの文字など） */
+  --text-inverse: #ffffff;
 
   --border-color: #444444;
   --border-light: #555555;
@@ -25,10 +26,10 @@
 
   --overlay-bg: rgba(0, 0, 0, 0.7);
 
-  /* Accents (共通) */
+  /* Accents */
   --color-primary: #646cff;
   --color-success: #28a745;
-  --color-danger: #dc3545; /* or #ff6b6b for text */
+  --color-danger: #dc3545;
   --color-danger-text: #ff4d4f;
   --color-info: #007bff;
   --color-suspend: #6f42c1;
@@ -38,28 +39,42 @@
 @media (prefers-color-scheme: light) {
   :root {
     /* ==========================================
-       Light Theme
+       Light Theme (High Contrast & Distinct)
        ========================================== */
-    --bg-body: #f4f4f4;
-    --bg-surface: #ffffff;
-    --bg-surface-hover: #f0f0f0;
-    --bg-board: #e0e0e0;
-    --bg-input: #ffffff;
-    --bg-button: #f9f9f9;
-    --bg-button-hover: #eaeaea;
+    
+    /* Darkテーマでの色の関係性を踏襲:
+       - Surface(#2a) と Body(#24) は違う -> Lightでも白とグレーで分ける
+       - Surface(#2a) と Input(#33) は違う -> Lightでも白と薄グレーで分ける
+       - Input(#33) と Button(#1a) は違う -> Lightでも分ける
+    */
 
-    --bg-calendar-day: #ffffff;
-    --bg-calendar-day-other: #eeeeee;
+    --bg-body: #faf6f0;        /* 全体背景: 薄いグレー */
+    --bg-surface: #e0e0e0;     /* カード: 真っ白 (Bodyより明るい) */
+    --bg-surface-hover: #f7f7f7;
+    
+    --bg-board: #c0c0c0;       /* ボード: Bodyより少し濃いグレー (DarkではBodyより暗いため) */
+    --bg-task: #fffff9;
+    
+    --bg-input: #fafafa;       /* 入力欄: Surface(#fff)と区別するためごく薄いグレー */
+    
+    --bg-button: #e8e8e8;      /* ボタン: 明確なグレー (Surfaceより暗く、Inputとも区別) */
+    --bg-button-hover: #dcdcdc; /* ホバー時は少し濃く */
+
+    --bg-calendar-day: #faf5f5;      /* Inputと同じ色 (Darkでの関係性を維持) */
+    --bg-calendar-day-other: #f0f0f0; /* 少し濃いグレー */
+    
     --bg-item-hover: rgba(0, 0, 0, 0.05);
 
-    --text-primary: #213547;
-    --text-secondary: #666666;
-    --text-placeholder: #999999;
-    /* --text-inverse は変更なし */
+    /* テキスト: くっきりと黒に近づける */
+    --text-primary: #1a1a1a;
+    --text-secondary: #555555;
+    --text-placeholder: #777777;
+    /* --text-inverse は白のまま */
 
+    /* ボーダー: 要素の区切りをはっきりさせる */
     --border-color: #cccccc;
     --border-light: #dddddd;
-    /* --border-focus は変更なし */
+    /* --border-focus は共通 */
 
     --overlay-bg: rgba(0, 0, 0, 0.5);
   }
