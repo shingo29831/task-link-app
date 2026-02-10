@@ -56,11 +56,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const StatusBadge = ({ status }: { status: number }) => {
     const config = {
-        0: { l: '未着手', c: '#888' },
-        1: { l: '進行中', c: '#007bff' },
-        2: { l: '完了', c: '#28a745' },
-        3: { l: '休止', c: '#6f42c1' }
-    }[status as 0|1|2|3] || { l: '不明', c: '#555' };
+        0: { l: '未着手', c: 'var(--text-placeholder)' },
+        1: { l: '進行中', c: 'var(--color-info)' },
+        2: { l: '完了', c: 'var(--color-success)' },
+        3: { l: '休止', c: 'var(--color-suspend)' }
+    }[status as 0|1|2|3] || { l: '不明', c: 'var(--border-light)' };
     return (
         <span style={{ backgroundColor: config.c, color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75em', marginRight: '6px', whiteSpace: 'nowrap', alignSelf: 'flex-start', marginTop: '2px' }}>{config.l}</span>
     );
@@ -351,8 +351,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                 <p>インポート: <strong>{incomingData.projectName}</strong></p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                     <button onClick={() => setStep('NAME_CHOICE')} style={btnStyle}>このプロジェクトにマージ</button>
-                    {onCreateNew && <button onClick={() => onCreateNew(incomingData)} style={{ ...btnStyle, backgroundColor: '#007bff', borderColor: '#0056b3' }}>新規プロジェクトとして作成</button>}
-                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: '#555' }}>キャンセル</button>
+                    {onCreateNew && <button onClick={() => onCreateNew(incomingData)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff' }}>新規プロジェクトとして作成</button>}
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>キャンセル</button>
                 </div>
             </div>
         </div>
@@ -368,7 +368,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                     <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>ローカルを使用: <strong>{localData.projectName}</strong></button>
                     <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>リモートを使用: <strong>{incomingData.projectName}</strong></button>
-                    <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: '#555' }}>戻る</button>
+                    <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>戻る</button>
                 </div>
             </div>
         </div>
@@ -381,15 +381,15 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         <div style={overlayStyle}>
             <div style={{ ...modalStyle, width: '600px', maxWidth: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ marginTop: 0 }}>競合タスクの追加確認</h3>
-                <p style={{ fontSize: '0.9em', color: '#ccc' }}>
+                <p style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
                     以下のリモートタスクはローカル優先でマージされましたが、別タスクとして追加することも可能です。<br/>
                     追加する場合、ローカルタスクのIDが変更され、リモートタスクが元のIDで追加されます。<br/>
-                    <span style={{color: '#ff6b6b'}}>※注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
+                    <span style={{color: 'var(--color-danger-text)'}}>※注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
                 </p>
-                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #444', borderRadius: '4px', margin: '10px 0' }}>
+                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', margin: '10px 0' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
                         <thead>
-                            <tr style={{ background: '#333', textAlign: 'left' }}>
+                            <tr style={{ background: 'var(--bg-input)', textAlign: 'left' }}>
                                 <th style={{ padding: '8px', width: '30px' }}>
                                     <input 
                                         type="checkbox" 
@@ -398,12 +398,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                     />
                                 </th>
                                 <th style={{ padding: '8px' }}>リモートタスク名 (追加対象)</th>
-                                <th style={{ padding: '8px', color: '#888' }}>ローカル (ID変更)</th>
+                                <th style={{ padding: '8px', color: 'var(--text-secondary)' }}>ローカル (ID変更)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {conflictRows.map(row => (
-                                <tr key={row.key} style={{ borderBottom: '1px solid #444' }}>
+                                <tr key={row.key} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                     <td style={{ padding: '8px', textAlign: 'center' }}>
                                         <input 
                                             type="checkbox" 
@@ -412,15 +412,15 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                         />
                                     </td>
                                     <td style={{ padding: '8px' }}>{row.remote?.name}</td>
-                                    <td style={{ padding: '8px', color: '#888' }}>{row.local?.name}</td>
+                                    <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{row.local?.name}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: '#555' }}>戻る</button>
-                    <button onClick={() => finalizeMerge(selectedIgnoredIds)} style={{ ...btnStyle, backgroundColor: '#007bff' }}>
+                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>戻る</button>
+                    <button onClick={() => finalizeMerge(selectedIgnoredIds)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff' }}>
                         決定してマージ
                     </button>
                 </div>
@@ -434,25 +434,25 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   return (
     <div style={overlayStyle}>
         <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h3 style={{ margin: '0 0 4px 0' }}>タスクのマージ (IDベース)</h3>
-                    <div style={{ fontSize: '0.85em', color: '#aaa' }}>Remote: <strong style={{ color: '#fff' }}>{incomingData.projectName}</strong> ➔ Local: <strong style={{ color: '#fff' }}>{localData.projectName}</strong></div>
+                    <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>Remote: <strong style={{ color: 'var(--text-primary)' }}>{incomingData.projectName}</strong> ➔ Local: <strong style={{ color: 'var(--text-primary)' }}>{localData.projectName}</strong></div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ padding: '5px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}>
+                    <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ padding: '5px', borderRadius: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                         <option value="LOCAL">Local優先</option><option value="REMOTE">Remote優先</option>
                     </select>
-                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: '#dc3545', border: 'none' }}>キャンセル</button>
-                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: '#28a745', border: 'none' }}>実行</button>
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--color-danger)', border: 'none', color: '#fff' }}>キャンセル</button>
+                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: 'var(--color-success)', border: 'none', color: '#fff' }}>実行</button>
                 </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
                 {displayedRows.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>差分はありません。すべてのタスクが一致しています。</div>
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-placeholder)' }}>差分はありません。すべてのタスクが一致しています。</div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
-                        <thead><tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>アクション</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
+                        <thead><tr style={{ borderBottom: '2px solid var(--border-light)', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>アクション</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
                         <tbody>
                             {displayedRows.map((row) => {
                                 const localDate = row.local ? getDeadlineDisplay(row.local) : '';
@@ -465,70 +465,70 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                 const isDuplicated = duplicateKeys.has(row.key);
 
                                 return (
-                                    <tr key={row.key} style={{ borderBottom: '1px solid #333' }}>
-                                        <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.local ? `rgba(255,255,255,${rowOpacity})` : '#666' }}>
+                                    <tr key={row.key} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                        <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.local ? 'var(--text-primary)' : 'var(--text-placeholder)', opacity: row.local ? rowOpacity : 1 }}>
                                             <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555' }}>└</span>}
+                                                {row.depth > 0 && <span style={{ marginRight: '6px', color: 'var(--text-placeholder)' }}>└</span>}
                                                 {row.local ? (
                                                     <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1 }}>
                                                         <StatusBadge status={row.local.status} />
                                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                                             {isDuplicated && row.local && (
-                                                                <div style={{ color: '#ff6b6b', fontSize: '0.75em', marginBottom: '2px' }}>
+                                                                <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px' }}>
                                                                     ⚠️ 名前重複
                                                                 </div>
                                                             )}
                                                             {editingId === row.key && row.local ? (
                                                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                                                    <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: '#444', color: '#fff', border: '1px solid #666' }} />
-                                                                    <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: '#007bff' }}>OK</button>
-                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: '#555' }}>✕</button>
+                                                                    <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
+                                                                    <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
+                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none' }}>✕</button>
                                                                 </div>
                                                             ) : (
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                    <span style={{ color: isRenamed ? '#ffeb3b' : 'inherit' }}>{isRenamed ? currentName : breakText(row.local.name)}</span>
-                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#646cff', padding: 0 }} title="名前を変更">✎</button>
+                                                                    <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.local.name)}</span>
+                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0 }} title="名前を変更">✎</button>
                                                                 </div>
                                                             )}
-                                                            {localDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({localDate})</span>}
-                                                            <span style={{fontSize: '0.7em', color:'#555'}}>{row.key}</span>
+                                                            {localDate && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>({localDate})</span>}
+                                                            <span style={{fontSize: '0.7em', color:'var(--text-placeholder)'}}>{row.key}</span>
                                                         </div>
                                                     </div>
                                                 ) : '(なし)'}
                                             </div>
                                         </td>
                                         
-                                        <td style={{ padding: '8px', opacity: rowOpacity }}>{isContextRow ? <span style={{ color: '#888', fontSize: '0.85em' }}>（一致）</span> : <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}>{row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}{row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}{!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}</select>}</td>
+                                        <td style={{ padding: '8px', opacity: rowOpacity }}>{isContextRow ? <span style={{ color: 'var(--text-placeholder)', fontSize: '0.85em' }}>（一致）</span> : <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>{row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}{row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}{!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}</select>}</td>
                                         
-                                        <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.remote ? `rgba(255,255,255,${rowOpacity})` : '#666' }}>
+                                        <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.remote ? 'var(--text-primary)' : 'var(--text-placeholder)', opacity: row.remote ? rowOpacity : 1 }}>
                                             {row.remote && (
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: '#555' }}>└</span>}
+                                                        {row.depth > 0 && <span style={{ marginRight: '6px', color: 'var(--text-placeholder)' }}>└</span>}
                                                         <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1 }}>
                                                             <StatusBadge status={row.remote.status} />
                                                             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                                                 {isDuplicated && !row.local && (
-                                                                    <div style={{ color: '#ff6b6b', fontSize: '0.75em', marginBottom: '2px' }}>
+                                                                    <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px' }}>
                                                                         ⚠️ 名前重複
                                                                     </div>
                                                                 )}
                                                                 {editingId === row.key && !row.local ? (
                                                                     <div style={{ display: 'flex', gap: '4px' }}>
-                                                                        <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: '#444', color: '#fff', border: '1px solid #666' }} />
-                                                                        <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: '#007bff' }}>OK</button>
-                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: '#555' }}>✕</button>
+                                                                        <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
+                                                                        <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
+                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none' }}>✕</button>
                                                                     </div>
                                                                 ) : (
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                        <span style={{ color: isRenamed ? '#ffeb3b' : 'inherit' }}>{isRenamed ? currentName : breakText(row.remote.name)}</span>
+                                                                        <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.remote.name)}</span>
                                                                         {!row.local && (
-                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#646cff', padding: 0 }} title="名前を変更">✎</button>
+                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0 }} title="名前を変更">✎</button>
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                {remoteDate && <span style={{ fontSize: '0.85em', color: '#aaa' }}>({remoteDate})</span>}
-                                                                <span style={{fontSize: '0.7em', color:'#555'}}>{row.key}</span>
+                                                                {remoteDate && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>({remoteDate})</span>}
+                                                                <span style={{fontSize: '0.7em', color:'var(--text-placeholder)'}}>{row.key}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -547,6 +547,6 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   );
 };
 
-const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 };
-const modalStyle: React.CSSProperties = { backgroundColor: '#2a2a2a', padding: '20px', borderRadius: '8px', color: '#fff', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' };
-const btnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#fff', cursor: 'pointer' };
+const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 };
+const modalStyle: React.CSSProperties = { backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', color: 'var(--text-primary)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' };
+const btnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', cursor: 'pointer' };

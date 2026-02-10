@@ -1,9 +1,43 @@
-:root { font-family: system-ui, sans-serif; color-scheme: light dark; color: rgba(255, 255, 255, 0.87); background-color: #242424; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-#root { width: 100%; }
-button { border-radius: 8px; border: 1px solid transparent; padding: 0.6em 1.2em; font-weight: 500; cursor: pointer; background-color: #1a1a1a; transition: border-color 0.25s; }
-button:hover { border-color: #646cff; }
-@media (prefers-color-scheme: light) { :root { color: #213547; background-color: #ffffff; } button { background-color: #f9f9f9; } }
+:root {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: var(--text-primary);
+  background-color: var(--bg-body);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: var(--bg-button);
+  color: var(--text-primary);
+  transition: border-color 0.25s, background-color 0.25s;
+}
+
+button:hover {
+  border-color: var(--color-primary);
+  background-color: var(--bg-button-hover);
+}
 
 /* Toggle Switch Styles */
 .toggle-switch {
@@ -27,7 +61,7 @@ button:hover { border-color: #646cff; }
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #555;
+  background-color: var(--border-light);
   transition: .4s;
   border-radius: 20px;
 }
@@ -39,13 +73,13 @@ button:hover { border-color: #646cff; }
   width: 16px;
   left: 2px;
   bottom: 2px;
-  background-color: white;
+  background-color: var(--bg-surface);
   transition: .4s;
   border-radius: 50%;
 }
 
 input:checked + .slider {
-  background-color: #646cff;
+  background-color: var(--color-primary);
 }
 
 input:checked + .slider:before {
@@ -63,20 +97,20 @@ input:checked + .slider:before {
   }
 }
 
-/* モバイル用日付入力スタイル 
-  文字（yyyy/mm/dd）は透明にし、カレンダーアイコンだけを表示する
-*/
 .date-input-mobile {
   color: transparent !important;
   position: relative;
 }
 
-/* カレンダーアイコンの色を反転（白く）させて表示 */
 .date-input-mobile::-webkit-calendar-picker-indicator {
   opacity: 1;
   display: block;
   background-color: transparent;
-  filter: invert(1); /* アイコンを白くする */
+  /* ライトテーマ対応のため filter invert はJS側またはテーマ依存で制御した方が安全ですが、
+     現状はダークモード前提のアイコン反転だったため、一旦 var(--text-primary)の色に合わせて調整が必要かもしれません。
+     ここでは簡易的に light/dark 自動反転に任せるため filter を削除するか、調整します。
+  */
+  /*bv filter: invert(1); */
   cursor: pointer;
   width: 100%;
   height: 100%;
@@ -85,4 +119,11 @@ input:checked + .slider:before {
   left: 0;
   margin: 0;
   padding: 0;
+}
+
+/* ライトモード時のカレンダーアイコン色調整用 */
+@media (prefers-color-scheme: dark) {
+  .date-input-mobile::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }

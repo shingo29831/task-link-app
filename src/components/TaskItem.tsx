@@ -20,7 +20,7 @@ interface Props {
   onClick: () => void;
   isMenuOpen: boolean;
   onToggleMenu: () => void;
-  isActiveParent?: boolean; // 追加: 親タスク選択中かどうか
+  isActiveParent?: boolean;
 }
 
 export const TaskItem: React.FC<Props> = ({ 
@@ -28,7 +28,7 @@ export const TaskItem: React.FC<Props> = ({
   onStatusChange, onParentStatusChange, onDelete, onRename, onDeadlineChange, 
   isExpanded, onToggleExpand, onClick,
   isMenuOpen, onToggleMenu,
-  isActiveParent = false // デフォルトfalse
+  isActiveParent = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -46,10 +46,8 @@ export const TaskItem: React.FC<Props> = ({
   }, []);
 
   const isMobile = windowWidth <= 1024;
-  // 日付省略表示の基準 (480px以下)
   const isNarrowLayout = windowWidth <= 480;
 
-  // 画面幅に応じたスタイル定義 (文字サイズを上げつつ、余白を詰める)
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
         return { 
@@ -76,7 +74,6 @@ export const TaskItem: React.FC<Props> = ({
             buttonFontSize: '0.85em'
         };
     }
-    // デスクトップ
     return { 
         fontSize: '16px', 
         indentWidth: 24, 
@@ -111,10 +108,10 @@ export const TaskItem: React.FC<Props> = ({
   });
 
   const config = { 
-    0: { l: '未着手', c: '#888' }, 
-    1: { l: '進行中', c: '#007bff' }, 
-    2: { l: '完了', c: '#28a745' },
-    3: { l: '休止', c: '#6f42c1' } 
+    0: { l: '未着手', c: 'var(--text-placeholder)' }, // #888 equivalent
+    1: { l: '進行中', c: 'var(--color-info)' }, 
+    2: { l: '完了', c: 'var(--color-success)' }, 
+    3: { l: '休止', c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
   const currentDeadlineStr = task.deadline !== undefined
@@ -139,8 +136,11 @@ export const TaskItem: React.FC<Props> = ({
 
   const getDeadline = () => {
     if (daysRemaining === null) return null;
-    const color = daysRemaining < 0 ? '#dc3545' : daysRemaining === 0 ? '#ffc107' : '#888';
+    let color = 'var(--text-placeholder)';
     
+    if (daysRemaining < 0) color = 'var(--color-danger)';
+    else if (daysRemaining === 0) color = 'var(--color-warning)';
+
     let label = '';
     if (daysRemaining < 0) label = `${Math.abs(daysRemaining)}日超過`;
     else if (daysRemaining === 0) label = '今日まで';
@@ -217,24 +217,22 @@ export const TaskItem: React.FC<Props> = ({
           display: 'flex', 
           alignItems: 'center', 
           padding: itemPadding,
-          borderBottom: '1px solid #333', 
+          borderBottom: '1px solid var(--border-color)', 
           marginLeft: `${depth * indentWidth}px`,
           position: 'relative',
           cursor: 'pointer',
-          // 変更: 親タスクとして選択中の場合も背景色を変えたり、枠線をつけたりする
-          backgroundColor: (isMenuOpen || isHovered || isActiveParent) ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+          backgroundColor: (isMenuOpen || isHovered || isActiveParent) ? 'var(--bg-item-hover)' : 'transparent',
           borderRadius: '4px',
           transition: 'background-color 0.2s, box-shadow 0.2s',
           fontSize: fontSize,
-          // 追加: 親タスク選択中の強調表示 (内側の枠線)
-          boxShadow: isActiveParent ? '0 0 0 2px #646cff inset' : 'none',
+          boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none',
         }}
       >
         {isOver && !isDropDisabled && (
           <div 
             style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              border: '2px dashed #646cff', boxSizing: 'border-box',
+              border: '2px dashed var(--color-primary)', boxSizing: 'border-box',
               pointerEvents: 'none', zIndex: 20, borderRadius: '4px'
             }}
           />
@@ -246,7 +244,7 @@ export const TaskItem: React.FC<Props> = ({
               background: 'transparent', border: 'none', cursor: 'pointer', 
               fontSize: '1em',
               padding: '0', marginRight: '2px',
-              color: '#aaa', visibility: hasChildren ? 'visible' : 'hidden', 
+              color: 'var(--text-placeholder)', visibility: hasChildren ? 'visible' : 'hidden', 
               width: '1.2em', textAlign: 'center', lineHeight: '1'
           }}
           title={isExpanded ? "折りたたむ" : "展開する"}
@@ -271,7 +269,7 @@ export const TaskItem: React.FC<Props> = ({
             fontSize: buttonFontSize, 
             cursor: 'pointer', 
             opacity: hasChildren ? 0.9 : 1, 
-            border: hasChildren ? '1px dashed #fff' : 'none', 
+            border: hasChildren ? '1px dashed var(--text-inverse)' : 'none', 
             padding: buttonPadding,
             lineHeight: '1.2',
             whiteSpace: 'nowrap'
@@ -291,9 +289,9 @@ export const TaskItem: React.FC<Props> = ({
               onClick={(e) => e.stopPropagation()} 
               onPointerDown={stopPropagation}
               style={{ 
-                backgroundColor: '#333', 
-                color: '#fff', 
-                border: '1px solid #555', 
+                backgroundColor: 'var(--bg-input)', 
+                color: 'var(--text-primary)', 
+                border: '1px solid var(--border-light)', 
                 padding: isMobile ? '4px' : '2px 4px',
                 borderRadius: '4px', 
                 width: 'calc(100% - 20px)', 
@@ -305,7 +303,7 @@ export const TaskItem: React.FC<Props> = ({
               <span 
                 onDoubleClick={(e) => { e.stopPropagation(); setEditName(task.name); setIsEditing(true); }} title="ダブルクリックで編集"
                 style={{ 
-                  color: isUrgent ? '#ff4d4f' : 'inherit', 
+                  color: isUrgent ? 'var(--color-danger-text)' : 'inherit', 
                   fontWeight: hasChildren ? 'bold' : 'normal', 
                   textDecoration: task.status === 2 ? 'line-through' : 'none', 
                   opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, 
@@ -316,7 +314,7 @@ export const TaskItem: React.FC<Props> = ({
               >
                 {task.name}
               </span>
-              {progress !== null && <span style={{ fontSize: '0.85em', color: '#aaa', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
+              {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
               {isEditingDeadline ? (
                   <input 
                       type="date" 
@@ -330,10 +328,10 @@ export const TaskItem: React.FC<Props> = ({
                         marginLeft: '6px', 
                         padding: isMobile ? '2px' : '2px', 
                         borderRadius: '4px', 
-                        border: '1px solid #555', 
-                        backgroundColor: '#333', 
-                        color: isNarrowLayout ? 'transparent' : '#fff',
-                        colorScheme: 'dark', 
+                        border: '1px solid var(--border-light)', 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: isNarrowLayout ? 'transparent' : 'var(--text-primary)',
+                        colorScheme: 'dark', // CSS変数が効かない場合用だが、theme.css側で制御推奨
                         fontSize: isMobile ? '16px' : 'inherit',
                         width: isNarrowLayout ? '36px' : 'auto'
                       }}
@@ -355,7 +353,7 @@ export const TaskItem: React.FC<Props> = ({
         }}>
           {isNarrowLayout ? (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <button title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+              <button title="期限を設定" style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
               <input 
                 type="date" 
                 onChange={(e) => onDeadlineChange(e.target.value)}
@@ -370,45 +368,45 @@ export const TaskItem: React.FC<Props> = ({
               />
             </div>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
+            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding, fontSize: buttonFontSize }}>📅</button>
           )}
           
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid #444', color: '#888', padding: buttonPadding, fontSize: buttonFontSize }}>✕</button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding, fontSize: buttonFontSize }}>✕</button>
         </div>
       </div>
 
       {showStatusModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
+          backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
         }} onClick={(e) => { e.stopPropagation(); setShowStatusModal(false); }}>
-          <div style={{ backgroundColor: '#2a2a2a', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid #444', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <h4 style={{ margin: '0 0 10px 0', color: '#fff', borderBottom: '1px solid #444', paddingBottom: '8px' }}>状態を一括変更</h4>
-            <p style={{ fontSize: '0.85em', color: '#aaa', marginBottom: '15px' }}>親タスクの状態を変更すると、子タスクにも影響します。</p>
+          <div style={{ backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid var(--border-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>状態を一括変更</h4>
+            <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: '15px' }}>親タスクの状態を変更すると、子タスクにも影響します。</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => { 
                 onParentStatusChange(task.id, 0); 
                 setShowStatusModal(false); 
-              }} style={{ backgroundColor: '#888', color: '#fff', textAlign: 'left' }}>未着手 (Todo)</button>
+              }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>未着手 (Todo)</button>
               
               <button onClick={() => { 
                 onParentStatusChange(task.id, 1); 
                 setShowStatusModal(false); 
-              }} style={{ backgroundColor: '#007bff', color: '#fff', textAlign: 'left' }}>進行中 (Doing)</button>
+              }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>進行中 (Doing)</button>
               
               <button onClick={() => { 
                 if(confirm('すべての子タスクを「完了」にします。\nよろしいですか？')) {
                   onParentStatusChange(task.id, 2); 
                   setShowStatusModal(false); 
                 }
-              }} style={{ backgroundColor: '#28a745', color: '#fff', textAlign: 'left' }}>完了 (Done) <span style={{fontSize:'0.8em', opacity:0.7}}>※ 子タスクが完了になります。</span></button>
+              }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>完了 (Done) <span style={{fontSize:'0.8em', opacity:0.7}}>※ 子タスクが完了になります。</span></button>
               
               <button onClick={() => { 
                 onParentStatusChange(task.id, 3); 
                 setShowStatusModal(false); 
-              }} style={{ backgroundColor: '#6f42c1', color: '#fff', textAlign: 'left' }}>休止 (Suspend)</button>
+              }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>休止 (Suspend)</button>
             </div>
-            <button onClick={() => setShowStatusModal(false)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid #555', color: '#ccc' }}>キャンセル</button>
+            <button onClick={() => setShowStatusModal(false)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>キャンセル</button>
           </div>
         </div>
       )}

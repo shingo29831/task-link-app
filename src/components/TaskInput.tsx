@@ -50,9 +50,9 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
           minWidth: 0, 
           padding: '10px',
           borderRadius: '4px', 
-          border: '1px solid #555', 
-          background: '#333', 
-          color: '#fff',
+          border: '1px solid var(--border-light)', 
+          background: 'var(--bg-input)', 
+          color: 'var(--text-primary)',
           fontSize: '16px'
         }}
       />
@@ -70,10 +70,10 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
           flex: '0 0 auto',
           padding: isNarrowLayout ? '10px 4px' : '10px',
           borderRadius: '4px', 
-          border: '1px solid #555', 
-          background: '#333', 
-          color: '#fff', 
-          colorScheme: 'dark',
+          border: '1px solid var(--border-light)', 
+          background: 'var(--bg-input)', 
+          color: 'var(--text-primary)', 
+          colorScheme: 'dark', // CSS変数が反映されない場合があるので必要に応じてtheme.cssで上書きが必要かも
           fontSize: '16px',
           cursor: 'pointer'
         }}
@@ -85,8 +85,8 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
         style={{
           // パディングや最小幅も 480px 基準で切り替え
           padding: isNarrowLayout ? '10px' : '10px 20px',
-          backgroundColor: !taskName.trim() ? '#555' : '#646cff',
-          color: '#fff',
+          backgroundColor: !taskName.trim() ? 'var(--border-light)' : 'var(--color-primary)',
+          color: '#fff', // ボタンは白文字維持
           border: 'none',
           borderRadius: '4px',
           cursor: !taskName.trim() ? 'not-allowed' : 'pointer',

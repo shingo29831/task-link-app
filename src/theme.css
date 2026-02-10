@@ -1,0 +1,66 @@
+:root {
+  /* ==========================================
+     Dark Theme (Default)
+     ========================================== */
+  --bg-body: #242424;
+  --bg-surface: #2a2a2a;         /* カード、モーダル、サイドバーなど */
+  --bg-surface-hover: #3a3a3a;   /* ホバー時など */
+  --bg-board: #1e1e1e;           /* ボード背景 */
+  --bg-input: #333333;           /* 入力欄、アイテム背景 */
+  --bg-button: #1a1a1a;          /* ボタン背景 */
+  --bg-button-hover: #333333;
+  
+  --bg-calendar-day: #333333;
+  --bg-calendar-day-other: #222222;
+  --bg-item-hover: rgba(255, 255, 255, 0.05);
+  
+  --text-primary: rgba(255, 255, 255, 0.87);
+  --text-secondary: #aaaaaa;
+  --text-placeholder: #888888;
+  --text-inverse: #ffffff;       /* 常に白（バッジの文字など） */
+
+  --border-color: #444444;
+  --border-light: #555555;
+  --border-focus: #646cff;
+
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+
+  /* Accents (共通) */
+  --color-primary: #646cff;
+  --color-success: #28a745;
+  --color-danger: #dc3545; /* or #ff6b6b for text */
+  --color-danger-text: #ff4d4f;
+  --color-info: #007bff;
+  --color-suspend: #6f42c1;
+  --color-warning: #ffc107;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* ==========================================
+       Light Theme
+       ========================================== */
+    --bg-body: #f4f4f4;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f0f0f0;
+    --bg-board: #e0e0e0;
+    --bg-input: #ffffff;
+    --bg-button: #f9f9f9;
+    --bg-button-hover: #eaeaea;
+
+    --bg-calendar-day: #ffffff;
+    --bg-calendar-day-other: #eeeeee;
+    --bg-item-hover: rgba(0, 0, 0, 0.05);
+
+    --text-primary: #213547;
+    --text-secondary: #666666;
+    --text-placeholder: #999999;
+    /* --text-inverse は変更なし */
+
+    --border-color: #cccccc;
+    --border-light: #dddddd;
+    /* --border-focus は変更なし */
+
+    --overlay-bg: rgba(0, 0, 0, 0.5);
+  }
+}

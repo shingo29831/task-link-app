@@ -44,14 +44,14 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
   return (
      <div style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center',
+      backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center',
       alignItems: 'center', zIndex: 2000
     }} onClick={onClose}>
       <div style={{
-        backgroundColor: '#2a2a2a', padding: '20px', borderRadius: '8px',
-        width: '400px', maxWidth: '90%', color: '#fff', boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+        backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px',
+        width: '400px', maxWidth: '90%', color: 'var(--text-primary)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
       }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #444', paddingBottom: '10px' }}>
+        <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
           プロジェクト名の変更
         </h3>
         
@@ -64,9 +64,9 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
           placeholder="プロジェクト名"
           style={{ 
             width: '100%', padding: '10px', borderRadius: '4px', 
-            border: error ? '2px solid #ff6b6b' : '1px solid #555', 
-            backgroundColor: '#1a1a1a', 
-            color: '#fff', fontSize: '1em', boxSizing: 'border-box',
+            border: error ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
+            backgroundColor: 'var(--bg-input)', 
+            color: 'var(--text-primary)', fontSize: '1em', boxSizing: 'border-box',
             outline: 'none'
           }}
         />
@@ -74,14 +74,14 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
         {/* エラーメッセージ（赤文字） */}
         <div style={{ minHeight: '1.5em', marginTop: '8px' }}>
           {error && (
-            <p style={{ color: '#ff6b6b', fontSize: '0.9em', margin: 0, fontWeight: 'bold' }}>
+            <p style={{ color: 'var(--color-danger-text)', fontSize: '0.9em', margin: 0, fontWeight: 'bold' }}>
               ⚠️ {error}
             </p>
           )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', backgroundColor: '#555', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
             キャンセル
           </button>
           <button 
@@ -89,7 +89,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
             disabled={!!error || !value.trim()}
             style={{ 
               padding: '8px 16px', 
-              backgroundColor: (error || !value.trim()) ? '#555' : '#007bff', 
+              backgroundColor: (error || !value.trim()) ? 'var(--border-light)' : 'var(--color-info)', 
               color: '#fff', border: 'none', borderRadius: '4px', 
               cursor: (error || !value.trim()) ? 'not-allowed' : 'pointer',
               opacity: (error || !value.trim()) ? 0.6 : 1,
