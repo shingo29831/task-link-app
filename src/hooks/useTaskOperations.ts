@@ -1,7 +1,7 @@
 // NOTE: App.tsxのロジック部分はこのファイルに記述すること。
 // 今後、ロジックの変更や追加が必要な場合は、App.tsxではなくこのファイルを修正してください。
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { 
   KeyboardSensor, 
   PointerSensor, 
@@ -100,6 +100,10 @@ export const useTaskOperations = () => {
   
   // 追加: メニューが開いているタスクID（排他制御用）
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
+
+  // Refs for DnD logic
+  const lastPointerX = useRef<number | null>(null);
+  const moveDirection = useRef<'left' | 'right' | null>(null);
 
   // --------------------------------------------------------------------------
   // Derived Data
@@ -589,6 +593,8 @@ export const useTaskOperations = () => {
   );
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const { active, pointerCoordinates, droppableContainers } = args;
+
     // 1. ネスト判定 (nest-xxx) を最優先
     // マウスカーソルが乗っている要素を確認
     const pointerCollisions = pointerWithin(args);
@@ -597,18 +603,28 @@ export const useTaskOperations = () => {
       return nestCollisions;
     }
 
-    // 2. 通常のアイテム判定
-    // 中心が近いアイテムを探す（標準的な挙動）
+    // 2. 通常のアイテム判定 (標準のclosestCenterを使用)
     const collisions = closestCenter(args);
+    
+    // ルートタスクを移動中は、BoardAreaへのヒットを除外する
+    // (ルートタスクはすでにルートにあるので、BoardAreaに反応させるとUIがちらつくため)
+    const isRootTask = active.data.current?.type === 'task' && active.data.current?.depth === 0;
+    
     if (collisions.length > 0) {
+      if (isRootTask) {
+        // ルートタスクの場合、BoardAreaを除外して返す
+        return collisions.filter(c => c.id !== 'root-board');
+      }
       return collisions;
     }
 
-    // 3. 最後にボード判定
-    // どのタスクにもヒットしなかった場合、ボード自体（背景）へのドロップを許可
-    const board = pointerCollisions.find(c => c.id === 'root-board');
-    if (board) {
-        return [board];
+    // 3. 最後にボード判定 (背景へのドロップ)
+    // どのタスクにもヒットしなかった場合、かつルートタスクでなければ許可
+    if (!isRootTask) {
+        const board = pointerCollisions.find(c => c.id === 'root-board');
+        if (board) {
+            return [board];
+        }
     }
 
     return [];
