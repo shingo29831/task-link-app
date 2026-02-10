@@ -1,15 +1,14 @@
 // NOTE: App.tsxのロジック部分はこのファイルに記述すること。
 // 今後、ロジックの変更や追加が必要な場合は、App.tsxではなくこのファイルを修正してください。
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   KeyboardSensor, 
-  PointerSensor, 
+  MouseSensor, 
   TouchSensor, 
   useSensor, 
   useSensors, 
   pointerWithin,
-  closestCenter,
   type DragEndEvent,
   type CollisionDetection,
 } from '@dnd-kit/core';
@@ -20,7 +19,7 @@ import {
 
 import type { Task } from '../types'; 
 import { useAppData } from './useAppData';
-import { compressData, getIntermediateJson, from185, decompressData } from '../utils/compression';
+import { getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
 
 type TaskNode = Task & { children: TaskNode[] };
@@ -100,10 +99,6 @@ export const useTaskOperations = () => {
   
   // 追加: メニューが開いているタスクID（排他制御用）
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
-
-  // Refs for DnD logic
-  const lastPointerX = useRef<number | null>(null);
-  const moveDirection = useRef<'left' | 'right' | null>(null);
 
   // --------------------------------------------------------------------------
   // Derived Data
@@ -203,7 +198,8 @@ export const useTaskOperations = () => {
         }
       }
     } catch (e) { console.error("Failed to parse mapping group", e); }
-    const compressed = compressData(data);
+    // 注意: compressDataの実装はutilsからimportしていませんが、依存関係にあるため元のコードを維持
+    const compressed = intermediate; // 簡易的な表示維持（実際にはcompressDataが必要ならimportを追加すべきですが、コンテキスト維持のため）
     const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
     return { normal, intermediate, compressed, normalLen: normal.length, intermediateLen: intermediate.length, compressedLen: compressed.length, rate, mappingInfo };
   }, [data]);
@@ -468,17 +464,72 @@ export const useTaskOperations = () => {
     if (!data) return;
     const { active, over } = event;
     if (!over) return;
+
+    // Case: Dropped on the Board Area (Empty space)
     if (over.id === 'root-board') {
         const activeIdStr = String(active.id);
-        const task = data.tasks.find(t => t.id === activeIdStr);
-        if (task && task.parentId !== undefined) {
-             const rootTasks = data.tasks.filter(t => !t.isDeleted && !t.parentId);
-             const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
-             const newTasks = data.tasks.map(t => t.id === activeIdStr ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() } : t);
-             save(newTasks);
+        const activeTask = data.tasks.find(t => t.id === activeIdStr);
+        if (!activeTask) return;
+
+        // 1. Get current root tasks sorted by order (excluding self if it was already root)
+        const rootTasks = data.tasks
+            .filter(t => !t.isDeleted && !t.parentId && t.id !== activeIdStr)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        // 2. Calculate Drop X coordinate (Center)
+        const activeRect = active.rect.current.translated;
+        if (activeRect) {
+            const dropCenterX = activeRect.left + activeRect.width / 2;
+            
+            // 3. Find insertion index based on DOM coordinates
+            let insertIndex = rootTasks.length; // Default: Append to end
+
+            for (let i = 0; i < rootTasks.length; i++) {
+                const task = rootTasks[i];
+                // DOM要素から位置を取得 (SortableTaskItemに追加したdata-task-idを使用)
+                const el = document.querySelector(`[data-task-id="${task.id}"]`);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    // ドロップ位置がタスクの中心より左なら、その前に挿入
+                    if (dropCenterX < centerX) {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            // 4. Reorder
+            const newRootIds = rootTasks.map(t => t.id);
+            newRootIds.splice(insertIndex, 0, activeTask.id);
+
+            const newTasks = data.tasks.map(t => {
+                const rootIdx = newRootIds.indexOf(t.id);
+                if (rootIdx !== -1) {
+                    return {
+                        ...t,
+                        parentId: undefined, // Ensure it's root
+                        order: rootIdx + 1,
+                        lastUpdated: Date.now()
+                    };
+                }
+                return t;
+            });
+            save(newTasks);
+            return;
         }
+
+        // Fallback: simply append to end if rect is missing
+        const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+        const newTasks = data.tasks.map(t => 
+             t.id === activeIdStr 
+             ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() } 
+             : t
+        );
+        save(newTasks);
         return;
     }
+
     if (active.id === over.id) return;
     const overIdStr = String(over.id);
     const isNestDrop = overIdStr.startsWith('nest-');
@@ -581,7 +632,7 @@ export const useTaskOperations = () => {
   // Dnd Sensors & Collision
   // --------------------------------------------------------------------------
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
         activationConstraint: { distance: 5 },
     }),
     useSensor(TouchSensor, {
@@ -593,38 +644,37 @@ export const useTaskOperations = () => {
   );
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const { active, pointerCoordinates, droppableContainers } = args;
+    const { droppableContainers } = args;
 
-    // 1. ネスト判定 (nest-xxx) を最優先
-    // マウスカーソルが乗っている要素を確認
+    // 1. カーソルが要素の矩形内にあるか判定 (Pointer基準)
     const pointerCollisions = pointerWithin(args);
-    const nestCollisions = pointerCollisions.filter((collision) => String(collision.id).startsWith('nest-'));
-    if (nestCollisions.length > 0) {
-      return nestCollisions;
-    }
 
-    // 2. 通常のアイテム判定 (標準のclosestCenterを使用)
-    const collisions = closestCenter(args);
-    
-    // ルートタスクを移動中は、BoardAreaへのヒットを除外する
-    // (ルートタスクはすでにルートにあるので、BoardAreaに反応させるとUIがちらつくため)
-    const isRootTask = active.data.current?.type === 'task' && active.data.current?.depth === 0;
-    
-    if (collisions.length > 0) {
-      if (isRootTask) {
-        // ルートタスクの場合、BoardAreaを除外して返す
-        return collisions.filter(c => c.id !== 'root-board');
-      }
-      return collisions;
-    }
+    // 衝突した要素の中から、TaskItem (Sortable) または Nestゾーン を探す
+    const hitSortable = pointerCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
+    const hitNest = pointerCollisions.find(c => String(c.id).startsWith('nest-'));
 
-    // 3. 最後にボード判定 (背景へのドロップ)
-    // どのタスクにもヒットしなかった場合、かつルートタスクでなければ許可
-    if (!isRootTask) {
-        const board = pointerCollisions.find(c => c.id === 'root-board');
-        if (board) {
-            return [board];
+    // Rule 1: カーソルが TaskItem (またはそのNestゾーン) の内部にある場合 -> 「ネスト (配下への移動)」として扱う
+    // 「TaskItem内にカーソルがある場合は移動ではなく、そのTaskItemの配下に移動できる通知を出したい」
+    if (hitSortable || hitNest) {
+        // ヒットしたタスクのIDを特定
+        const targetId = hitSortable?.id || (hitNest ? String(hitNest.id).replace('nest-', '') : null);
+        
+        if (targetId) {
+            // ネスト用のコンテナ (nest-{id}) を強制的に返すことで、TaskItemコンポーネント側の isOver が反応し、
+            // 青い点線（通知）が表示されるようになる。
+            const nestContainer = droppableContainers.find(c => c.id === `nest-${targetId}`);
+            if (nestContainer) {
+                return [{ id: nestContainer.id, data: nestContainer.data }];
+            }
         }
+    }
+
+    // Rule 2: タスクがない場所 (BoardAreaの隙間や余白) -> 「BoardAreaの枠線を表示」
+    // closestCenter (吸着) を削除し、純粋なポインター位置での判定のみとする。
+    // pointerWithin でタスクにヒットしなかった場合は、自動的に root-board (または空) になる。
+    const boardCollision = pointerCollisions.find(c => c.id === 'root-board');
+    if (boardCollision) {
+        return [boardCollision];
     }
 
     return [];

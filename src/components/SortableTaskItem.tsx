@@ -28,7 +28,10 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.8 : 1,
-    touchAction: 'none', 
+    // 変更: 'none' から 'manipulation' に変更
+    // これにより、ドラッグ開始前（長押し判定待ち）のスワイプ操作が
+    // ブラウザのスクロールとして処理されるようになります。
+    touchAction: 'manipulation', 
     position: 'relative',
     zIndex: isDragging ? 999 : 'auto', 
     // 視覚フィードバック: ドラッグ中は背景を少し明るく、枠線を強調
@@ -38,7 +41,8 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    // 変更: data-task-id 属性を追加して座標計算に使用できるようにする
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-task-id={id}>
       {children}
     </div>
   );
