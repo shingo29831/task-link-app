@@ -575,7 +575,7 @@ export const useTaskOperations = () => {
     setActiveParentId(null);
     setMenuOpenTaskId(null); // ボードの空白クリックでメニューも閉じる
   }, []);
-  const handleProjectNameDoubleClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
+  const handleProjectNameClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
 
   // --------------------------------------------------------------------------
   // Dnd Sensors & Collision
@@ -634,7 +634,7 @@ export const useTaskOperations = () => {
     menuOpenTaskId, setMenuOpenTaskId, // 追加
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
-    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameDoubleClick, toggleNodeExpansion, undo, redo,
+    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo,
     sensors, handleDragEnd, customCollisionDetection,
   };
 };

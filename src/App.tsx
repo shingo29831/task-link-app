@@ -107,7 +107,7 @@ function App() {
     handleAddTaskWrapper,
     handleTaskClick,
     handleBoardClick,
-    handleProjectNameDoubleClick,
+    handleProjectNameClick,
     toggleNodeExpansion,
     undo,
     redo,
@@ -296,7 +296,7 @@ function App() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span 
                                     style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer' }} 
-                                    onDoubleClick={handleProjectNameDoubleClick}
+                                    onClick={handleProjectNameClick}
                                   >
                                     {data.projectName}
                                   </span>
@@ -316,7 +316,7 @@ function App() {
                       <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? '#646cff' : '#333' }} title="カレンダーを表示/非表示">📅</button>
                       <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                              <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onDoubleClick={handleProjectNameDoubleClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                              <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer' }} onClick={handleProjectNameClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
                               {renderProjectMenu()}
                               <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
                           </div>
@@ -353,7 +353,7 @@ function App() {
                 {/* トグルエリア */}
                 <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
                     <label style={{ fontSize: '0.85em', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>全プロジェクトを表示</span>
+                        <span>全プロジェクト表示</span>
                         <div className="toggle-switch">
                             <input 
                                 type="checkbox" 
@@ -365,7 +365,7 @@ function App() {
                     </label>
                 </div>
                 {/* カレンダー本体: 高さを100%確保してスクロール可能に */}
-                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}>
                     <TaskCalendar 
                         tasks={calendarTasks} 
                         // activeTasks={activeTasks} // 削除
