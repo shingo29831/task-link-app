@@ -14,7 +14,7 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
     listeners,
     setNodeRef,
     transform,
-    transition,
+    // transition, 
     isDragging,
   } = useSortable({ 
     id,
@@ -26,22 +26,19 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0.8 : 1,
-    // 変更: 'none' から 'manipulation' に変更
-    // これにより、ドラッグ開始前（長押し判定待ち）のスワイプ操作が
-    // ブラウザのスクロールとして処理されるようになります。
+    // transition: transition, // アニメーション無効化のため削除
+    // ドラッグ中のアイテム（リストに残る方）はプレースホルダーとして薄く表示
+    opacity: isDragging ? 0.3 : 1, 
     touchAction: 'manipulation', 
     position: 'relative',
-    zIndex: isDragging ? 999 : 'auto', 
-    // 視覚フィードバック: ドラッグ中は背景を少し明るく、枠線を強調
-    backgroundColor: isDragging ? '#444' : undefined,
+    zIndex: isDragging ? 0 : 'auto', // 重なり順を下げる
+    backgroundColor: isDragging ? 'rgba(0,0,0,0.1)' : undefined, // 必要に応じて背景調整
     borderRadius: isDragging ? '8px' : undefined,
-    boxShadow: isDragging ? '0 0 10px rgba(100, 108, 255, 0.5)' : 'none',
+    // ドラッグ中はボーダーを表示して「ここに入る」感を出しても良い
+    border: isDragging ? '1px dashed #666' : 'none',
   };
 
   return (
-    // 変更: data-task-id 属性を追加して座標計算に使用できるようにする
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-task-id={id}>
       {children}
     </div>

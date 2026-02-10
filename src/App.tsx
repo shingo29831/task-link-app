@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
-  useDroppable, 
-  // DragStartEvent は未使用のため削除
+  useDroppable,
+  DragOverlay, // 追加
+  type DragStartEvent, // 追加
+  type DragEndEvent
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -123,6 +125,9 @@ function App() {
   // 画面幅に応じた計算のために幅自体も保持
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
+  // 追加: ドラッグ中のアイテムID
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
@@ -139,11 +144,23 @@ function App() {
   const isCompactSpacing = windowWidth <= 1080;
 
   // バイブレーション処理
-  const handleDragStart = () => {
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
     if (navigator.vibrate) {
       navigator.vibrate(50); // 50ms振動
     }
   };
+
+  const handleDragEndWrapper = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    handleDragEnd(event);
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragId(null);
+  };
+
+  const activeDragTask = data?.tasks.find(t => t.id === activeDragId);
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
 
@@ -233,8 +250,9 @@ function App() {
     <DndContext 
       sensors={sensors} 
       collisionDetection={customCollisionDetection} 
-      onDragStart={handleDragStart} // バイブレーション発火
-      onDragEnd={handleDragEnd}
+      onDragStart={handleDragStart} // 変更
+      onDragEnd={handleDragEndWrapper} // 変更
+      onDragCancel={handleDragCancel} // 追加
     >
         {/* ルートコンテナ: セーフエリア対応とパディングを追加 */}
         <div style={{ 
@@ -493,6 +511,40 @@ function App() {
           </div>
 
         </div>
+
+        {/* DragOverlay の追加 */}
+        <DragOverlay dropAnimation={null}>
+          {activeDragTask ? (
+            <div style={{ 
+              backgroundColor: '#2a2a2a', 
+              borderRadius: '8px', 
+              border: '1px solid #646cff', 
+              padding: '10px', 
+              boxShadow: '0 5px 15px rgba(0,0,0,0.5)', 
+              opacity: 0.9,
+              cursor: 'grabbing',
+              width: '220px' // 固定幅（リスト内の計算に合わせても良い）
+            }}>
+              <TaskItem 
+                task={activeDragTask} 
+                tasks={data.tasks} 
+                depth={0} 
+                // childrenの有無だけ簡易チェック
+                hasChildren={data.tasks.some(t => t.parentId === activeDragTask.id && !t.isDeleted)}
+                onStatusChange={() => {}} 
+                onParentStatusChange={() => {}}
+                onDelete={() => {}}
+                onRename={() => {}}
+                onDeadlineChange={() => {}}
+                isExpanded={false}
+                onToggleExpand={() => {}}
+                onClick={() => {}}
+                isMenuOpen={false}
+                onToggleMenu={() => {}}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
     </DndContext>
   );
 }
