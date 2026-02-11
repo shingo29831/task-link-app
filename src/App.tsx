@@ -51,6 +51,63 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
     onDragCancel: () => setIsDragging(false),
   });
 
+  // ==========================================
+  // 追加: PC環境用 ドラッグスクロール（パン）状態管理
+  // ==========================================
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [scrollPos, setScrollPos] = useState({ left: 0, top: 0 });
+  const hasMovedRef = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // モバイル、タスクドラッグ中、または左クリック以外は処理しない
+    if (isMobile || isDragging || e.button !== 0) return;
+    
+    // タスク（[data-task-id]）の上でクリックされた場合は
+    // タスクのドラッグや操作を優先するため、ボードのパンを行わない
+    if ((e.target as Element).closest('[data-task-id]')) {
+      return;
+    }
+
+    setIsPanning(true);
+    hasMovedRef.current = false;
+    setStartPos({ x: e.clientX, y: e.clientY });
+    if (scrollRef.current) {
+      setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop });
+    }
+    // ポインターをキャプチャし、マウスが要素外に出ても追従するようにする
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanning || !scrollRef.current) return;
+    
+    const dx = e.clientX - startPos.x;
+    const dy = e.clientY - startPos.y;
+
+    // 少しでも動いたら「パンした」と判定し、単純なクリックと区別する
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMovedRef.current = true;
+    }
+    
+    // 現在のスクロール位置を更新（移動量分を引く）
+    scrollRef.current.scrollLeft = scrollPos.left - dx;
+    scrollRef.current.scrollTop = scrollPos.top - dy;
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+    setIsPanning(false);
+    (e.target as Element).releasePointerCapture(e.pointerId);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+    setIsPanning(false);
+    (e.target as Element).releasePointerCapture(e.pointerId);
+  };
+  // ==========================================
+
   // カスタム自動スクロールロジック (モバイルのみ有効)
   useEffect(() => {
     if (!isDragging || !isMobile) return;
@@ -66,16 +123,17 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
       }
     };
 
-    const handlePointerMove = (e: PointerEvent) => {
+    const handlePointerMoveGlobal = (e: PointerEvent) => {
       updatePointer(e.clientX, e.clientY);
     };
 
     // イベントリスナー登録 (passive: true でパフォーマンス確保)
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointermove', handlePointerMoveGlobal);
 
     let animationFrameId: number;
     const MAX_SPEED = 15; // 最大スクロール速度 (px/frame)
+    const DEADZONE = 0.4; // 中心から40%の範囲はスクロールしない（デッドゾーン）
 
     const tick = () => {
       if (scrollRef.current) {
@@ -90,10 +148,25 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
         const ratioX = (pointerRef.current.x - centerX) / (rect.width / 2);
         const ratioY = (pointerRef.current.y - centerY) / (rect.height / 2);
         
+        let speedX = 0;
+        let speedY = 0;
+
+        const absX = Math.abs(ratioX);
+        if (absX > DEADZONE) {
+          // デッドゾーン境界で0、端で1になるように正規化
+          const normalized = (absX - DEADZONE) / (1.0 - DEADZONE);
+          speedX = Math.sign(ratioX) * normalized * MAX_SPEED;
+        }
+
+        const absY = Math.abs(ratioY);
+        if (absY > DEADZONE) {
+          const normalized = (absY - DEADZONE) / (1.0 - DEADZONE);
+          speedY = Math.sign(ratioY) * normalized * MAX_SPEED;
+        }
+        
         // スクロール実行
-        // そのまま加算することで、中心(=0)なら停止、離れるほど高速になる
-        scrollRef.current.scrollLeft += ratioX * MAX_SPEED;
-        scrollRef.current.scrollTop += ratioY * MAX_SPEED;
+        scrollRef.current.scrollLeft += speedX;
+        scrollRef.current.scrollTop += speedY;
       }
       animationFrameId = requestAnimationFrame(tick);
     };
@@ -103,7 +176,7 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
 
     return () => {
       window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointermove', handlePointerMoveGlobal);
       cancelAnimationFrame(animationFrameId);
     };
   }, [isDragging, isMobile]);
@@ -111,27 +184,34 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
   return (
     <div 
       ref={setRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onClick={() => {
-        onBoardClick();
+        // パン（ドラッグ）した直後の場合は、クリックイベントを無効化する
+        if (!hasMovedRef.current) {
+          onBoardClick();
+        }
       }}
       style={{ 
         flex: 1, 
         overflowX: 'auto', 
         overflowY: 'auto',
         display: 'flex', 
-        gap: isMobile ? '8px' : '16px', // モバイル時は間隔を詰める
+        gap: isMobile ? '8px' : '16px', 
         alignItems: 'flex-start',
         paddingBottom: '20px',
         border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)',
         borderRadius: '8px',
-        padding: isMobile ? '8px' : '16px', // モバイル時は内側余白を減らす
+        padding: isMobile ? '8px' : '16px', 
         backgroundColor: 'var(--bg-board)',
         transition: 'border 0.2s',
         minHeight: '200px',
-        cursor: 'default',
-        // 【修正】touchAction: 'none' を削除して通常のスクロール操作を許可する
-        // ドラッグ中はdnd-kitがイベントを専有するため干渉しません
-        position: 'relative' // 座標計算の基準として安定させる
+        // ドラッグ中はカーソルを grabbing に変更、テキスト選択を防ぐ
+        cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'),
+        userSelect: isPanning ? 'none' : 'auto',
+        position: 'relative' 
     }}>
       {activeTasks.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p>
