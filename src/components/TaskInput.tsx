@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   taskName: string;
@@ -9,22 +10,14 @@ interface Props {
 }
 
 export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, setDateStr, onSubmit }) => {
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // フックからフラグを取得
+  const { isNarrowLayout } = useResponsive();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName.trim()) return;
     onSubmit();
   };
-
-  // 変更: 省略表示の基準を 768px から 480px に変更
-  const isNarrowLayout = windowWidth <= 480;
 
   const stopPropagation = (e: React.PointerEvent) => {
     e.stopPropagation();

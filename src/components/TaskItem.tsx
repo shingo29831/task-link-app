@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext } from '@dnd-kit/core'; 
+import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
 
 type TaskNode = Task & { children: TaskNode[] };
@@ -36,17 +37,8 @@ export const TaskItem: React.FC<Props> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
 
-  // 画面幅監視
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isMobile = windowWidth <= 1024;
-  const isNarrowLayout = windowWidth <= 480;
+  // フックから画面幅とフラグを取得
+  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
@@ -65,7 +57,7 @@ export const TaskItem: React.FC<Props> = ({
             buttonPadding: '3px 8px',
             buttonFontSize: '0.8em'
         };
-    } else if (windowWidth <= 1024) {
+    } else if (windowWidth < 1280) {
         return { 
             fontSize: '15px',      
             indentWidth: 20, 

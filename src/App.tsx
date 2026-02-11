@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 
 import { useTaskOperations } from './hooks/useTaskOperations';
+import { useResponsive } from './hooks/useResponsive';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
@@ -249,7 +250,7 @@ function App() {
     inputTaskName, setInputTaskName,
     inputDateStr, setInputDateStr,
     
-    // 追加: メニュー制御
+    // メニュー制御
     menuOpenTaskId,
     setMenuOpenTaskId,
 
@@ -280,28 +281,16 @@ function App() {
     customCollisionDetection,
   } = useTaskOperations();
 
-  // スマホ・タブレット表示判定用のState (1024px以下を対象とする)
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
-  // 画面幅に応じた計算のために幅自体も保持
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  // フックを使用して画面幅やフラグを取得
+  const { windowWidth, isMobile } = useResponsive();
 
-  // 追加: ドラッグ中のアイテムID
+  // ドラッグ中のアイテムID
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      setWindowWidth(width);
-      setIsMobile(width <= 1024);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const isDev = import.meta.env.DEV;
 
-  // 余白を詰める基準 (1080px以下)
-  const isCompactSpacing = windowWidth <= 1080;
+  // 余白を詰める基準 (1280px未満)
+  const isCompactSpacing = windowWidth < 1280;
 
   // バイブレーション処理
   const handleDragStart = (event: DragStartEvent) => {
@@ -343,13 +332,13 @@ function App() {
         INDENT_WIDTH = 16;
         CHAR_WIDTH_PX = 9;
         DEADLINE_WIDTH = 60;
-    } else if (windowWidth <= 1024) { // タブレット・PC狭め想定
+    } else if (windowWidth < 1280) { // タブレット・PC狭め想定
         BASE_WIDTH = 200;
         INDENT_WIDTH = 20;
         CHAR_WIDTH_PX = 10;
         DEADLINE_WIDTH = 70;
     }
-    // 1025px以上はデフォルト値
+    // 1280px以上はデフォルト値
 
     const len = getStrLen(node.name);
     const textWidth = Math.min(len, 20) * CHAR_WIDTH_PX;

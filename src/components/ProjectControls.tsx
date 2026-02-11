@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   onCopyLink: () => void;
@@ -11,13 +12,9 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
+  // フックから画面幅とフラグを取得
+  const { windowWidth, isNarrowLayout } = useResponsive();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -34,18 +31,15 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
     setShowModal(false);
   };
 
-  // 画面幅の判定
-  const isVeryNarrow = windowWidth < 480;
-
-  // ボタンのテキスト設定 (1024px以下をモバイル/タブレットとして短縮)
+  // ボタンのテキスト設定 (1280px未満をモバイル/タブレットとして短縮)
   const getLinkButtonText = () => {
-    if (windowWidth <= 1024) return "🔗 リンク";
+    if (windowWidth < 1280) return "🔗 リンク";
     return "🔗 リンクをコピー";
   };
 
   const getIOButtonText = () => {
-    if (windowWidth < 480) return "⬆⬇";
-    if (windowWidth <= 1024) return "⬆⬇ 入出力";
+    if (isNarrowLayout) return "⬆⬇";
+    if (windowWidth < 1280) return "⬆⬇ 入出力";
     return "⬆⬇ 出力 / 読み込み";
   };
 
@@ -63,7 +57,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         justifyContent: 'flex-end'
       }}>
         {/* 画面幅が狭くない場合のみ、ヘッダーにリンクコピーボタンを表示 */}
-        {!isVeryNarrow && (
+        {!isNarrowLayout && (
           <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }} title="リンクをコピー">
             {getLinkButtonText()}
           </button>
@@ -99,7 +93,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
             <h3 style={{ margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>メニュー</h3>
 
             {/* 画面幅が狭い場合のみ、モーダル内にリンクコピー機能を表示 */}
-            {isVeryNarrow && (
+            {isNarrowLayout && (
               <div>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>共有</h4>
                 <button 
