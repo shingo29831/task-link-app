@@ -73,7 +73,7 @@ button:hover {
   width: 16px;
   left: 2px;
   bottom: 2px;
-  background-color: var(--bg-surface);
+  background-color: var(--slider-lever);
   transition: .4s;
   border-radius: 50%;
 }

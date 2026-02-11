@@ -48,11 +48,8 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
       <div style={{ 
         display: 'flex', 
         flexWrap: 'wrap', 
-        gap: '10px', 
-        padding: '15px', 
-        backgroundColor: 'var(--bg-surface)', 
-        borderRadius: '8px',
-        marginBottom: '5px',
+        gap: '20px', 
+        marginTop: '15px',
         alignItems: 'center',
         justifyContent: 'flex-end'
       }}>
@@ -64,7 +61,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         )}
         
         {/* 入出力ボタン (狭い時はこれだけ表示) */}
-        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }} title="データの出力 / 読み込み">
+        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }} title="データの出力 / 読み込み">
           {getIOButtonText()}
         </button>
 

@@ -34,7 +34,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
   today.setHours(0, 0, 0, 0);
 
   return (
-    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' }}>
+    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', paddingTop: '17px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)' }}>
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>&lt;</button>
             <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{format(currentMonth, 'yyyy年 M月', { locale: ja })}</span>

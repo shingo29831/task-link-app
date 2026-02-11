@@ -43,7 +43,7 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
           minWidth: 0, 
           padding: '10px',
           borderRadius: '4px', 
-          border: '1px solid var(--border-light)', 
+          border: '2px solid var(--border-light)', 
           background: 'var(--bg-input)', 
           color: 'var(--text-primary)',
           fontSize: '16px'
@@ -63,7 +63,7 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
           flex: '0 0 auto',
           padding: isNarrowLayout ? '10px 4px' : '10px',
           borderRadius: '4px', 
-          border: '1px solid var(--border-light)', 
+          border: '2px solid var(--border-light)', 
           background: 'var(--bg-input)', 
           color: 'var(--text-primary)', 
           colorScheme: 'dark', // CSS変数が反映されない場合があるので必要に応じてtheme.cssで上書きが必要かも

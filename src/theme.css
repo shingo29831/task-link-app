@@ -20,6 +20,8 @@
   --text-placeholder: #888888;
   --text-inverse: #ffffff;
 
+  --slider-lever: #2a2a2a;
+
   --border-color: #444444;
   --border-light: #555555;
   --border-focus: #646cff;
@@ -55,7 +57,7 @@
     --bg-board: #e0e0e0;       /* ボード: Bodyより少し濃いグレー (DarkではBodyより暗いため) */
     --bg-task: #fffff9;
     
-    --bg-input: #f0f0f0;       /* 入力欄: Surface(#fff)と区別するためごく薄いグレー */
+    --bg-input: #ffffff;       /* 入力欄: Surface(#fff)と区別するためごく薄いグレー */
     
     --bg-button: #ffffff;      /* ボタン: 明確なグレー (Surfaceより暗く、Inputとも区別) */
     --bg-button-hover: #dcdcdc; /* ホバー時は少し濃く */
@@ -70,6 +72,8 @@
     --text-secondary: #555555;
     --text-placeholder: #777777;
     /* --text-inverse は白のまま */
+
+    --slider-lever: #ffffff;
 
     /* ボーダー: 要素の区切りをはっきりさせる */
     --border-color: #cccccc;

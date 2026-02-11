@@ -206,7 +206,7 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile }: { children
         border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)',
         borderRadius: '8px',
         padding: isMobile ? '8px' : '16px', 
-        backgroundColor: 'var(--bg-board)',
+        backgroundColor: 'var(--bg-surface)',
         transition: 'border 0.2s',
         minHeight: '200px',
         // ドラッグ中はカーソルを grabbing に変更、テキスト選択を防ぐ
@@ -497,7 +497,7 @@ function App() {
           </header>
 
           {/* 2. Content Body (Sidebar + Main) */}
-          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '20px' : '0' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '23px' : '0' }}>
             
             {/* Sidebar (Calendar) */}
             <div style={{ 
@@ -510,7 +510,14 @@ function App() {
               height: '100%', 
               minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' 
             }}>
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <div style={{ 
+                    padding: '10px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'flex-end', 
+                    flexShrink: 0,
+                    marginBottom: isMobile ? '0px' : '21px'
+                }}>
                     <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>全プロジェクト表示</span>
                         <div className="toggle-switch">
