@@ -477,7 +477,7 @@ function App() {
                       <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)' }} title="カレンダーを表示/非表示">📅</button>
                       <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                              <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>TaskLink: <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                              <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}> <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
                               {renderProjectMenu()}
                               <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
                           </div>
