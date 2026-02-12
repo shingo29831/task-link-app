@@ -452,7 +452,7 @@ function App() {
               {isMobile ? (
                   // スマホ用ヘッダー
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>TaskLink:</div>
+                      {/* <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>TaskLink:</div> */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                           <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)' }} title="カレンダーを表示/非表示">📅</button>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
