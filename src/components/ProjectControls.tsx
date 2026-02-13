@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
-import { IconLink, IconArrowUp, IconArrowDown } from './Icons';
+import { IconLink, IconArrowUp, IconArrowDown, IconInputOutput } from './Icons';
 
 interface Props {
   onCopyLink: () => void;
@@ -52,8 +52,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         {/* 入出力ボタン */}
         <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <IconArrowUp size={14} />
-            <IconArrowDown size={14} />
+            <IconInputOutput size={14} />
           </div>
           <span>{isNarrowLayout ? "" : (windowWidth < 1280 ? "入出力" : "出力 / 読み込み")}</span>
         </button>
