@@ -113,7 +113,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
                   type="text" 
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://.../?d=..."
+                  placeholder="https://meld-task.com/?d=..."
                   style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
                 <button onClick={handleUrlImport} style={{ backgroundColor: 'var(--color-info)', color: '#fff' }}>

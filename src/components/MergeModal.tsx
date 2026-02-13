@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { AppData, Task } from '../types';
 import { to185 } from '../utils/compression'; 
+import { IconEdit, IconX, IconWarning } from './Icons';
 
 interface Props {
   localData: AppData;
@@ -381,11 +382,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         <div style={overlayStyle}>
             <div style={{ ...modalStyle, width: '600px', maxWidth: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ marginTop: 0 }}>競合タスクの追加確認</h3>
-                <p style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
                     以下のリモートタスクはローカル優先でマージされましたが、別タスクとして追加することも可能です。<br/>
                     追加する場合、ローカルタスクのIDが変更され、リモートタスクが元のIDで追加されます。<br/>
-                    <span style={{color: 'var(--color-danger-text)'}}>※注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
-                </p>
+                    <div style={{color: 'var(--color-danger-text)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px'}}>
+                       <IconWarning size={14} />
+                       <span>注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
+                    </div>
+                </div>
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', margin: '10px 0' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
                         <thead>
@@ -474,20 +478,25 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                         <StatusBadge status={row.local.status} />
                                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                                             {isDuplicated && row.local && (
-                                                                <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px' }}>
-                                                                    ⚠️ 名前重複
+                                                                <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <IconWarning size={12} />
+                                                                    <span>名前重複</span>
                                                                 </div>
                                                             )}
                                                             {editingId === row.key && row.local ? (
                                                                 <div style={{ display: 'flex', gap: '4px' }}>
                                                                     <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
                                                                     <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
-                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none' }}>✕</button>
+                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="キャンセル">
+                                                                        <IconX size={12} />
+                                                                    </button>
                                                                 </div>
                                                             ) : (
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                     <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.local.name)}</span>
-                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0 }} title="名前を変更">✎</button>
+                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title="名前を変更">
+                                                                        <IconEdit size={14} />
+                                                                    </button>
                                                                 </div>
                                                             )}
                                                             {localDate && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>({localDate})</span>}
@@ -509,21 +518,26 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                             <StatusBadge status={row.remote.status} />
                                                             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                                                 {isDuplicated && !row.local && (
-                                                                    <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px' }}>
-                                                                        ⚠️ 名前重複
+                                                                    <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                        <IconWarning size={12} />
+                                                                        <span>名前重複</span>
                                                                     </div>
                                                                 )}
                                                                 {editingId === row.key && !row.local ? (
                                                                     <div style={{ display: 'flex', gap: '4px' }}>
                                                                         <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
                                                                         <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
-                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none' }}>✕</button>
+                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="キャンセル">
+                                                                            <IconX size={12} />
+                                                                        </button>
                                                                     </div>
                                                                 ) : (
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                         <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.remote.name)}</span>
                                                                         {!row.local && (
-                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0 }} title="名前を変更">✎</button>
+                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title="名前を変更">
+                                                                                <IconEdit size={14} />
+                                                                            </button>
                                                                         )}
                                                                     </div>
                                                                 )}

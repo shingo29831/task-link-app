@@ -23,6 +23,7 @@ import type { Task } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectNameEditModal } from './components/ProjectNameEditModal';
+import { IconUndo, IconRedo, IconCalendar, IconCaretDown } from './components/Icons';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -382,7 +383,22 @@ function App() {
   // プロジェクトメニューのレンダリング（共通化）
   const renderProjectMenu = () => (
     <div style={{ position: 'relative' }}>
-        <button onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} style={{ padding: '0 4px', fontSize: '0.8em', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-placeholder)', cursor: 'pointer' }}>▼</button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); setShowProjectMenu(!showProjectMenu); }} 
+          style={{ 
+            padding: '4px', 
+            background: 'transparent', 
+            border: '1px solid var(--border-light)', 
+            color: 'var(--text-placeholder)', 
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px'
+          }}
+        >
+          <IconCaretDown size={12} />
+        </button>
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -454,7 +470,20 @@ function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {/* <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>TaskLink:</div> */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)' }} title="カレンダーを表示/非表示">📅</button>
+                          <button 
+                            onClick={() => setShowSidebar(!showSidebar)} 
+                            style={{ 
+                              padding: '8px', 
+                              backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', 
+                              color: showSidebar ? '#fff' : 'var(--text-primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }} 
+                            title="カレンダーを表示/非表示"
+                          >
+                            <IconCalendar size={20} />
+                          </button>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span 
@@ -474,7 +503,20 @@ function App() {
               ) : (
                   // PC用ヘッダー
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', fontSize: '1.2em', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)' }} title="カレンダーを表示/非表示">📅</button>
+                      <button 
+                        onClick={() => setShowSidebar(!showSidebar)} 
+                        style={{ 
+                          padding: '8px', 
+                          backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', 
+                          color: showSidebar ? '#fff' : 'var(--text-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center' 
+                        }} 
+                        title="カレンダーを表示/非表示"
+                      >
+                        <IconCalendar size={20} />
+                      </button>
                       <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
                               <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}> <span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
@@ -607,16 +649,16 @@ function App() {
                     <button
                       onClick={undo}
                       title="元に戻す (Ctrl+Z)"
-                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}
                     >
-                      ↩
+                      <IconUndo size={18} />
                     </button>
                     <button
                       onClick={redo}
                       title="やり直す (Ctrl+y)"
-                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px 12px', borderRadius: '4px', fontSize: '1.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px' }}
+                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}
                     >
-                      ↪
+                      <IconRedo size={18} />
                     </button>
                   </div>
                 </div>
