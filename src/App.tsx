@@ -664,7 +664,7 @@ function App() {
 
               {/* Footer / Debug Area */}
               <div style={{ marginTop: '10px', flexShrink: 0 }}>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '30px' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '32px' }}>
                   {isDev && (
                     <button 
                       onClick={() => setShowDebug(!showDebug)} 
