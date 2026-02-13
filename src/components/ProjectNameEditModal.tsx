@@ -16,13 +16,18 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
 
   // 入力値が変わるたびに重複チェックを実行
   useEffect(() => {
-    if (!value.trim()) {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
       setError('プロジェクト名を入力してください');
       return;
     }
     
     // 自分以外のプロジェクトで同じ名前があるかチェック
-    const isDuplicate = projects.some(p => p.id !== currentId && p.projectName === value);
+    // トリム処理と小文字変換により、表記揺れを含めた重複を禁止
+    const isDuplicate = projects.some(p => 
+      p.id !== currentId && 
+      p.projectName.trim().toLowerCase() === trimmedValue.toLowerCase()
+    );
     
     if (isDuplicate) {
       setError('他のプロジェクト名で使用しています。');
@@ -31,9 +36,20 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
     }
   }, [value, currentId, projects]);
 
+  // 英数字を半角に強制変換するハンドラ
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    // 全角英数字（Ａ-Ｚ、ａ-ｚ、０-９）を半角に変換
+    const normalizedValue = rawValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+    setValue(normalizedValue);
+  };
+
   const handleSave = () => {
     if (error || !value.trim()) return;
-    onSave(value);
+    // 保存時もトリムした値を渡す
+    onSave(value.trim());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -59,7 +75,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
         <input 
           type="text" 
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           autoFocus
           placeholder="プロジェクト名"
