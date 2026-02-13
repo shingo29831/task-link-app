@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { AppData } from '../types';
+import { IconWarning } from './Icons';
 
 interface Props {
   currentName: string;
@@ -74,9 +75,10 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
         {/* エラーメッセージ（赤文字） */}
         <div style={{ minHeight: '1.5em', marginTop: '8px' }}>
           {error && (
-            <p style={{ color: 'var(--color-danger-text)', fontSize: '0.9em', margin: 0, fontWeight: 'bold' }}>
-              ⚠️ {error}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-danger-text)', fontSize: '0.9em', fontWeight: 'bold' }}>
+              <IconWarning size={16} />
+              <span>{error}</span>
+            </div>
           )}
         </div>
 
