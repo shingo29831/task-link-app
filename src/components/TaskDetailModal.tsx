@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
+import { IconX } from './Icons';
 
 interface Props {
   date: Date;
@@ -59,16 +60,20 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatu
             <button 
               onClick={onClose} 
               style={{ 
-                padding: '8px 16px', 
+                padding: '8px', 
                 fontSize: '1.2em', 
                 background: 'transparent', 
                 border: '1px solid var(--border-light)', 
                 color: 'var(--text-secondary)',
                 cursor: 'pointer',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
+              title="閉じる"
             >
-              ✕
+              <IconX size={20} />
             </button>
           </div>
 

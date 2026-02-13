@@ -23,7 +23,7 @@ import type { Task } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectNameEditModal } from './components/ProjectNameEditModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown } from './components/Icons';
+import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconTrash } from './components/Icons';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -406,8 +406,37 @@ function App() {
                         <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{p.projectName}</div>
                     ))}
                 </div>
-                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em' }}>+ 新規プロジェクト</div>
-                <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-danger-text)', fontSize: '0.9em' }}>🗑️ このプロジェクトを削除</div>
+                <div 
+                  onClick={() => { addProject(); setShowProjectMenu(false); }} 
+                  style={{ 
+                    padding: '8px 12px', 
+                    cursor: 'pointer', 
+                    color: 'var(--color-primary)', 
+                    borderTop: '1px solid var(--border-color)', 
+                    fontSize: '0.9em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <IconPlus size={16} />
+                  <span>新規プロジェクト</span>
+                </div>
+                <div 
+                  onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} 
+                  style={{ 
+                    padding: '8px 12px', 
+                    cursor: 'pointer', 
+                    color: 'var(--color-danger-text)', 
+                    fontSize: '0.9em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <IconTrash size={16} />
+                  <span>このプロジェクトを削除</span>
+                </div>
             </div>
         )}
     </div>
