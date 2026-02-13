@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
-import { IconLink, IconArrowUp, IconArrowDown, IconInputOutput } from './Icons';
+import { IconLink, IconArrowUp, IconArrowDown, IconInputOutput, IconHelp } from './Icons';
+import { HelpModal } from './HelpModal';
 
 interface Props {
   onCopyLink: () => void;
@@ -12,6 +13,7 @@ interface Props {
 export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   
   const { windowWidth, isNarrowLayout } = useResponsive();
@@ -33,6 +35,8 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
 
   return (
     <>
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+
       <div style={{ 
         display: 'flex', 
         flexWrap: 'wrap', 
@@ -41,6 +45,25 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         alignItems: 'center',
         justifyContent: 'flex-end'
       }}>
+        
+        {/* ヘルプボタン */}
+        <button 
+          onClick={() => setShowHelp(true)} 
+          style={{ 
+            backgroundColor: 'transparent', 
+            border: 'none', 
+            color: 'var(--text-secondary)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            cursor: 'pointer',
+            padding: '5px'
+          }} 
+          title="ヘルプ"
+        >
+          <IconHelp size={24} />
+        </button>
+
         {/* リンクコピーボタン */}
         {!isNarrowLayout && (
           <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }} title="リンクをコピー">

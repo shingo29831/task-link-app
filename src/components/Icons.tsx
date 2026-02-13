@@ -137,3 +137,12 @@ export const IconCaretDown: React.FC<IconProps> = ({ size = 12, color = 'current
     <path d="M7 10l5 5 5-5z" />
   </svg>
 );
+
+// ヘルプ (Help)
+export const IconHelp: React.FC<IconProps> = ({ size = 20, color = 'currentColor', style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
