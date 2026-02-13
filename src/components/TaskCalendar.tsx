@@ -3,6 +3,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, en
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
+import { IconChevronLeft, IconChevronRight } from './Icons';
 
 interface Props {
   tasks: Task[];
@@ -36,9 +37,13 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
   return (
     <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', paddingTop: '17px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)' }}>
-            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>&lt;</button>
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
+                <IconChevronLeft size={16} />
+            </button>
             <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{format(currentMonth, 'yyyy年 M月', { locale: ja })}</span>
-            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>&gt;</button>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
+                <IconChevronRight size={16} />
+            </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '5px', textAlign: 'center', color: 'var(--text-placeholder)', fontWeight: 'bold' }}>
@@ -74,9 +79,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
                                 const diffDays = differenceInCalendarDays(t.deadline!, today);
                                 const isUrgent = t.status !== 2 && diffDays <= 1;
 
-                                // デフォルト(進行中など)は青
                                 let bgColor = 'var(--color-info)'; 
-                                // 未着手はグレー
                                 if (t.status === 0) bgColor = 'var(--text-placeholder)';
                                 else if (t.status === 2) bgColor = 'var(--color-success)';
                                 else if (t.status === 3) bgColor = 'var(--color-suspend)';
@@ -89,7 +92,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
                                     <div key={t.id} style={{ 
                                         fontSize: '0.9em', 
                                         backgroundColor: bgColor, 
-                                        color: '#fff', /* バッジ内は白文字固定が見やすい */
+                                        color: '#fff', 
                                         borderRadius: '2px', 
                                         padding: '1px 3px',
                                         whiteSpace: 'nowrap', 
