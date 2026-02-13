@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
+import { IconLink, IconArrowUp, IconArrowDown } from './Icons';
 
 interface Props {
   onCopyLink: () => void;
@@ -13,14 +14,13 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
   const [showModal, setShowModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   
-  // フックから画面幅とフラグを取得
   const { windowWidth, isNarrowLayout } = useResponsive();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onImport(e.target.files[0]);
       e.target.value = ''; // Reset input
-      setShowModal(false); // ファイル選択後にモーダルを閉じる
+      setShowModal(false);
     }
   };
 
@@ -29,18 +29,6 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
     onImportFromUrl(urlInput);
     setUrlInput('');
     setShowModal(false);
-  };
-
-  // ボタンのテキスト設定 (1280px未満をモバイル/タブレットとして短縮)
-  const getLinkButtonText = () => {
-    if (windowWidth < 1280) return "🔗 リンク";
-    return "🔗 リンクをコピー";
-  };
-
-  const getIOButtonText = () => {
-    if (isNarrowLayout) return "⬆⬇";
-    if (windowWidth < 1280) return "⬆⬇ 入出力";
-    return "⬆⬇ 出力 / 読み込み";
   };
 
   return (
@@ -53,16 +41,21 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         alignItems: 'center',
         justifyContent: 'flex-end'
       }}>
-        {/* 画面幅が狭くない場合のみ、ヘッダーにリンクコピーボタンを表示 */}
+        {/* リンクコピーボタン */}
         {!isNarrowLayout && (
-          <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }} title="リンクをコピー">
-            {getLinkButtonText()}
+          <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }} title="リンクをコピー">
+            <IconLink size={18} />
+            <span>{windowWidth < 1280 ? "リンク" : "リンクをコピー"}</span>
           </button>
         )}
         
-        {/* 入出力ボタン (狭い時はこれだけ表示) */}
-        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }} title="データの出力 / 読み込み">
-          {getIOButtonText()}
+        {/* 入出力ボタン */}
+        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <IconArrowUp size={14} />
+            <IconArrowDown size={14} />
+          </div>
+          <span>{isNarrowLayout ? "" : (windowWidth < 1280 ? "入出力" : "出力 / 読み込み")}</span>
         </button>
 
         <input 
@@ -89,33 +82,30 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
             
             <h3 style={{ margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>メニュー</h3>
 
-            {/* 画面幅が狭い場合のみ、モーダル内にリンクコピー機能を表示 */}
             {isNarrowLayout && (
               <div>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>共有</h4>
                 <button 
                   onClick={() => { onCopyLink(); setShowModal(false); }} 
-                  style={{ width: '100%', backgroundColor: 'var(--color-primary)', color: '#fff' }}
+                  style={{ width: '100%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                  🔗 リンクをコピー
+                  <IconLink size={18} /> リンクをコピー
                 </button>
               </div>
             )}
 
-            {/* ファイル操作セクション */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>ファイル操作 (.json)</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={onExport} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
-                  ⬆ ファイル出力
+                <button onClick={onExport} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <IconArrowUp size={16} /> ファイル出力
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
-                  ⬇ ファイル読み込み
+                <button onClick={() => fileInputRef.current?.click()} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <IconArrowDown size={16} /> ファイル読み込み
                 </button>
               </div>
             </div>
 
-            {/* URL読み込みセクション */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>共有URLから読み込み</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
