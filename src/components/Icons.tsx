@@ -1,3 +1,4 @@
+// src/components/Icons.tsx
 import React from 'react';
 
 interface IconProps {
@@ -53,19 +54,23 @@ export const IconChevronLeft: React.FC<IconProps> = ({ size = 16, color = 'curre
   </svg>
 );
 
-// 元に戻す (Undo)
+// 元に戻す (Undo) - 下側から右へ行き、Uターンして上側の左へ戻る
 export const IconUndo: React.FC<IconProps> = ({ size = 20, color = 'currentColor', style }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-    <path d="M3 7v6h6" />
-    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+    {/* 左下(4,17)から右へ、円弧を描いて左上(4,7)へ戻るパス */}
+    <path d="M4 17h13a5 5 0 0 0 0-10H4" />
+    {/* 先端の矢印（上側・左向き） */}
+    <polyline points="8 3 4 7 8 11" />
   </svg>
 );
 
-// やり直す (Redo)
+// やり直す (Redo) - 下側から左へ行き、Uターンして上側の右へ戻る
 export const IconRedo: React.FC<IconProps> = ({ size = 20, color = 'currentColor', style }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-    <path d="M21 7v6h-6" />
-    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+    {/* 右下(20,17)から左へ、円弧を描いて右上(20,7)へ戻るパス */}
+    <path d="M20 17H7a5 5 0 0 1 0-10h13" />
+    {/* 先端の矢印（上側・右向き） */}
+    <polyline points="16 3 20 7 16 11" />
   </svg>
 );
 
