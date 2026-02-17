@@ -22,9 +22,7 @@ const isTaskEqual = (local: Task, incoming: Task): boolean => {
   if (local.name !== incoming.name) return false;
   if (local.status !== incoming.status) return false;
   if (local.parentId !== incoming.parentId) return false;
-  
   if (local.deadline !== incoming.deadline) return false;
-
   if (local.isDeleted !== incoming.isDeleted) return false;
   if ((local.order ?? 0) !== (incoming.order ?? 0)) return false;
 
@@ -40,7 +38,9 @@ export const useAppData = () => {
     setState: setProjects, 
     resetState: resetProjects, 
     undo, 
-    redo 
+    redo,
+    canUndo, // 追加
+    canRedo  // 追加
   } = useHistory<AppData[]>([]);
 
   const [activeId, setActiveId] = useState<string>('');
@@ -91,7 +91,6 @@ export const useAppData = () => {
         const incoming = decompressData(compressed);
         if (incoming) {
           incoming.id = generateProjectId();
-          
           const sameNameProject = loadedProjects.find(p => p.projectName === incoming.projectName);
 
           if (sameNameProject) {
@@ -171,7 +170,6 @@ export const useAppData = () => {
     setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
   };
 
-  // 追加: 任意のプロジェクトを更新する関数
   const updateProject = useCallback((updatedProject: AppData) => {
     setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
   }, [setProjects]);
@@ -230,7 +228,7 @@ export const useAppData = () => {
   return { 
     data: activeData, 
     setData: setActiveData,
-    updateProject, // 追加
+    updateProject, 
     incomingData, 
     setIncomingData, 
     getShareUrl,
@@ -241,6 +239,8 @@ export const useAppData = () => {
     switchProject,
     deleteProject,
     undo,
-    redo
+    redo,
+    canUndo, // 追加
+    canRedo  // 追加
   };
 };
