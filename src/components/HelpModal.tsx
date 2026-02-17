@@ -58,7 +58,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           <div style={sectionStyle}>
             <h3 style={headerStyle}><span style={{ marginRight: '8px' }}>🚀</span> 使い方</h3>
             <ol style={listStyle}>
-              <li style={listItemStyle}><strong>タスクを作成</strong>: [meld-task.com](https://meld-task.com) を開いてタスクを追加・編集します。</li>
+              <li style={listItemStyle}><strong>タスクを作成</strong>: https://meld-task.com を開いてタスクを追加・編集します。</li>
               <li style={listItemStyle}><strong>保存</strong>: ブラウザのブックマークに登録するか、JSONとしてダウンロードして保存します。</li>
               <li style={listItemStyle}><strong>共有</strong>: URLをコピーして送るか、JSONファイルを共有します。受け取った相手はそれを読み込むことでタスクを確認・マージできます。</li>
             </ol>
