@@ -339,10 +339,10 @@ function App() {
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
         <div style={{ 
             maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px',
-            paddingBottom: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-bottom))`, 
-            paddingTop: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-top))`,
-            paddingLeft: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-left))`,
-            paddingRight: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-right))`,
+            paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, 
+            paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`,
+            paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`,
+            paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`,
             display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' 
         }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
           
