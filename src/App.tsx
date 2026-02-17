@@ -373,10 +373,10 @@ function App() {
               display: 'flex', flexDirection: 'row', justifyContent: 'space-between', 
               alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, 
               marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px',
-              paddingBottom: `calc(${isMobile ? '10px' : '20px'}`, 
-              paddingTop: `calc(${isMobile ? '10px' : '20px'}`,
-              paddingLeft: `calc(${isMobile ? '10px' : '20px'}`,
-              paddingRight: `calc(${isMobile ? '10px' : '20px'}`,
+              paddingBottom: isMobile ? '10px' : '0px', 
+              paddingTop: isMobile ? '10px' : '0px',
+              paddingLeft: isMobile ? '10px' : '0px',
+              paddingRight: isMobile ? '10px' : '0px',
           }}>
               {isMobile ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
