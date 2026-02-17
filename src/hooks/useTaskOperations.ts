@@ -81,7 +81,9 @@ export const useTaskOperations = () => {
     switchProject,
     deleteProject,
     undo, 
-    redo 
+    redo,
+    canUndo, // 追加
+    canRedo  // 追加
   } = useAppData();
 
   // --------------------------------------------------------------------------
@@ -198,8 +200,7 @@ export const useTaskOperations = () => {
         }
       }
     } catch (e) { console.error("Failed to parse mapping group", e); }
-    // 注意: compressDataの実装はutilsからimportしていませんが、依存関係にあるため元のコードを維持
-    const compressed = intermediate; // 簡易的な表示維持（実際にはcompressDataが必要ならimportを追加すべきですが、コンテキスト維持のため）
+    const compressed = intermediate; 
     const rate = normal.length > 0 ? (compressed.length / normal.length) * 100 : 0;
     return { normal, intermediate, compressed, normalLen: normal.length, intermediateLen: intermediate.length, compressedLen: compressed.length, rate, mappingInfo };
   }, [data]);
@@ -237,14 +238,18 @@ export const useTaskOperations = () => {
 
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) {
-          e.preventDefault();
-          redo();
+          if (canRedo) {
+            e.preventDefault();
+            redo();
+          }
           return;
         }
         
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          undo();
+          if (canUndo) {
+            e.preventDefault();
+            undo();
+          }
           return;
         }
       }
@@ -252,7 +257,7 @@ export const useTaskOperations = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, canUndo, canRedo]);
 
   // --------------------------------------------------------------------------
   // Task Logic (CRUD & Status)
@@ -486,12 +491,10 @@ export const useTaskOperations = () => {
 
             for (let i = 0; i < rootTasks.length; i++) {
                 const task = rootTasks[i];
-                // DOM要素から位置を取得 (SortableTaskItemに追加したdata-task-idを使用)
                 const el = document.querySelector(`[data-task-id="${task.id}"]`);
                 if (el) {
                     const rect = el.getBoundingClientRect();
                     const centerX = rect.left + rect.width / 2;
-                    // ドロップ位置がタスクの中心より左なら、その前に挿入
                     if (dropCenterX < centerX) {
                         insertIndex = i;
                         break;
@@ -519,7 +522,6 @@ export const useTaskOperations = () => {
             return;
         }
 
-        // Fallback: simply append to end if rect is missing
         const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
         const newTasks = data.tasks.map(t => 
              t.id === activeIdStr 
@@ -624,7 +626,7 @@ export const useTaskOperations = () => {
 
   const handleBoardClick = useCallback(() => { 
     setActiveParentId(null);
-    setMenuOpenTaskId(null); // ボードの空白クリックでメニューも閉じる
+    setMenuOpenTaskId(null); 
   }, []);
   const handleProjectNameClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
 
@@ -645,23 +647,13 @@ export const useTaskOperations = () => {
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { droppableContainers } = args;
-
-    // 1. カーソルが要素の矩形内にあるか判定 (Pointer基準)
     const pointerCollisions = pointerWithin(args);
-
-    // 衝突した要素の中から、TaskItem (Sortable) または Nestゾーン を探す
     const hitSortable = pointerCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
     const hitNest = pointerCollisions.find(c => String(c.id).startsWith('nest-'));
 
-    // Rule 1: カーソルが TaskItem (またはそのNestゾーン) の内部にある場合 -> 「ネスト (配下への移動)」として扱う
-    // 「TaskItem内にカーソルがある場合は移動ではなく、そのTaskItemの配下に移動できる通知を出したい」
     if (hitSortable || hitNest) {
-        // ヒットしたタスクのIDを特定
         const targetId = hitSortable?.id || (hitNest ? String(hitNest.id).replace('nest-', '') : null);
-        
         if (targetId) {
-            // ネスト用のコンテナ (nest-{id}) を強制的に返すことで、TaskItemコンポーネント側の isOver が反応し、
-            // 青い点線（通知）が表示されるようになる。
             const nestContainer = droppableContainers.find(c => c.id === `nest-${targetId}`);
             if (nestContainer) {
                 return [{ id: nestContainer.id, data: nestContainer.data }];
@@ -669,9 +661,6 @@ export const useTaskOperations = () => {
         }
     }
 
-    // Rule 2: タスクがない場所 (BoardAreaの隙間や余白) -> 「BoardAreaの枠線を表示」
-    // closestCenter (吸着) を削除し、純粋なポインター位置での判定のみとする。
-    // pointerWithin でタスクにヒットしなかった場合は、自動的に root-board (または空) になる。
     const boardCollision = pointerCollisions.find(c => c.id === 'root-board');
     if (boardCollision) {
         return [boardCollision];
@@ -683,10 +672,12 @@ export const useTaskOperations = () => {
   return {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, activeParent, calendarTasks,
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showRenameModal, setShowRenameModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
-    menuOpenTaskId, setMenuOpenTaskId, // 追加
+    menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
-    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo,
+    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
+    undo, redo,
+    canUndo, canRedo, // 追加
     sensors, handleDragEnd, customCollisionDetection,
   };
 };

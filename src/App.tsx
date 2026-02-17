@@ -35,7 +35,9 @@ const BoardArea = ({
   isMobile, 
   onShowAddModal,
   onUndo,
-  onRedo 
+  onRedo,
+  canUndo,
+  canRedo
 }: { 
   children: React.ReactNode, 
   activeTasks: Task[], 
@@ -43,7 +45,9 @@ const BoardArea = ({
   isMobile: boolean,
   onShowAddModal: () => void,
   onUndo: () => void,
-  onRedo: () => void
+  onRedo: () => void,
+  canUndo: boolean,
+  canRedo: boolean
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-board',
@@ -171,6 +175,7 @@ const BoardArea = ({
             zIndex: 100
           }}>
             <button
+              disabled={!canUndo}
               onClick={(e) => { e.stopPropagation(); onUndo(); }}
               style={{
                 width: '44px', height: '44px', borderRadius: '50%',
@@ -178,12 +183,15 @@ const BoardArea = ({
                 backdropFilter: 'blur(4px)',
                 color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', 
+                cursor: canUndo ? 'pointer' : 'default',
+                opacity: canUndo ? 1 : 0.4
               }}
             >
               <IconUndo size={20} />
             </button>
             <button
+              disabled={!canRedo}
               onClick={(e) => { e.stopPropagation(); onRedo(); }}
               style={{
                 width: '44px', height: '44px', borderRadius: '50%',
@@ -191,7 +199,9 @@ const BoardArea = ({
                 backdropFilter: 'blur(4px)',
                 color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', 
+                cursor: canRedo ? 'pointer' : 'default',
+                opacity: canRedo ? 1 : 0.4
               }}
             >
               <IconRedo size={20} />
@@ -232,6 +242,7 @@ function App() {
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo,
+    canUndo, canRedo, // 追加
     sensors, handleDragEnd, customCollisionDetection,
   } = useTaskOperations();
 
@@ -430,6 +441,8 @@ function App() {
                 onShowAddModal={() => setShowAddModal(true)}
                 onUndo={undo}
                 onRedo={redo}
+                canUndo={canUndo}
+                canRedo={canRedo}
               >
                 <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                     {rootNodes.map(root => {
@@ -469,8 +482,30 @@ function App() {
                       <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: 'var(--text-placeholder)', background: 'transparent', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} >{showDebug ? 'デバッグを隠す' : 'デバッグを表示'}</button>
                     )}
                     <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
-                      <button onClick={undo} title="元に戻す (Ctrl+Z)" style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }} ><IconUndo size={18} /></button>
-                      <button onClick={redo} title="やり直す (Ctrl+y)" style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }} ><IconRedo size={18} /></button>
+                      <button 
+                        disabled={!canUndo}
+                        onClick={undo} 
+                        title="元に戻す (Ctrl+Z)" 
+                        style={{ 
+                          background: 'transparent', border: '1px solid var(--border-color)', 
+                          color: 'var(--text-secondary)', cursor: canUndo ? 'pointer' : 'default', 
+                          padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', 
+                          justifyContent: 'center', height: '32px',
+                          opacity: canUndo ? 1 : 0.4 
+                        }} 
+                      ><IconUndo size={18} /></button>
+                      <button 
+                        disabled={!canRedo}
+                        onClick={redo} 
+                        title="やり直す (Ctrl+y)" 
+                        style={{ 
+                          background: 'transparent', border: '1px solid var(--border-color)', 
+                          color: 'var(--text-secondary)', cursor: canRedo ? 'pointer' : 'default', 
+                          padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', 
+                          justifyContent: 'center', height: '32px',
+                          opacity: canRedo ? 1 : 0.4
+                        }} 
+                      ><IconRedo size={18} /></button>
                     </div>
                   </div>
                   {isDev && showDebug && (
