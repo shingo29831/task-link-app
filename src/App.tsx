@@ -339,10 +339,10 @@ function App() {
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
         <div style={{ 
             maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px',
-            paddingBottom: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-bottom))`, 
-            paddingTop: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-top))`,
-            paddingLeft: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-left))`,
-            paddingRight: `calc(${isMobile ? '10px' : '20px'} + env(safe-area-inset-right))`,
+            paddingBottom: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-bottom))`, 
+            paddingTop: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-top))`,
+            paddingLeft: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-left))`,
+            paddingRight: `calc(${isMobile ? '0px' : '20px'} + env(safe-area-inset-right))`,
             display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' 
         }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
           
@@ -372,7 +372,11 @@ function App() {
           <header style={{ 
               display: 'flex', flexDirection: 'row', justifyContent: 'space-between', 
               alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, 
-              marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '0'
+              marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px',
+              paddingBottom: `calc(${isMobile ? '10px' : '20px'}`, 
+              paddingTop: `calc(${isMobile ? '10px' : '20px'}`,
+              paddingLeft: `calc(${isMobile ? '10px' : '20px'}`,
+              paddingRight: `calc(${isMobile ? '10px' : '20px'}`,
           }}>
               {isMobile ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
