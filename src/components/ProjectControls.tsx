@@ -73,7 +73,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         )}
         
         {/* 入出力ボタン */}
-        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
+        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <IconInputOutput size={14} />
           </div>
@@ -97,7 +97,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
           alignItems: 'center', zIndex: 1000
         }} onClick={() => setShowModal(false)}>
           <div style={{
-            backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px',
+            backgroundColor: 'var(--bg-modal)', padding: '20px', borderRadius: '8px',
             width: '400px', maxWidth: '90%', color: 'var(--text-primary)',
             display: 'flex', flexDirection: 'column', gap: '20px'
           }} onClick={e => e.stopPropagation()}>
