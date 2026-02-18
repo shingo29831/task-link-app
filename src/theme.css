@@ -7,6 +7,7 @@
   --bg-surface-hover: #3a3a3a;
   --bg-board: #1e1e1e;           /* ボードエリア */
   --bg-task: #2a2a2a;
+  --bg-modal:#2a2a2a;
   --bg-input: #333333;           /* 入力欄 */
   --bg-button: #1a1a1a;          /* ボタン */
   --bg-button-hover: #333333;
@@ -56,10 +57,11 @@
     
     --bg-board: #e0e0e0;       /* ボード: Bodyより少し濃いグレー (DarkではBodyより暗いため) */
     --bg-task: #fffff9;
+    --bg-modal: #fffff9;
     
     --bg-input: #ffffff;       /* 入力欄: Surface(#fff)と区別するためごく薄いグレー */
     
-    --bg-button: #ffffff;      /* ボタン: 明確なグレー (Surfaceより暗く、Inputとも区別) */
+    --bg-button: #dedede;      /* ボタン: 明確なグレー (Surfaceより暗く、Inputとも区別) */
     --bg-button-hover: #dcdcdc; /* ホバー時は少し濃く */
 
     --bg-calendar-day: #faf5f5;      /* Inputと同じ色 (Darkでの関係性を維持) */
