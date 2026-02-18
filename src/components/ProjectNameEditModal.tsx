@@ -14,16 +14,27 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
   const [value, setValue] = useState(currentName);
   const [error, setError] = useState('');
 
+  // 全角英数字（Ａ-Ｚ、ａ-ｚ、０-９）を半角に変換するヘルパー関数
+  const normalize = (str: string) => {
+    return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+  };
+
   // 入力値が変わるたびに重複チェックを実行
   useEffect(() => {
-    const trimmedValue = value.trim();
+    // チェック用に正規化した値を使用する
+    const normalizedValue = normalize(value);
+    const trimmedValue = normalizedValue.trim();
+
+    // 元の入力値が空かどうかではなく、正規化・トリム後の値で判定（スペースのみ等の防止）
     if (!trimmedValue) {
       setError('プロジェクト名を入力してください');
       return;
     }
     
     // 自分以外のプロジェクトで同じ名前があるかチェック
-    // トリム処理と小文字変換により、表記揺れを含めた重複を禁止
+    // 正規化した値でチェックすることで、全角「Ａ」入力時に半角「A」との重複を検知
     const isDuplicate = projects.some(p => 
       p.id !== currentId && 
       p.projectName.trim().toLowerCase() === trimmedValue.toLowerCase()
@@ -36,20 +47,19 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
     }
   }, [value, currentId, projects]);
 
-  // 英数字を半角に強制変換するハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    // 全角英数字（Ａ-Ｚ、ａ-ｚ、０-９）を半角に変換
-    const normalizedValue = rawValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
-      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    setValue(normalizedValue);
+    // 入力中は変換せず、そのままstateにセットする
+    setValue(e.target.value);
   };
 
   const handleSave = () => {
-    if (error || !value.trim()) return;
-    // 保存時もトリムした値を渡す
-    onSave(value.trim());
+    // 保存時に正規化を行う
+    const normalizedValue = normalize(value);
+    
+    if (error || !normalizedValue.trim()) return;
+    
+    // トリムして保存
+    onSave(normalizedValue.trim());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
