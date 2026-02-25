@@ -12,6 +12,7 @@ import {
   verticalListSortingStrategy,
   horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react"; // 追加
 
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { useResponsive } from './hooks/useResponsive';
@@ -242,7 +243,7 @@ function App() {
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo,
-    canUndo, canRedo, // 追加
+    canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
   } = useTaskOperations();
 
@@ -251,6 +252,21 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
+
+  // 認証メニューの状態管理（追加）
+  const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
+  const authMenuRef = useRef<HTMLDivElement>(null);
+
+  // 認証メニューの外側クリックで閉じる処理（追加）
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) {
+        setIsAuthMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
@@ -381,7 +397,7 @@ function App() {
               {isMobile ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="カレンダーを表示/非表示">
+                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '4px' }} title="カレンダーを表示/非表示">
                             <IconCalendar size={20} />
                           </button>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -395,7 +411,7 @@ function App() {
                   </div>
               ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="カレンダーを表示/非表示">
+                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '4px' }} title="カレンダーを表示/非表示">
                         <IconCalendar size={20} />
                       </button>
                       <div>
@@ -407,8 +423,54 @@ function App() {
                       </div>
                   </div>
               )}
-              <div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <ProjectControls onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }} onImport={handleFileImport} onImportFromUrl={handleImportFromUrl} />
+                
+                {/* 認証UIの追加 */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <SignedIn>
+                    <UserButton />
+                  </SignedIn>
+                  <SignedOut>
+                    <div ref={authMenuRef} style={{ position: 'relative' }}>
+                      <button 
+                        onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)}
+                        style={{
+                          width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0
+                        }}
+                        aria-label="アカウントメニューを開く"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                          <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+
+                      {isAuthMenuOpen && (
+                        <div style={{
+                          position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden'
+                        }}>
+                          <SignInButton mode="modal">
+                            <button 
+                              onClick={() => setIsAuthMenuOpen(false)}
+                              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+                            >
+                              ログイン
+                            </button>
+                          </SignInButton>
+                          <SignUpButton mode="modal">
+                            <button 
+                              onClick={() => setIsAuthMenuOpen(false)}
+                              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}
+                            >
+                              新規登録
+                            </button>
+                          </SignUpButton>
+                        </div>
+                      )}
+                    </div>
+                  </SignedOut>
+                </div>
               </div>
           </header>
 
