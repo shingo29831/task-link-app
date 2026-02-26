@@ -4,7 +4,7 @@ import { clerkMiddleware, getAuth } from '@hono/clerk-auth'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { users, projects, projectMembers } from './db/schema'
-import { eq, and } from 'drizzle-orm' // ★ and を追加
+import { eq, and } from 'drizzle-orm'
 
 // 環境変数の型定義
 type Bindings = {
@@ -37,7 +37,7 @@ app.post('/api/user/sync', async (c) => {
   return c.json({ success: true })
 })
 
-// 2. プロジェクトの保存（新規作成時はDB側でUUIDを生成）
+// 2. プロジェクトの保存（新規作成時はDB側で制限チェック＆UUIDを生成）
 app.post('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -50,6 +50,18 @@ app.post('/api/projects', async (c) => {
   const isLocal = String(id).startsWith('local_')
 
   if (isLocal) {
+    // ★ 追加: バックエンド側での上限数チェック (二重判定)
+    const userRecord = await db.select().from(users).where(eq(users.id, auth.userId))
+    const limit = userRecord[0]?.plan === 'premium' ? 10 : 3
+    
+    // 現在のプロジェクト数を取得
+    const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId))
+    
+    if (userProjects.length >= limit) {
+      // 上限に達している場合は 403 Forbidden を返す
+      return c.json({ error: 'Plan limit exceeded' }, 403)
+    }
+
     // 新規作成: DB側で自動的に正しいUUIDを生成させる
     const inserted = await db.insert(projects)
       .values({
@@ -89,9 +101,9 @@ app.get('/api/projects', async (c) => {
 
   const db = getDb(c.env.DATABASE_URL)
   
-  // ユーザーのプランを取得してアップロード制限数を決定 (無料=3件, プレミアム=100件)
+  // ★ 変更: ユーザーのプランを取得してアップロード制限数を決定 (無料=3件, プレミアム=10件)
   const userRecord = await db.select().from(users).where(eq(users.id, auth.userId))
-  const limit = userRecord[0]?.plan === 'premium' ? 100 : 3 
+  const limit = userRecord[0]?.plan === 'premium' ? 10 : 3 
 
   const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId))
 

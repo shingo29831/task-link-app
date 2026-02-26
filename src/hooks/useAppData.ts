@@ -17,10 +17,8 @@ const createDefaultProject = (): AppData => ({
   lastSynced: Date.now()
 });
 
-// ★ 追加: 最も計算が軽量なハッシュ関数 (djb2アルゴリズム)
-// 文字列から高速に一意な32ビット整数を生成します
+// 最も計算が軽量なハッシュ関数 (djb2アルゴリズム)
 const calculateHash = (project: AppData): number => {
-  // 更新日時(lastUpdated)などのメタデータを除外し、タスクの本質的な構成のみを抽出
   const essentialTasks = project.tasks.map(t => ({
     id: t.id,
     name: t.name,
@@ -34,9 +32,9 @@ const calculateHash = (project: AppData): number => {
   
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
   }
-  return hash >>> 0; // 符号なし32ビット整数に変換
+  return hash >>> 0;
 };
 
 export const useAppData = () => {
@@ -49,7 +47,6 @@ export const useAppData = () => {
   const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
   
-  // ★ 変更: ハッシュ値(数値)で前回同期状態を記録する
   const lastSyncedHashMap = useRef<Record<string, number>>({});
 
   const [currentLimit, setCurrentLimit] = useState<number>(3);
@@ -125,7 +122,6 @@ export const useAppData = () => {
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now()
       };
-      // ダウンロードした状態のハッシュを記録
       lastSyncedHashMap.current[p.id] = calculateHash(p);
       return p;
     });
@@ -204,6 +200,7 @@ export const useAppData = () => {
     const target = projects.find(p => p.id === localId);
     if (!target) return;
     
+    // ★ フロントエンド側での制限判定 (1重目)
     const cloudCount = projects.filter(p => !String(p.id).startsWith('local_')).length;
     if (cloudCount >= currentLimit) {
       alert(`プランのアップロード上限（${currentLimit}件）に達しています。\n不要なクラウドプロジェクトを削除するか、プランをアップグレードしてください。`);
@@ -229,6 +226,12 @@ export const useAppData = () => {
           alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
         }
       } else {
+        // ★ バックエンド側での制限判定 (2重目) のエラーハンドリング
+        if (res.status === 403) {
+          alert(`サーバーで制限が確認されました。アップロード上限（${currentLimit}件）に達しています。`);
+        } else {
+          alert('アップロードに失敗しました');
+        }
         setSyncState('idle');
       }
     } catch (e) {
@@ -243,10 +246,8 @@ export const useAppData = () => {
       return;
     }
 
-    // ★ 1. 瞬時にハッシュを計算
     const currentHash = calculateHash(activeData);
 
-    // ★ 2. 前回同期時とハッシュが同じなら、即座にローディングを止める（15秒待たない）
     if (lastSyncedHashMap.current[activeData.id] === currentHash) {
       setSyncState('synced');
       return;
@@ -291,7 +292,6 @@ export const useAppData = () => {
                 requiresLocalUpdate = true;
             }
 
-            // ダウンロードしたデータと、マージ後のデータが同じ（差分なし）かハッシュで判定
             const cloudHash = calculateHash({ ...activeData, projectName: cloudProject.projectName, tasks: cloudTasks });
             const mergedHash = calculateHash({ ...activeData, projectName: mergedProjectName, tasks: mergedTasks });
 
@@ -304,7 +304,6 @@ export const useAppData = () => {
         const mergedProjectData = { ...activeData, projectName: mergedProjectName, tasks: mergedTasks };
         const newMergedHash = calculateHash(mergedProjectData);
 
-        // ★ ダウンロード時点と差分がなければ、POST通信をスキップする
         if (isSameAsCloud) {
           console.log(`プロジェクト "${mergedProjectName}" はクラウドと差分がないためアップロードをスキップしました`);
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
@@ -329,7 +328,6 @@ export const useAppData = () => {
         });
 
         if (res.ok) {
-          // 成功したら新しいハッシュを記録
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
 
           if (requiresLocalUpdate) {
