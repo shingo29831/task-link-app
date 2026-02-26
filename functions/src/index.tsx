@@ -3,10 +3,9 @@ import { cors } from 'hono/cors'
 import { clerkMiddleware, getAuth } from '@hono/clerk-auth'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
-import { users, projects, projectMembers } from './db/schema'
-import { eq, and } from 'drizzle-orm'
+import { users, projects, projectMembers, sequences } from './db/schema' // ★ sequences を追加
+import { eq, and, sql } from 'drizzle-orm' // ★ sql を追加
 
-// 環境変数の型定義
 type Bindings = {
   DATABASE_URL: string
   CLERK_PUBLISHABLE_KEY: string
@@ -19,9 +18,22 @@ app.use('*', cors())
 app.use('*', clerkMiddleware())
 
 const getDb = (databaseUrl: string) => {
-  const sql = neon(databaseUrl)
-  return drizzle(sql)
+  const sqlClient = neon(databaseUrl)
+  return drizzle(sqlClient)
 }
+
+// ★ 追加: 0からインクリメントした数値をURLセーフな64文字に変換する関数
+const toBase64Url = (num: number): string => {
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
+  if (num === 0) return chars[0];
+  let str = '';
+  let n = num;
+  while (n > 0) {
+    str = chars[n % 64] + str;
+    n = Math.floor(n / 64);
+  }
+  return str;
+};
 
 // 1. ユーザー同期
 app.post('/api/user/sync', async (c) => {
@@ -37,7 +49,7 @@ app.post('/api/user/sync', async (c) => {
   return c.json({ success: true })
 })
 
-// 2. プロジェクトの保存（新規作成時はDB側で制限チェック＆UUIDを生成）
+// 2. プロジェクトの保存
 app.post('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -46,36 +58,42 @@ app.post('/api/projects', async (c) => {
   const db = getDb(c.env.DATABASE_URL)
   const { id, projectName, data, isPublic = false, publicRole = 'viewer' } = body
 
-  // フロントエンドで生成された "local_" から始まるIDかどうかを判定
   const isLocal = String(id).startsWith('local_')
 
   if (isLocal) {
-    // ★ 追加: バックエンド側での上限数チェック (二重判定)
     const userRecord = await db.select().from(users).where(eq(users.id, auth.userId))
     const limit = userRecord[0]?.plan === 'premium' ? 10 : 3
-    
-    // 現在のプロジェクト数を取得
     const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId))
     
     if (userProjects.length >= limit) {
-      // 上限に達している場合は 403 Forbidden を返す
       return c.json({ error: 'Plan limit exceeded' }, 403)
     }
 
-    // 新規作成: DB側で自動的に正しいUUIDを生成させる
-    const inserted = await db.insert(projects)
+    // ★ シーケンステーブルを使ってアトミックにインクリメント値を取得
+    const updateResult = await db.execute(sql`
+      INSERT INTO sequences (name, value) VALUES ('projectId', 1)
+      ON CONFLICT (name) DO UPDATE SET value = sequences.value + 1
+      RETURNING value;
+    `);
+    
+    // DBは1から始まるため、-1して「0」からスタートするように調整
+    const seqValue = Number(updateResult.rows[0].value) - 1;
+    const newId = toBase64Url(seqValue); // IDを 0, 1, 2... a, b... に変換
+
+    await db.insert(projects)
       .values({
+        id: newId,
         ownerId: auth.userId,
         projectName,
         data,
         isPublic,
         publicRole,
         updatedAt: new Date()
-      })
-      .returning({ id: projects.id }) // 生成されたUUIDを取得
-    return c.json({ success: true, newId: inserted[0].id })
+      });
+      
+    return c.json({ success: true, newId: newId })
   } else {
-    // 既存更新: 既存のUUIDを使って上書き
+    // 既存更新
     await db.insert(projects)
       .values({
         id: id,
@@ -100,13 +118,10 @@ app.get('/api/projects', async (c) => {
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
 
   const db = getDb(c.env.DATABASE_URL)
-  
-  // ★ 変更: ユーザーのプランを取得してアップロード制限数を決定 (無料=3件, プレミアム=10件)
   const userRecord = await db.select().from(users).where(eq(users.id, auth.userId))
   const limit = userRecord[0]?.plan === 'premium' ? 10 : 3 
 
   const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId))
-
   return c.json({ projects: userProjects, limit })
 })
 
@@ -118,9 +133,7 @@ app.delete('/api/projects/:id', async (c) => {
   const id = c.req.param('id')
   const db = getDb(c.env.DATABASE_URL)
 
-  // セキュリティのため、自分のプロジェクトのみ削除可能にする
   await db.delete(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
-  
   return c.json({ success: true })
 })
 

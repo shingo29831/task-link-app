@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DndContext, useDroppable, DragOverlay, useDndMonitor, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { 
+  DndContext, 
+  useDroppable,
+  DragOverlay,
+  useDndMonitor,
+  type DragStartEvent,
+  type DragEndEvent
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy
+} from '@dnd-kit/sortable';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/clerk-react";
 
 import { useTaskOperations } from './hooks/useTaskOperations';
@@ -26,14 +37,12 @@ const IconCloudUpload = ({ size = 20 }) => (
   </svg>
 );
 
-// ★ 追加: 同期待機・同期中のアニメーションアイコン
 const IconLoader = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin">
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
 
-// ★ 追加: 同期完了のチェックアイコン
 const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -145,7 +154,7 @@ function App() {
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
-    uploadProject, syncLimitState, resolveSyncLimit, syncState // ★ syncState を受け取る
+    uploadProject, syncLimitState, resolveSyncLimit, syncState
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -229,7 +238,6 @@ function App() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
-        {/* ★ Loader用のアニメーションCSSを注入 */}
         <style>{`
           @keyframes spin { 100% { transform: rotate(360deg); } }
           .spin { animation: spin 1s linear infinite; }
@@ -250,7 +258,6 @@ function App() {
                                   <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
                                   {renderProjectMenu()}
                                   
-                                  {/* ★ モバイル用: 同期状態表示 */}
                                   {isSignedIn && String(data.id).startsWith('local_') ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
                                       <IconCloudUpload size={16} />
@@ -272,7 +279,6 @@ function App() {
                           <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
                           {renderProjectMenu()}
                           
-                          {/* ★ PC用: 同期状態表示 */}
                           {isSignedIn && String(data.id).startsWith('local_') ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
                               <IconCloudUpload size={16} /> 保存

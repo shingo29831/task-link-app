@@ -8,6 +8,7 @@ const STORAGE_KEY = 'progress_app_v2';
 
 const generateProjectId = () => 'local_' + crypto.randomUUID();
 
+// IDがUUID形式かどうかの判定（今回は使わなくなりますが後方互換のために残します）
 const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const createDefaultProject = (): AppData => ({
@@ -17,7 +18,6 @@ const createDefaultProject = (): AppData => ({
   lastSynced: Date.now()
 });
 
-// 最も計算が軽量なハッシュ関数 (djb2アルゴリズム)
 const calculateHash = (project: AppData): number => {
   const essentialTasks = project.tasks.map(t => ({
     id: t.id,
@@ -101,7 +101,8 @@ export const useAppData = () => {
 
       if (newIncoming) {
         setIncomingData(newIncoming);
-        window.history.replaceState(null, '', window.location.pathname);
+        // ★ ローカルのまま読み込んだ場合はURLのパスを `/` にする
+        window.history.replaceState(null, '', `${window.location.origin}/?d=${compressed}`);
       }
 
       loadedProjects.forEach(p => {
@@ -200,7 +201,6 @@ export const useAppData = () => {
     const target = projects.find(p => p.id === localId);
     if (!target) return;
     
-    // ★ フロントエンド側での制限判定 (1重目)
     const cloudCount = projects.filter(p => !String(p.id).startsWith('local_')).length;
     if (cloudCount >= currentLimit) {
       alert(`プランのアップロード上限（${currentLimit}件）に達しています。\n不要なクラウドプロジェクトを削除するか、プランをアップグレードしてください。`);
@@ -226,7 +226,6 @@ export const useAppData = () => {
           alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
         }
       } else {
-        // ★ バックエンド側での制限判定 (2重目) のエラーハンドリング
         if (res.status === 403) {
           alert(`サーバーで制限が確認されました。アップロード上限（${currentLimit}件）に達しています。`);
         } else {
@@ -305,9 +304,7 @@ export const useAppData = () => {
         const newMergedHash = calculateHash(mergedProjectData);
 
         if (isSameAsCloud) {
-          console.log(`プロジェクト "${mergedProjectName}" はクラウドと差分がないためアップロードをスキップしました`);
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
-          
           if (requiresLocalUpdate) {
             setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, tasks: mergedTasks, projectName: mergedProjectName, lastSynced: Date.now() } : p));
           }
@@ -335,7 +332,6 @@ export const useAppData = () => {
           }
           
           setSyncState('synced');
-          console.log(`プロジェクト "${mergedProjectName}" をクラウドに保存しました！`);
         } else {
           setSyncState('idle');
         }
@@ -353,10 +349,13 @@ export const useAppData = () => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   }, [projects]);
 
+  // ★ 変更: URLのパス生成ルール（ローカルは "/", クラウドは "/ID/" にする）
   useEffect(() => {
     if (activeData) {
       const compressed = compressData(activeData);
-      window.history.replaceState(null, '', `${window.location.origin}${window.location.pathname}?d=${compressed}`);
+      const isLocal = String(activeData.id).startsWith('local_');
+      const basePath = isLocal ? '/' : `/${activeData.id}/`;
+      window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
     }
   }, [activeData]);
 
@@ -391,9 +390,13 @@ export const useAppData = () => {
     if (id === activeId) setActiveId(newProjects[0].id);
   };
 
+  // ★ 変更: シェア用URLの生成ルール
   const getShareUrl = () => {
     if (!activeData) return '';
-    return `${window.location.origin}${window.location.pathname}?d=${compressData(activeData)}`;
+    const compressed = compressData(activeData);
+    const isLocal = String(activeData.id).startsWith('local_');
+    const basePath = isLocal ? '/' : `/${activeData.id}/`;
+    return `${window.location.origin}${basePath}?d=${compressed}`;
   };
 
   return { 
