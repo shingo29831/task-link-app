@@ -12,7 +12,8 @@ import {
   verticalListSortingStrategy,
   horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/clerk-react";
+// ★ useUser を追加
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/clerk-react";
 
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { useResponsive } from './hooks/useResponsive';
@@ -142,6 +143,8 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddMod
 
 function App() {
   const { getToken, isSignedIn } = useAuth();
+  const { user } = useUser(); // ★ 追加: ユーザー情報を取得
+  
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
     rootNodes, projectProgress, debugInfo, activeParentId, calendarTasks,
@@ -165,19 +168,23 @@ function App() {
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
 
+  // ★ 変更: user.username もバックエンドに同期する
   useEffect(() => {
     const syncUserToDatabase = async () => {
-      if (!isSignedIn) return;
+      if (!isSignedIn || !user) return; // userの存在チェックを追加
       try {
         const token = await getToken();
         await fetch('http://localhost:5174/api/user/sync', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user.username }) // username を送信
         });
-      } catch (error) {}
+      } catch (error) {
+        console.error("Sync user failed:", error);
+      }
     };
     syncUserToDatabase();
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, getToken, user?.username]); // user.username が変わった時にも再実行
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) { if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) setIsAuthMenuOpen(false); }

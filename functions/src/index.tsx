@@ -34,19 +34,39 @@ const toBase64Url = (num: number): string => {
   return str;
 };
 
+// 1. ユーザー同期 (Usernameの保存と一意性エラーのハンドリングを含む)
 app.post('/api/user/sync', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
 
+  // フロントエンドから username を受け取る
+  const body = await c.req.json().catch(() => ({}));
+  const username = body.username || null;
+
   const db = getDb(c.env.DATABASE_URL)
-  const existingUser = await db.select().from(users).where(eq(users.id, auth.userId))
   
-  if (existingUser.length === 0) {
-    await db.insert(users).values({ id: auth.userId, plan: 'free' })
+  try {
+    const existingUser = await db.select().from(users).where(eq(users.id, auth.userId))
+    
+    if (existingUser.length === 0) {
+      // 新規作成時に username も保存
+      await db.insert(users).values({ id: auth.userId, username: username, plan: 'free' })
+    } else if (existingUser[0].username !== username) {
+      // 既存ユーザーの username が変更されていれば更新する
+      await db.update(users).set({ username: username }).where(eq(users.id, auth.userId))
+    }
+    return c.json({ success: true })
+  } catch (error: any) {
+    // DB側での一意制約違反エラー (PostgreSQL error 23505) を検知
+    if (error.code === '23505') {
+      return c.json({ error: 'Username is already taken' }, 400)
+    }
+    console.error('User sync error:', error);
+    return c.json({ error: 'Database error' }, 500)
   }
-  return c.json({ success: true })
 })
 
+// 2. プロジェクトの保存
 app.post('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -72,7 +92,7 @@ app.post('/api/projects', async (c) => {
     
     const seqValue = Number(updateResult.rows[0].value) - 1;
     const newShortId = toBase64Url(seqValue);
-    const newId = crypto.randomUUID(); // ★ システム用にはセキュアなUUIDを生成
+    const newId = crypto.randomUUID(); // システム用にはセキュアなUUIDを生成
 
     await db.insert(projects)
       .values({
@@ -86,7 +106,7 @@ app.post('/api/projects', async (c) => {
         updatedAt: new Date()
       });
       
-    // ★ フロントエンドには両方返す
+    // フロントエンドには両方返す
     return c.json({ success: true, newId: newId, shortId: newShortId })
   } else {
     await db.insert(projects)
@@ -107,6 +127,7 @@ app.post('/api/projects', async (c) => {
   }
 })
 
+// 3. 自分のプロジェクト一覧とプラン制限を取得
 app.get('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -119,6 +140,7 @@ app.get('/api/projects', async (c) => {
   return c.json({ projects: userProjects, limit })
 })
 
+// 4. 同期の解除（クラウドから削除）
 app.delete('/api/projects/:id', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
