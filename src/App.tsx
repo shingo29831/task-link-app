@@ -12,7 +12,7 @@ import {
   verticalListSortingStrategy,
   horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react"; // 追加
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/clerk-react";
 
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { useResponsive } from './hooks/useResponsive';
@@ -180,7 +180,7 @@ const BoardArea = ({
               onClick={(e) => { e.stopPropagation(); onUndo(); }}
               style={{
                 width: '44px', height: '44px', borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)', // 透過背景
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 backdropFilter: 'blur(4px)',
                 color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -196,7 +196,7 @@ const BoardArea = ({
               onClick={(e) => { e.stopPropagation(); onRedo(); }}
               style={{
                 width: '44px', height: '44px', borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)', // 透過背景
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 backdropFilter: 'blur(4px)',
                 color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -232,6 +232,8 @@ const BoardArea = ({
 };
 
 function App() {
+  const { getToken, isSignedIn } = useAuth(); // Clerkから認証情報取得
+  
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
     rootNodes, projectProgress, debugInfo, activeParentId, calendarTasks,
@@ -253,11 +255,37 @@ function App() {
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
 
-  // 認証メニューの状態管理（追加）
+  // 認証メニューの状態管理
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
 
-  // 認証メニューの外側クリックで閉じる処理（追加）
+  // バックエンドとのユーザー情報同期 (ログイン直後)
+  useEffect(() => {
+    const syncUserToDatabase = async () => {
+      if (!isSignedIn) return;
+
+      try {
+        const token = await getToken();
+        // Hono API (ターミナル2で立ち上がっているポート。基本は5174になります)
+        const response = await fetch('http://localhost:5174/api/user/sync', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          console.log('バックエンドとのユーザー同期が完了しました！');
+        }
+      } catch (error) {
+        console.error('ユーザー同期に失敗しました:', error);
+      }
+    };
+
+    syncUserToDatabase();
+  }, [isSignedIn, getToken]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) {
@@ -578,7 +606,6 @@ function App() {
                     <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-button)', borderRadius: '8px', fontSize: '0.75em', color: 'var(--text-secondary)', maxHeight: '400px', overflowY: 'auto' }}>
                       <p><b>プロジェクト名:</b> {data.projectName}</p>
                       <p><b>適用マッピング:</b> <span style={{ color: 'var(--color-info)' }}>{debugInfo.mappingInfo}</span></p>
-                      {/* ... debug stats ... */}
                     </div>
                   )}
                 </div>
