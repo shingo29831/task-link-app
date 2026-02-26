@@ -8,7 +8,6 @@ const STORAGE_KEY = 'progress_app_v2';
 
 const generateProjectId = () => 'local_' + crypto.randomUUID();
 
-// IDがUUID形式かどうかの判定（今回は使わなくなりますが後方互換のために残します）
 const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const createDefaultProject = (): AppData => ({
@@ -101,8 +100,7 @@ export const useAppData = () => {
 
       if (newIncoming) {
         setIncomingData(newIncoming);
-        // ★ ローカルのまま読み込んだ場合はURLのパスを `/` にする
-        window.history.replaceState(null, '', `${window.location.origin}/?d=${compressed}`);
+        window.history.replaceState(null, '', window.location.pathname);
       }
 
       loadedProjects.forEach(p => {
@@ -119,6 +117,7 @@ export const useAppData = () => {
     const loadedCloud = dbProjects.map((row: any) => {
       const p = {
         id: row.id,
+        shortId: row.shortId, // ★ クラウドから shortId も取得
         projectName: row.projectName,
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now()
@@ -220,7 +219,8 @@ export const useAppData = () => {
         const data = await res.json();
         if (data.newId) {
           lastSyncedHashMap.current[data.newId] = calculateHash(target);
-          setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: data.newId } : p));
+          // ★ 新しいUUID(id)とURL用(shortId)を両方セットする
+          setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: data.newId, shortId: data.shortId } : p));
           if (activeId === localId) setActiveId(data.newId);
           setSyncState('synced');
           alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
@@ -349,12 +349,12 @@ export const useAppData = () => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   }, [projects]);
 
-  // ★ 変更: URLのパス生成ルール（ローカルは "/", クラウドは "/ID/" にする）
+  // ★ 変更: URLのパスにはUUID(id)ではなく、shortId を使う
   useEffect(() => {
     if (activeData) {
       const compressed = compressData(activeData);
       const isLocal = String(activeData.id).startsWith('local_');
-      const basePath = isLocal ? '/' : `/${activeData.id}/`;
+      const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
       window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
     }
   }, [activeData]);
@@ -390,12 +390,12 @@ export const useAppData = () => {
     if (id === activeId) setActiveId(newProjects[0].id);
   };
 
-  // ★ 変更: シェア用URLの生成ルール
+  // ★ 変更: 共有URLも shortId ベースで出力
   const getShareUrl = () => {
     if (!activeData) return '';
     const compressed = compressData(activeData);
     const isLocal = String(activeData.id).startsWith('local_');
-    const basePath = isLocal ? '/' : `/${activeData.id}/`;
+    const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
     return `${window.location.origin}${basePath}?d=${compressed}`;
   };
 

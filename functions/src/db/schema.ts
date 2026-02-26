@@ -9,7 +9,8 @@ export const users = pgTable('users', {
 });
 
 export const projects = pgTable('projects', {
-  id: varchar('id', { length: 50 }).primaryKey(), // ★ uuid から varchar に変更
+  id: varchar('id', { length: 255 }).primaryKey(), // ★ システム内部用の UUID
+  shortId: varchar('short_id', { length: 50 }).unique(), // ★ 追加: URL表示用の短いID
   ownerId: varchar('owner_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   projectName: varchar('project_name', { length: 255 }).notNull(),
   data: jsonb('data').notNull(),
@@ -20,7 +21,7 @@ export const projects = pgTable('projects', {
 });
 
 export const projectMembers = pgTable('project_members', {
-  projectId: varchar('project_id', { length: 50 }).notNull().references(() => projects.id, { onDelete: 'cascade' }), // ★ varchar に変更
+  projectId: varchar('project_id', { length: 255 }).notNull().references(() => projects.id, { onDelete: 'cascade' }),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: varchar('role', { length: 50 }).notNull(),
   invitedAt: timestamp('invited_at').defaultNow().notNull(),
@@ -28,7 +29,6 @@ export const projectMembers = pgTable('project_members', {
   pk: primaryKey({ columns: [table.projectId, table.userId] })
 }));
 
-// ★ 追加: 0からインクリメントする値を管理するためのテーブル
 export const sequences = pgTable('sequences', {
   name: varchar('name', { length: 50 }).primaryKey(),
   value: integer('value').notNull().default(0),

@@ -3,8 +3,8 @@ import { cors } from 'hono/cors'
 import { clerkMiddleware, getAuth } from '@hono/clerk-auth'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
-import { users, projects, projectMembers, sequences } from './db/schema' // ★ sequences を追加
-import { eq, and, sql } from 'drizzle-orm' // ★ sql を追加
+import { users, projects, projectMembers, sequences } from './db/schema'
+import { eq, and, sql } from 'drizzle-orm'
 
 type Bindings = {
   DATABASE_URL: string
@@ -22,7 +22,6 @@ const getDb = (databaseUrl: string) => {
   return drizzle(sqlClient)
 }
 
-// ★ 追加: 0からインクリメントした数値をURLセーフな64文字に変換する関数
 const toBase64Url = (num: number): string => {
   const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
   if (num === 0) return chars[0];
@@ -35,7 +34,6 @@ const toBase64Url = (num: number): string => {
   return str;
 };
 
-// 1. ユーザー同期
 app.post('/api/user/sync', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -49,7 +47,6 @@ app.post('/api/user/sync', async (c) => {
   return c.json({ success: true })
 })
 
-// 2. プロジェクトの保存
 app.post('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -65,24 +62,22 @@ app.post('/api/projects', async (c) => {
     const limit = userRecord[0]?.plan === 'premium' ? 10 : 3
     const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId))
     
-    if (userProjects.length >= limit) {
-      return c.json({ error: 'Plan limit exceeded' }, 403)
-    }
+    if (userProjects.length >= limit) return c.json({ error: 'Plan limit exceeded' }, 403)
 
-    // ★ シーケンステーブルを使ってアトミックにインクリメント値を取得
     const updateResult = await db.execute(sql`
       INSERT INTO sequences (name, value) VALUES ('projectId', 1)
       ON CONFLICT (name) DO UPDATE SET value = sequences.value + 1
       RETURNING value;
     `);
     
-    // DBは1から始まるため、-1して「0」からスタートするように調整
     const seqValue = Number(updateResult.rows[0].value) - 1;
-    const newId = toBase64Url(seqValue); // IDを 0, 1, 2... a, b... に変換
+    const newShortId = toBase64Url(seqValue);
+    const newId = crypto.randomUUID(); // ★ システム用にはセキュアなUUIDを生成
 
     await db.insert(projects)
       .values({
         id: newId,
+        shortId: newShortId,
         ownerId: auth.userId,
         projectName,
         data,
@@ -91,9 +86,9 @@ app.post('/api/projects', async (c) => {
         updatedAt: new Date()
       });
       
-    return c.json({ success: true, newId: newId })
+    // ★ フロントエンドには両方返す
+    return c.json({ success: true, newId: newId, shortId: newShortId })
   } else {
-    // 既存更新
     await db.insert(projects)
       .values({
         id: id,
@@ -112,7 +107,6 @@ app.post('/api/projects', async (c) => {
   }
 })
 
-// 3. 自分のプロジェクト一覧とプラン制限を取得
 app.get('/api/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
@@ -125,7 +119,6 @@ app.get('/api/projects', async (c) => {
   return c.json({ projects: userProjects, limit })
 })
 
-// 4. 同期の解除（クラウドから削除）
 app.delete('/api/projects/:id', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
