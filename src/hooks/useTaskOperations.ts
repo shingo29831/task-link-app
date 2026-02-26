@@ -16,17 +16,15 @@ import {
   sortableKeyboardCoordinates,
   arrayMove
 } from '@dnd-kit/sortable';
+import { useAuth } from '@clerk/clerk-react';
 
-import type { Task } from '../types'; 
+import type { Task, UserRole } from '../types'; 
 import { useAppData } from './useAppData';
 import { getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-/**
- * 親タスクのステータスを子タスクの状態に基づいて再計算するヘルパー関数
- */
 const recalculateStatus = (tasks: Task[]): Task[] => {
   const next = [...tasks];
   let changed = true;
@@ -66,7 +64,8 @@ const recalculateStatus = (tasks: Task[]): Task[] => {
 };
 
 export const useTaskOperations = () => {
-  // AppDataの取得 (★ 最新の同期用関数・状態を追加で受け取る)
+  const { getToken } = useAuth();
+  
   const { 
     data, 
     setData, 
@@ -91,23 +90,17 @@ export const useTaskOperations = () => {
     syncState
   } = useAppData();
 
-  // --------------------------------------------------------------------------
-  // UI State
-  // --------------------------------------------------------------------------
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
-  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false); 
   const [showAllProjectsInCalendar, setShowAllProjectsInCalendar] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
-  // --------------------------------------------------------------------------
-  // Derived Data
-  // --------------------------------------------------------------------------
   const activeTasks = useMemo(() => {
     return data ? data.tasks.filter(t => !t.isDeleted) : [];
   }, [data]);
@@ -211,9 +204,6 @@ export const useTaskOperations = () => {
     return Math.round(total / count);
   }, [data, activeTasks]);
 
-  // --------------------------------------------------------------------------
-  // Effects
-  // --------------------------------------------------------------------------
   useEffect(() => {
     if (activeParentId && data) {
       const exists = data.tasks.some(t => t.id === activeParentId && !t.isDeleted);
@@ -250,9 +240,24 @@ export const useTaskOperations = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, canUndo, canRedo]);
 
-  // --------------------------------------------------------------------------
-  // Task Logic (CRUD & Status)
-  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (showSettingsModal && data && !String(data.id).startsWith('local_') && data.isCloudSync !== false) {
+        const fetchMembers = async () => {
+            try {
+                const token = await getToken();
+                const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const resData = await res.json();
+                    setData({...data, members: resData.members, isPublic: resData.isPublic, publicRole: resData.publicRole});
+                }
+            } catch (e) { console.error(e); }
+        };
+        fetchMembers();
+    }
+  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken]);
+
   const save = useCallback((newTasks: Task[]) => {
     if (!data) return;
     setData({
@@ -431,7 +436,6 @@ export const useTaskOperations = () => {
     }
     const newTasks = data.tasks.map(t => idsToDelete.has(t.id) ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t);
     save(newTasks);
-    // 削除時にメニューが開いていたら閉じる
     if (menuOpenTaskId === taskId) {
       setMenuOpenTaskId(null);
     }
@@ -456,30 +460,24 @@ export const useTaskOperations = () => {
     save(newTasks);
   }, [data, save]);
 
-  // ★ 削られていたルートへのドロップ判定ロジックを完全復元
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!data) return;
     const { active, over } = event;
     if (!over) return;
 
-    // Case: Dropped on the Board Area (Empty space)
     if (over.id === 'root-board') {
         const activeIdStr = String(active.id);
         const activeTask = data.tasks.find(t => t.id === activeIdStr);
         if (!activeTask) return;
 
-        // 1. Get current root tasks sorted by order (excluding self if it was already root)
         const rootTasks = data.tasks
             .filter(t => !t.isDeleted && !t.parentId && t.id !== activeIdStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        // 2. Calculate Drop X coordinate (Center)
         const activeRect = active.rect.current.translated;
         if (activeRect) {
             const dropCenterX = activeRect.left + activeRect.width / 2;
-            
-            // 3. Find insertion index based on DOM coordinates
-            let insertIndex = rootTasks.length; // Default: Append to end
+            let insertIndex = rootTasks.length; 
 
             for (let i = 0; i < rootTasks.length; i++) {
                 const task = rootTasks[i];
@@ -494,7 +492,6 @@ export const useTaskOperations = () => {
                 }
             }
 
-            // 4. Reorder
             const newRootIds = rootTasks.map(t => t.id);
             newRootIds.splice(insertIndex, 0, activeTask.id);
 
@@ -503,7 +500,7 @@ export const useTaskOperations = () => {
                 if (rootIdx !== -1) {
                     return {
                         ...t,
-                        parentId: undefined, // Ensure it's root
+                        parentId: undefined,
                         order: rootIdx + 1,
                         lastUpdated: Date.now()
                     };
@@ -621,11 +618,120 @@ export const useTaskOperations = () => {
     setActiveParentId(null);
     setMenuOpenTaskId(null); 
   }, []);
-  const handleProjectNameClick = useCallback(() => { if (data) setShowRenameModal(true); }, [data]);
+  const handleProjectNameClick = useCallback(() => { if (data) setShowSettingsModal(true); }, [data]);
 
-  // --------------------------------------------------------------------------
-  // Dnd Sensors & Collision
-  // --------------------------------------------------------------------------
+  const handleToggleSync = useCallback(async (enabled: boolean) => {
+      if (!data) return;
+      if (enabled) {
+          uploadProject(data.id);
+      } else {
+           if (!confirm("クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？")) return;
+           try {
+               const token = await getToken();
+               await fetch(`http://localhost:5174/api/projects/${data.id}`, {
+                   method: 'DELETE',
+                   headers: { 'Authorization': `Bearer ${token}` }
+               });
+               
+               // IDを変えずに isCloudSync: false とし、同期オフを表現。shortId は URLから消すために削除する
+               setData({ ...data, isCloudSync: false, shortId: undefined });
+               
+           } catch (e) {
+               console.error("Failed to disable sync", e);
+               alert("同期のオフに失敗しました");
+           }
+      }
+  }, [data, uploadProject, getToken, setData]);
+
+  const handleTogglePublic = useCallback(async (isPublic: boolean) => {
+      if (!data || String(data.id).startsWith('local_')) return;
+      try {
+          const token = await getToken();
+          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/public`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isPublic })
+          });
+          if (res.ok) {
+              setData({ ...data, isPublic });
+          } else {
+               alert("公開設定の変更に失敗しました");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("公開設定の変更に失敗しました");
+      }
+  }, [data, getToken, setData]);
+
+  const handleInviteUser = useCallback(async (username: string) => {
+      if (!data || String(data.id).startsWith('local_')) return;
+      try {
+          const token = await getToken();
+          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, role: 'viewer' })
+          });
+          if (res.ok) {
+              const resData = await res.json();
+              if (resData.member) {
+                  const newMembers = [...(data.members || []), resData.member];
+                  setData({ ...data, members: newMembers });
+                  alert(`${username} を招待しました。`);
+              }
+          } else {
+              const errorData = await res.json();
+              alert(`招待に失敗しました: ${errorData.error}`);
+          }
+      } catch (e) {
+          console.error(e);
+          alert("招待に失敗しました");
+      }
+  }, [data, getToken, setData]);
+
+  const handleChangeRole = useCallback(async (memberId: string, newRole: UserRole) => {
+      if (!data || String(data.id).startsWith('local_')) return;
+      try {
+          const token = await getToken();
+          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members/${memberId}`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: newRole })
+          });
+          if (res.ok) {
+              const newMembers = (data.members || []).map(m => m.id === memberId ? { ...m, role: newRole } : m);
+              setData({ ...data, members: newMembers });
+          } else {
+              alert("権限の変更に失敗しました");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("権限の変更に失敗しました");
+      }
+  }, [data, getToken, setData]);
+
+  const handleRemoveMember = useCallback(async (memberId: string) => {
+      if (!data || String(data.id).startsWith('local_')) return;
+      if (!confirm("このメンバーを削除しますか？")) return;
+      try {
+          const token = await getToken();
+          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members/${memberId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+              const newMembers = (data.members || []).filter(m => m.id !== memberId);
+              setData({ ...data, members: newMembers });
+          } else {
+               alert("メンバーの削除に失敗しました");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("メンバーの削除に失敗しました");
+      }
+  }, [data, getToken, setData]);
+
+
   const sensors = useSensors(
     useSensor(MouseSensor, {
         activationConstraint: { distance: 5 },
@@ -664,15 +770,15 @@ export const useTaskOperations = () => {
 
   return {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, activeParent, calendarTasks,
-    showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showRenameModal, setShowRenameModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
+    showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showSettingsModal, setShowSettingsModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
     menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     undo, redo,
     canUndo, canRedo,
     sensors, handleDragEnd, customCollisionDetection,
-    // ★ 最新の同期機能を追加でエクスポート
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState
   };
 };

@@ -12,7 +12,6 @@ import {
   verticalListSortingStrategy,
   horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
-// ★ useUser を追加
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/clerk-react";
 
 import { useTaskOperations } from './hooks/useTaskOperations';
@@ -24,7 +23,7 @@ import { TaskCalendar } from './components/TaskCalendar';
 import type { Task } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
-import { ProjectNameEditModal } from './components/ProjectNameEditModal';
+import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
 import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconTrash } from './components/Icons';
 
@@ -143,13 +142,13 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddMod
 
 function App() {
   const { getToken, isSignedIn } = useAuth();
-  const { user } = useUser(); // ★ 追加: ユーザー情報を取得
+  const { user } = useUser();
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
     rootNodes, projectProgress, debugInfo, activeParentId, calendarTasks,
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu,
-    showRenameModal, setShowRenameModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar,
+    showSettingsModal, setShowSettingsModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar,
     collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
@@ -157,7 +156,8 @@ function App() {
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
-    uploadProject, syncLimitState, resolveSyncLimit, syncState
+    uploadProject, syncLimitState, resolveSyncLimit, syncState,
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -168,23 +168,22 @@ function App() {
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
 
-  // ★ 変更: user.username もバックエンドに同期する
   useEffect(() => {
     const syncUserToDatabase = async () => {
-      if (!isSignedIn || !user) return; // userの存在チェックを追加
+      if (!isSignedIn || !user) return; 
       try {
         const token = await getToken();
         await fetch('http://localhost:5174/api/user/sync', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user.username }) // username を送信
+          body: JSON.stringify({ username: user.username }) 
         });
       } catch (error) {
         console.error("Sync user failed:", error);
       }
     };
     syncUserToDatabase();
-  }, [isSignedIn, getToken, user?.username]); // user.username が変わった時にも再実行
+  }, [isSignedIn, getToken, user?.username]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) { if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) setIsAuthMenuOpen(false); }
@@ -234,7 +233,7 @@ function App() {
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {projects.map(p => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') ? '📁' : '☁️'} {p.projectName}</div>)}
+                    {projects.map(p => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
                 <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-danger-text)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconTrash size={16} /><span>このプロジェクトを削除</span></div>
@@ -252,7 +251,23 @@ function App() {
 
         <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
           {incomingData && targetLocalData && <MergeModal localData={targetLocalData} incomingData={incomingData} onConfirm={(merged) => { setData(merged); if (merged.id !== activeId) switchProject(merged.id); setIncomingData(null); alert('マージが完了しました'); }} onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} />}
-          {showRenameModal && data && <ProjectNameEditModal currentName={data.projectName} currentId={data.id} projects={projects} onClose={() => setShowRenameModal(false)} onSave={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowRenameModal(false); }} />}
+          {showSettingsModal && data && (
+            <ProjectSettingsModal 
+              currentName={data.projectName} 
+              currentId={data.id} 
+              projects={projects} 
+              isSyncEnabled={!String(data.id).startsWith('local_') && data.isCloudSync !== false}
+              isPublic={!!data.isPublic}
+              members={data.members || []}
+              onClose={() => setShowSettingsModal(false)} 
+              onSaveName={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowSettingsModal(false); }} 
+              onToggleSync={handleToggleSync}
+              onTogglePublic={handleTogglePublic}
+              onInviteUser={handleInviteUser}
+              onChangeRole={handleChangeRole}
+              onRemoveMember={handleRemoveMember}
+            />
+          )}
           {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
 
           <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' }}>
@@ -265,7 +280,7 @@ function App() {
                                   <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
                                   {renderProjectMenu()}
                                   
-                                  {isSignedIn && String(data.id).startsWith('local_') ? (
+                                  {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
                                       <IconCloudUpload size={16} />
                                     </button>
@@ -286,7 +301,7 @@ function App() {
                           <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
                           {renderProjectMenu()}
                           
-                          {isSignedIn && String(data.id).startsWith('local_') ? (
+                          {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
                               <IconCloudUpload size={16} /> 保存
                             </button>

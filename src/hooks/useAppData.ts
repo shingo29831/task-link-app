@@ -14,7 +14,8 @@ const createDefaultProject = (): AppData => ({
   id: generateProjectId(),
   projectName: 'マイプロジェクト',
   tasks: [],
-  lastSynced: Date.now()
+  lastSynced: Date.now(),
+  isCloudSync: false
 });
 
 const calculateHash = (project: AppData): number => {
@@ -117,10 +118,11 @@ export const useAppData = () => {
     const loadedCloud = dbProjects.map((row: any) => {
       const p = {
         id: row.id,
-        shortId: row.shortId, // ★ クラウドから shortId も取得
+        shortId: row.shortId,
         projectName: row.projectName,
         tasks: row.data.tasks || [],
-        lastSynced: row.data.lastSynced || Date.now()
+        lastSynced: row.data.lastSynced || Date.now(),
+        isCloudSync: true
       };
       lastSyncedHashMap.current[p.id] = calculateHash(p);
       return p;
@@ -190,7 +192,8 @@ export const useAppData = () => {
       id: generateProjectId(),
       projectName: row.projectName + ' (オフライン)',
       tasks: row.data.tasks || [],
-      lastSynced: Date.now()
+      lastSynced: Date.now(),
+      isCloudSync: false
     }));
     setProjects(prev => [...prev, ...downgradedLocal]);
     setSyncLimitState(null);
@@ -200,7 +203,7 @@ export const useAppData = () => {
     const target = projects.find(p => p.id === localId);
     if (!target) return;
     
-    const cloudCount = projects.filter(p => !String(p.id).startsWith('local_')).length;
+    const cloudCount = projects.filter(p => !String(p.id).startsWith('local_') && p.isCloudSync !== false).length;
     if (cloudCount >= currentLimit) {
       alert(`プランのアップロード上限（${currentLimit}件）に達しています。\n不要なクラウドプロジェクトを削除するか、プランをアップグレードしてください。`);
       return;
@@ -212,19 +215,19 @@ export const useAppData = () => {
       const res = await fetch('http://localhost:5174/api/projects', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: target.id, projectName: target.projectName, data: { tasks: target.tasks, lastSynced: target.lastSynced } })
+        body: JSON.stringify({ id: target.id, shortId: target.shortId, projectName: target.projectName, data: { tasks: target.tasks, lastSynced: target.lastSynced } })
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.newId) {
-          lastSyncedHashMap.current[data.newId] = calculateHash(target);
-          // ★ 新しいUUID(id)とURL用(shortId)を両方セットする
-          setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: data.newId, shortId: data.shortId } : p));
-          if (activeId === localId) setActiveId(data.newId);
-          setSyncState('synced');
-          alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
-        }
+        const resData = await res.json();
+        const finalId = resData.newId || target.id;
+        const finalShortId = resData.shortId || target.shortId;
+        lastSyncedHashMap.current[finalId] = calculateHash(target);
+        
+        setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true } : p));
+        if (activeId === localId && resData.newId) setActiveId(finalId);
+        setSyncState('synced');
+        alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
       } else {
         if (res.status === 403) {
           alert(`サーバーで制限が確認されました。アップロード上限（${currentLimit}件）に達しています。`);
@@ -241,7 +244,7 @@ export const useAppData = () => {
   };
 
   useEffect(() => {
-    if (!isSignedIn || !activeData || String(activeData.id).startsWith('local_')) {
+    if (!isSignedIn || !activeData || String(activeData.id).startsWith('local_') || activeData.isCloudSync === false) {
       return;
     }
 
@@ -349,11 +352,10 @@ export const useAppData = () => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   }, [projects]);
 
-  // ★ 変更: URLのパスにはUUID(id)ではなく、shortId を使う
   useEffect(() => {
     if (activeData) {
       const compressed = compressData(activeData);
-      const isLocal = String(activeData.id).startsWith('local_');
+      const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
       window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
     }
@@ -361,6 +363,7 @@ export const useAppData = () => {
 
   const setActiveData = (newData: AppData) => { setProjects(prev => prev.map(p => p.id === newData.id ? newData : p)); };
   const updateProject = useCallback((updatedProject: AppData) => { setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p)); }, [setProjects]);
+  const replaceProject = useCallback((oldId: string, newData: AppData) => { setProjects(prev => prev.map(p => p.id === oldId ? newData : p)); }, [setProjects]);
 
   const addProject = () => {
     const newProject = createDefaultProject();
@@ -382,25 +385,39 @@ export const useAppData = () => {
 
   const switchProject = (id: string) => { if (projects.some(p => p.id === id)) setActiveId(id); };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
     if (projects.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
     if (!confirm("このプロジェクトを削除しますか？")) return;
+    
+    // バックエンドからも削除する
+    const targetProject = projects.find(p => p.id === id);
+    if (targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
+       try {
+          const token = await getToken();
+          await fetch(`http://localhost:5174/api/projects/${id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+       } catch (e) {
+          console.error("Failed to delete from cloud", e);
+       }
+    }
+
     const newProjects = projects.filter(p => p.id !== id);
     setProjects(newProjects);
     if (id === activeId) setActiveId(newProjects[0].id);
   };
 
-  // ★ 変更: 共有URLも shortId ベースで出力
   const getShareUrl = () => {
     if (!activeData) return '';
     const compressed = compressData(activeData);
-    const isLocal = String(activeData.id).startsWith('local_');
+    const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
     const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
     return `${window.location.origin}${basePath}?d=${compressed}`;
   };
 
   return { 
-    data: activeData, setData: setActiveData, updateProject, incomingData, setIncomingData, getShareUrl,
+    data: activeData, setData: setActiveData, updateProject, replaceProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,

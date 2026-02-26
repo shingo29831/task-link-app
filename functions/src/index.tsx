@@ -73,7 +73,7 @@ app.post('/api/projects', async (c) => {
 
   const body = await c.req.json()
   const db = getDb(c.env.DATABASE_URL)
-  const { id, projectName, data, isPublic = false, publicRole = 'viewer' } = body
+  const { id, shortId, projectName, data, isPublic = false, publicRole = 'viewer' } = body
 
   const isLocal = String(id).startsWith('local_')
 
@@ -109,9 +109,27 @@ app.post('/api/projects', async (c) => {
     // フロントエンドには両方返す
     return c.json({ success: true, newId: newId, shortId: newShortId })
   } else {
+    // 既存のUUIDの場合
+    let finalShortId = shortId;
+    const existing = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)));
+    
+    if (existing.length > 0) {
+      // 既にDBに保存されている場合は、それを維持する（フロントのshortIdが欠落していても補完する）
+      finalShortId = existing[0].shortId;
+    } else if (!finalShortId) {
+      // DBに存在せず、フロントからも送られていない場合（同期オフ状態から再度オンにした場合など）、新しいshortIdを発行
+      const updateResult = await db.execute(sql`
+        INSERT INTO sequences (name, value) VALUES ('projectId', 1)
+        ON CONFLICT (name) DO UPDATE SET value = sequences.value + 1
+        RETURNING value;
+      `);
+      finalShortId = toBase64Url(Number(updateResult.rows[0].value) - 1);
+    }
+
     await db.insert(projects)
       .values({
         id: id,
+        shortId: finalShortId,
         ownerId: auth.userId,
         projectName,
         data,
@@ -123,7 +141,8 @@ app.post('/api/projects', async (c) => {
         target: projects.id,
         set: { projectName, data, isPublic, publicRole, updatedAt: new Date() }
       })
-    return c.json({ success: true, id: id })
+      
+    return c.json({ success: true, id: id, shortId: finalShortId })
   }
 })
 
@@ -148,8 +167,124 @@ app.delete('/api/projects/:id', async (c) => {
   const id = c.req.param('id')
   const db = getDb(c.env.DATABASE_URL)
 
-  await db.delete(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+  // プロジェクトが存在し、オーナーが一致するか確認
+  const proj = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+  if (proj.length === 0) return c.json({ error: 'Project not found or unauthorized' }, 404)
+
+  // プロジェクトメンバーも明示的に削除する
+  await db.delete(projectMembers).where(eq(projectMembers.projectId, id))
+  
+  // プロジェクトを削除する
+  await db.delete(projects).where(eq(projects.id, id))
+  
   return c.json({ success: true })
+})
+
+// 公開設定の更新
+app.put('/api/projects/:id/public', async (c) => {
+  const auth = getAuth(c)
+  if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+  
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const db = getDb(c.env.DATABASE_URL)
+
+  await db.update(projects)
+      .set({ isPublic: body.isPublic })
+      .where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+      
+  return c.json({ success: true })
+})
+
+// プロジェクトメンバー一覧取得
+app.get('/api/projects/:id/members', async (c) => {
+    const auth = getAuth(c)
+    if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+    
+    const id = c.req.param('id')
+    const db = getDb(c.env.DATABASE_URL)
+  
+    // プロジェクトのオーナーか確認
+    const proj = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+    if (proj.length === 0) return c.json({ error: 'Project not found or unauthorized' }, 404)
+  
+    const members = await db.select({
+        id: users.id,
+        username: users.username,
+        role: projectMembers.role
+    })
+    .from(projectMembers)
+    .innerJoin(users, eq(projectMembers.userId, users.id))
+    .where(eq(projectMembers.projectId, id))
+  
+    return c.json({ members, isPublic: proj[0].isPublic, publicRole: proj[0].publicRole })
+})
+
+// メンバー招待
+app.post('/api/projects/:id/members', async (c) => {
+    const auth = getAuth(c)
+    if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+    
+    const id = c.req.param('id')
+    const body = await c.req.json()
+    const db = getDb(c.env.DATABASE_URL)
+  
+    const proj = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+    if (proj.length === 0) return c.json({ error: 'Project not found or unauthorized' }, 404)
+  
+    // 招待対象のユーザーをユーザー名で検索
+    const targetUser = await db.select().from(users).where(eq(users.username, body.username))
+    if (targetUser.length === 0) return c.json({ error: 'User not found' }, 404)
+    if (targetUser[0].id === auth.userId) return c.json({ error: 'Cannot invite yourself' }, 400)
+
+    try {
+        await db.insert(projectMembers).values({
+            projectId: id,
+            userId: targetUser[0].id,
+            role: body.role || 'viewer'
+        })
+        return c.json({ success: true, member: { id: targetUser[0].id, username: targetUser[0].username, role: body.role || 'viewer' } })
+    } catch(e) {
+        return c.json({ error: 'User may already be a member' }, 400)
+    }
+})
+
+// メンバー権限変更
+app.put('/api/projects/:id/members/:memberId', async (c) => {
+    const auth = getAuth(c)
+    if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+    
+    const id = c.req.param('id')
+    const memberId = c.req.param('memberId')
+    const body = await c.req.json()
+    const db = getDb(c.env.DATABASE_URL)
+  
+    const proj = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+    if (proj.length === 0) return c.json({ error: 'Project not found or unauthorized' }, 404)
+  
+    await db.update(projectMembers)
+        .set({ role: body.role })
+        .where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, memberId)))
+
+    return c.json({ success: true })
+})
+
+// メンバー削除
+app.delete('/api/projects/:id/members/:memberId', async (c) => {
+    const auth = getAuth(c)
+    if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+    
+    const id = c.req.param('id')
+    const memberId = c.req.param('memberId')
+    const db = getDb(c.env.DATABASE_URL)
+  
+    const proj = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)))
+    if (proj.length === 0) return c.json({ error: 'Project not found or unauthorized' }, 404)
+  
+    await db.delete(projectMembers)
+        .where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, memberId)))
+
+    return c.json({ success: true })
 })
 
 export default app
