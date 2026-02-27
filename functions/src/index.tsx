@@ -207,44 +207,58 @@ app.delete('/api/projects/:id/members/:memberId', async (c) => {
     return c.json({ success: true })
 })
 
-// ★ここを修正しました： project.data ではなく、project 全体を返すように変更
 app.get('/api/projects/shared/:shortId', async (c) => {
   const auth = getAuth(c)
   const shortId = c.req.param('shortId')
   const db = getDb(c.env.DATABASE_URL)
 
+  console.log(`[SharedProject Check] shortId: ${shortId}, userId: ${auth?.userId || 'anonymous'}`);
+
   const proj = await db.select().from(projects).where(eq(projects.shortId, shortId))
   
   if (proj.length === 0) {
+    console.log(`[SharedProject Check] Error: Project not found.`);
     return c.json({ error: 'Project not found' }, 404)
   }
 
   const project = proj[0]
+  let role = 'none';
 
-  if (project.isPublic) {
-    return c.json({ success: true, project: project, role: project.publicRole })
+  // フロー2: ログイン中であれば閲覧以上の権限があるか確認
+  if (auth?.userId) {
+    if (project.ownerId === auth.userId) {
+      role = 'owner';
+      console.log(`[SharedProject Check] User is the owner.`);
+    } else {
+      const memberRecord = await db.select()
+        .from(projectMembers)
+        .where(and(
+          eq(projectMembers.projectId, project.id),
+          eq(projectMembers.userId, auth.userId)
+        ))
+
+      if (memberRecord.length > 0) {
+        role = memberRecord[0].role;
+        console.log(`[SharedProject Check] User is a member. Role: ${role}`);
+      } else {
+        console.log(`[SharedProject Check] User is logged in but not a member of this project.`);
+      }
+    }
   }
 
-  if (!auth?.userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
+  // フロー3: 権限がない場合は公開設定か否か確認
+  if (role === 'none') {
+    if (project.isPublic) {
+      role = project.publicRole || 'viewer';
+      console.log(`[SharedProject Check] Project is public. Granted role: ${role}`);
+    } else {
+      console.log(`[SharedProject Check] Project is private and user has no access. Forbidden.`);
+      return c.json({ error: 'Forbidden' }, 403) // ここで403が返るとフロントでエラーモーダルが出る
+    }
   }
 
-  if (project.ownerId === auth.userId) {
-    return c.json({ success: true, project: project, role: 'owner' })
-  }
-
-  const memberRecord = await db.select()
-    .from(projectMembers)
-    .where(and(
-      eq(projectMembers.projectId, project.id),
-      eq(projectMembers.userId, auth.userId)
-    ))
-
-  if (memberRecord.length > 0) {
-    return c.json({ success: true, project: project, role: memberRecord[0].role })
-  }
-
-  return c.json({ error: 'Forbidden' }, 403)
+  console.log(`[SharedProject Check] Success. Final Role: ${role}`);
+  return c.json({ success: true, project: project, role: role })
 })
 
 export default app

@@ -23,9 +23,26 @@ export const useSharedProject = () => {
       const pathParts = path.split('/').filter(Boolean);
       
       if (pathParts.length === 1) {
-        hasCheckedRef.current = true;
         const shortId = pathParts[0];
 
+        hasCheckedRef.current = true;
+
+        // リファラー（遷移元）のチェック:
+        // 遷移元のURLのパスが現在のshortIdと同じ場合（リロードやプロジェクト内遷移）はモーダル展開処理をスキップ
+        try {
+          if (document.referrer) {
+            const referrerUrl = new URL(document.referrer);
+            const referrerPathParts = referrerUrl.pathname.split('/').filter(Boolean);
+            if (referrerPathParts.length === 1 && referrerPathParts[0] === shortId) {
+              console.log(`[useSharedProject] Referrer matches shortId: ${shortId}. Skipping modal.`);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("[useSharedProject] Referrer URL parse error", e);
+        }
+
+        console.log(`[useSharedProject] Start checking shared project for shortId: ${shortId}`);
         setIsCheckingShared(true);
         
         try {
@@ -41,23 +58,29 @@ export const useSharedProject = () => {
           });
 
           const result = await response.json();
+          console.log(`[useSharedProject] API Response:`, result);
+
+          const params = new URLSearchParams(window.location.search);
+          const compressed = params.get('d');
 
           if (!response.ok || !result.success) {
-            // 権限エラーや存在しないエラーはモーダルで表示させるために state にセット
+            console.warn(`[useSharedProject] Access denied or error:`, result?.error);
+            // 権限エラーや存在しない場合でも、URL圧縮データがあればマージできるように compressedData は残す
             setSharedProjectState({
               shortId,
               projectData: null,
               role: 'none',
-              compressedData: null
+              compressedData: compressed
             });
           } else {
+            console.log(`[useSharedProject] Access granted. Assigned Role:`, result.role);
             const projectData = result.project;
             const role = result.role; 
+            
+            if (compressed) {
+               console.log(`[useSharedProject] Found compressed link data '?d='`);
+            }
 
-            const params = new URLSearchParams(window.location.search);
-            const compressed = params.get('d');
-
-            // 取得成功時もモーダルに情報を渡して表示させる
             setSharedProjectState({
               shortId,
               projectData,
@@ -66,7 +89,7 @@ export const useSharedProject = () => {
             });
           }
         } catch (error) {
-          console.error("共有プロジェクトの取得に失敗しました", error);
+          console.error("[useSharedProject] Failed to fetch shared project:", error);
           setSharedProjectState({
             shortId,
             projectData: null,

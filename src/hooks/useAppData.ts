@@ -354,6 +354,19 @@ export const useAppData = () => {
 
   useEffect(() => {
     if (activeData) {
+      // ★ 修正箇所：URLが共有リンクであり、まだそのプロジェクトを開けていない間は URL の上書きを防止するガード条件
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isSharedLink = pathParts.length === 1;
+      
+      if (isSharedLink) {
+         const urlShortId = pathParts[0];
+         // 現在アクティブなデータが、URLが示す共有プロジェクト自身ではない場合、URLの上書きを待つ
+         if (activeData.shortId !== urlShortId) {
+            console.log(`[useAppData] Waiting for shared project data. Skipping URL overwrite for shortId: ${urlShortId}`);
+            return;
+         }
+      }
+
       const compressed = compressData(activeData);
       const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
@@ -361,7 +374,7 @@ export const useAppData = () => {
     }
   }, [activeData]);
 
-  // ★ 追加: 共有プロジェクトを一覧に安全に追加・更新し、アクティブにする処理
+  // 共有プロジェクトを一覧に安全に追加・更新し、アクティブにする処理
   const addOrUpdateProject = useCallback((newData: AppData) => {
     setProjects(prev => {
       const exists = prev.some(p => p.id === newData.id);
@@ -433,6 +446,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState, addOrUpdateProject // ★ 返り値に追加
+    syncState, addOrUpdateProject
   };
 };
