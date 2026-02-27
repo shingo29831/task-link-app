@@ -159,7 +159,8 @@ function App() {
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
-    isCheckingShared, sharedProjectState, setSharedProjectState
+    isCheckingShared, sharedProjectState, setSharedProjectState,
+    addOrUpdateProject // ★ ここで受け取る
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -203,7 +204,6 @@ function App() {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
   }
 
-  // ★ 権限検証中のローディング表示。この間はURLデータの読み込みやメイン画面の表示を行わない
   if (isCheckingShared) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
@@ -266,8 +266,8 @@ function App() {
             sharedState={sharedProjectState} 
             onClose={() => setSharedProjectState(null)}
             onOpenAsProject={(sharedData) => {
-               setData(sharedData);
-               switchProject(sharedData.id);
+               // ★ 修正: 直接プロジェクト一覧に追加（または更新）してアクティブにする
+               addOrUpdateProject(sharedData);
             }}
             onMergeProject={(sharedData) => {
                setIncomingData(sharedData);

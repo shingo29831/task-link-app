@@ -87,12 +87,9 @@ export const useAppData = () => {
 
       initialActiveId = loadedProjects[0].id;
       
-      // ★ 共有リンクでのアクセスかどうかを判定
       const pathParts = window.location.pathname.split('/').filter(Boolean);
       const isSharedLink = pathParts.length === 1;
 
-      // ★ 共有リンクでない（ローカルプロジェクトへのアクセス）場合のみ、
-      // URLからのデータの解凍と読み込み（マージ準備）を行う
       if (!isSharedLink) {
         const params = new URLSearchParams(window.location.search);
         const compressed = params.get('d');
@@ -364,6 +361,19 @@ export const useAppData = () => {
     }
   }, [activeData]);
 
+  // ★ 追加: 共有プロジェクトを一覧に安全に追加・更新し、アクティブにする処理
+  const addOrUpdateProject = useCallback((newData: AppData) => {
+    setProjects(prev => {
+      const exists = prev.some(p => p.id === newData.id);
+      if (exists) {
+        return prev.map(p => p.id === newData.id ? newData : p);
+      } else {
+        return [...prev, newData];
+      }
+    });
+    setActiveId(newData.id);
+  }, [setProjects]);
+
   const setActiveData = (newData: AppData) => { setProjects(prev => prev.map(p => p.id === newData.id ? newData : p)); };
   const updateProject = useCallback((updatedProject: AppData) => { setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p)); }, [setProjects]);
   const replaceProject = useCallback((oldId: string, newData: AppData) => { setProjects(prev => prev.map(p => p.id === oldId ? newData : p)); }, [setProjects]);
@@ -423,6 +433,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState
+    syncState, addOrUpdateProject // ★ 返り値に追加
   };
 };

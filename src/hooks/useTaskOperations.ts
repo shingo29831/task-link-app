@@ -18,10 +18,10 @@ export const useTaskOperations = () => {
   const { 
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
-    undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState
+    undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
+    addOrUpdateProject // ★ 追加
   } = useAppData();
 
-  // モーダル表示用のステートを受け取る
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
 
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
@@ -566,6 +566,7 @@ export const useTaskOperations = () => {
     canUndo, canRedo,
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    isCheckingShared, sharedProjectState, setSharedProjectState
+    isCheckingShared, sharedProjectState, setSharedProjectState,
+    addOrUpdateProject // ★ エクスポートを追加
   };
 };
