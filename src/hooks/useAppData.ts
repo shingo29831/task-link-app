@@ -87,26 +87,24 @@ export const useAppData = () => {
 
       initialActiveId = loadedProjects[0].id;
       
-      const params = new URLSearchParams(window.location.search);
-      const compressed = params.get('d');
-      let newIncoming: AppData | null = null;
+      // ★ 共有リンクでのアクセスかどうかを判定
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isSharedLink = pathParts.length === 1;
 
-      if (compressed) {
-        const incoming = decompressData(compressed);
-        if (incoming) {
-          incoming.id = generateProjectId();
-          newIncoming = incoming;
-        }
-      }
+      // ★ 共有リンクでない（ローカルプロジェクトへのアクセス）場合のみ、
+      // URLからのデータの解凍と読み込み（マージ準備）を行う
+      if (!isSharedLink) {
+        const params = new URLSearchParams(window.location.search);
+        const compressed = params.get('d');
 
-      if (newIncoming) {
-        const pathParts = window.location.pathname.split('/').filter(Boolean);
-        // shortIdがない（ローカル遷移）場合のみここで処理とURLクリーンアップを行う
-        if (pathParts.length !== 1) {
-            setIncomingData(newIncoming);
+        if (compressed) {
+          const incoming = decompressData(compressed);
+          if (incoming) {
+            incoming.id = generateProjectId();
+            setIncomingData(incoming);
             window.history.replaceState(null, '', window.location.pathname);
+          }
         }
-        // shortIdがある場合は何もしない（URLパラメータは残し、useSharedProjectに処理を任せる）
       }
 
       loadedProjects.forEach(p => {
@@ -359,7 +357,6 @@ export const useAppData = () => {
 
   useEffect(() => {
     if (activeData) {
-      // クラウドデータの場合もURLにdパラメータを付与する
       const compressed = compressData(activeData);
       const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
@@ -395,7 +392,6 @@ export const useAppData = () => {
     if (projects.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
     if (!confirm("このプロジェクトを削除しますか？")) return;
     
-    // バックエンドからも削除する
     const targetProject = projects.find(p => p.id === id);
     if (targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
        try {
@@ -416,7 +412,6 @@ export const useAppData = () => {
 
   const getShareUrl = () => {
     if (!activeData) return '';
-    // クラウドデータの場合もURLにdパラメータを付与する
     const compressed = compressData(activeData);
     const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
     const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;

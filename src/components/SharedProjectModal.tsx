@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { AppData } from '../types';
 import { decompressData } from '../utils/compression';
 
@@ -16,21 +16,41 @@ type Props = {
 
 export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOpenAsProject, onMergeProject }) => {
   const { shortId, projectData, role, compressedData } = sharedState;
+  
+  // 権限がない場合の自動遷移用カウントダウン
+  const [countdown, setCountdown] = useState(3);
 
-  // 権限エラー、またはプロジェクトが見つからない場合のエラーモーダル
+  useEffect(() => {
+    // プロジェクトデータがない、または権限がない場合
+    if (!projectData || role === 'none' || role === 'error') {
+      if (countdown > 0) {
+        const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+        return () => clearTimeout(timer);
+      } else {
+        // カウントが0になったらURLをリセットしてモーダルを閉じる
+        window.history.replaceState(null, '', '/');
+        onClose();
+      }
+    }
+  }, [projectData, role, countdown, onClose]);
+
+  // 権限エラー、またはプロジェクトが見つからない場合のエラーモーダル表示
   if (!projectData || role === 'none' || role === 'error') {
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
           <h3 style={{ color: 'var(--color-danger-text)', marginTop: 0 }}>アクセスエラー</h3>
           <p style={{ color: 'var(--text-primary)', lineHeight: '1.5' }}>
-            {role === 'error' ? 'データの読み込みに失敗しました。' : 'このプロジェクトを閲覧する権限がありません。'}
+            {role === 'error' ? 'データの読み込みに失敗しました。' : '権限がありません。'}
+          </p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9em', marginTop: '10px' }}>
+            {countdown}秒後にトップページへ遷移します...
           </p>
           <button 
             onClick={() => { window.history.replaceState(null, '', '/'); onClose(); }} 
             style={{ padding: '10px 20px', marginTop: '20px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
           >
-            トップへ戻る
+            今すぐ戻る
           </button>
         </div>
       </div>

@@ -26,7 +26,7 @@ import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
 import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconTrash } from './components/Icons';
-import { SharedProjectModal } from './components/SharedProjectModal'; // ★ モーダルのインポートを追加
+import { SharedProjectModal } from './components/SharedProjectModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -159,7 +159,7 @@ function App() {
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
-    sharedProjectState, setSharedProjectState // ★ 共有プロジェクトのモーダル状態を追加
+    isCheckingShared, sharedProjectState, setSharedProjectState
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -201,6 +201,16 @@ function App() {
 
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
+  }
+
+  // ★ 権限検証中のローディング表示。この間はURLデータの読み込みやメイン画面の表示を行わない
+  if (isCheckingShared) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
+        <IconLoader size={48} />
+        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>プロジェクトの権限を確認中...</p>
+      </div>
+    );
   }
 
   if (!data) return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
@@ -251,7 +261,6 @@ function App() {
           .spin { animation: spin 1s linear infinite; }
         `}</style>
 
-        {/* ★ モーダルの表示処理を追加 */}
         {sharedProjectState && (
           <SharedProjectModal 
             sharedState={sharedProjectState} 
