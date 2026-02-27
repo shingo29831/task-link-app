@@ -1,28 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import type { AppData } from '../types';
 
-export const useSharedProject = (
-  setData: (data: AppData) => void,
-  switchProject: (id: string) => void
-) => {
+export type SharedProjectState = {
+  shortId: string;
+  projectData: any;
+  role: string;
+  compressedData: string | null;
+} | null;
+
+export const useSharedProject = () => {
   const { getToken, isLoaded } = useAuth();
   const [isCheckingShared, setIsCheckingShared] = useState(false);
-  const [sharedRole, setSharedRole] = useState<string | null>(null);
+  const [sharedProjectState, setSharedProjectState] = useState<SharedProjectState>(null);
+  
+  const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || hasCheckedRef.current) return;
 
     const checkSharedProject = async () => {
       const path = window.location.pathname;
       const pathParts = path.split('/').filter(Boolean);
       
-      // パスが1つ（例: /short_id/）の場合を共有リンクへのアクセスとみなす
       if (pathParts.length === 1) {
+        hasCheckedRef.current = true;
         const shortId = pathParts[0];
-        // dataパラメータ（'d'）がある場合は共有URL生成による遷移なのでスキップ
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('d')) return;
 
         setIsCheckingShared(true);
         
@@ -41,31 +43,36 @@ export const useSharedProject = (
           const result = await response.json();
 
           if (!response.ok || !result.success) {
-            // 観ることができない（権限がない、非公開設定、存在しない）場合
-            alert('権限がありません。');
-            window.location.href = '/'; 
+            // 権限エラーや存在しないエラーはモーダルで表示させるために state にセット
+            setSharedProjectState({
+              shortId,
+              projectData: null,
+              role: 'none',
+              compressedData: null
+            });
           } else {
-            // APIから返ってきたプロジェクト情報をセット
             const projectData = result.project;
-            const sharedData: AppData = {
-              id: projectData.id,
-              shortId: shortId,
-              projectName: projectData.projectName,
-              tasks: projectData.data?.tasks || [],
-              lastSynced: Date.now(),
-              isCloudSync: true,
-              isPublic: projectData.isPublic,
-              publicRole: projectData.publicRole || result.role,
-            };
+            const role = result.role; 
 
-            setData(sharedData);
-            switchProject(sharedData.id);
-            setSharedRole(result.role);
+            const params = new URLSearchParams(window.location.search);
+            const compressed = params.get('d');
+
+            // 取得成功時もモーダルに情報を渡して表示させる
+            setSharedProjectState({
+              shortId,
+              projectData,
+              role,
+              compressedData: compressed
+            });
           }
         } catch (error) {
           console.error("共有プロジェクトの取得に失敗しました", error);
-          alert('読み込みに失敗しました。');
-          window.location.href = '/';
+          setSharedProjectState({
+            shortId,
+            projectData: null,
+            role: 'error',
+            compressedData: null
+          });
         } finally {
           setIsCheckingShared(false);
         }
@@ -73,7 +80,7 @@ export const useSharedProject = (
     };
 
     checkSharedProject();
-  }, [isLoaded, getToken, setData, switchProject]);
+  }, [isLoaded, getToken]);
 
-  return { isCheckingShared, sharedRole };
+  return { isCheckingShared, sharedProjectState, setSharedProjectState };
 };

@@ -16,31 +16,13 @@ export const useTaskOperations = () => {
   const { getToken } = useAuth();
   
   const { 
-    data, 
-    setData, 
-    updateProject, 
-    incomingData, 
-    setIncomingData, 
-    getShareUrl,
-    projects,
-    activeId,
-    addProject,
-    importNewProject,
-    switchProject,
-    deleteProject,
-    undo, 
-    redo,
-    canUndo,
-    canRedo,
-    uploadProject,
-    syncLimitState,
-    resolveSyncLimit,
-    currentLimit,
-    syncState
+    data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
+    projects, activeId, addProject, importNewProject, switchProject, deleteProject,
+    undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState
   } = useAppData();
 
-  // 共有プロジェクトの検証ロジックを呼び出し、自身の権限(sharedRole)を取得
-  const { isCheckingShared, sharedRole } = useSharedProject(setData, switchProject);
+  // モーダル表示用のステートを受け取る
+  const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
 
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -208,7 +190,6 @@ export const useTaskOperations = () => {
     });
   }, [data, setData]);
 
-  // DnDロジックの呼び出し
   const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
 
   const updateExternalProjectTask = useCallback((targetProjId: string, taskId: string, newStatus: 0 | 1 | 2 | 3) => {
@@ -392,9 +373,8 @@ export const useTaskOperations = () => {
           if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; 
         }
 
-        // クラウド上のプロジェクトで権限がない（viewer）場合はマージさせない
-        if (targetProj && targetProj.isCloudSync && sharedRole === 'viewer') {
-          alert('権限がありません。クラウド上のプロジェクトにマージすることはできません。');
+        if (targetProj && targetProj.isCloudSync) {
+          alert('クラウド上のプロジェクトにマージすることはできません。');
           return;
         }
 
@@ -408,7 +388,7 @@ export const useTaskOperations = () => {
         setIncomingData(incoming);
       } else { alert('データの復元に失敗しました。'); }
     } catch (e) { console.error(e); alert('URLの形式が正しくありません。'); }
-  }, [data, setIncomingData, setData, projects, activeId, switchProject, sharedRole]);
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
 
   const handleFileImport = useCallback((f: File) => {
       const r = new FileReader();
@@ -429,9 +409,8 @@ export const useTaskOperations = () => {
             if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; 
           }
 
-          // クラウド上のプロジェクトで権限がない（viewer）場合はマージさせない
-          if (targetProj && targetProj.isCloudSync && sharedRole === 'viewer') {
-            alert('権限がありません。クラウド上のプロジェクトにマージすることはできません。');
+          if (targetProj && targetProj.isCloudSync) {
+            alert('クラウド上のプロジェクトにマージすることはできません。');
             return;
           }
 
@@ -445,7 +424,7 @@ export const useTaskOperations = () => {
         } catch(err) { alert('JSONの読み込みに失敗しました'); }
       };
       r.readAsText(f);
-  }, [data, setIncomingData, setData, projects, activeId, switchProject, sharedRole]);
+  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
 
   const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
     if (!inputTaskName.trim()) return;
@@ -587,6 +566,6 @@ export const useTaskOperations = () => {
     canUndo, canRedo,
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    isCheckingShared, sharedRole
+    isCheckingShared, sharedProjectState, setSharedProjectState
   };
 };

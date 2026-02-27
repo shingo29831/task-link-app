@@ -100,8 +100,13 @@ export const useAppData = () => {
       }
 
       if (newIncoming) {
-        setIncomingData(newIncoming);
-        window.history.replaceState(null, '', window.location.pathname);
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        // shortIdがない（ローカル遷移）場合のみここで処理とURLクリーンアップを行う
+        if (pathParts.length !== 1) {
+            setIncomingData(newIncoming);
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+        // shortIdがある場合は何もしない（URLパラメータは残し、useSharedProjectに処理を任せる）
       }
 
       loadedProjects.forEach(p => {
@@ -354,6 +359,7 @@ export const useAppData = () => {
 
   useEffect(() => {
     if (activeData) {
+      // クラウドデータの場合もURLにdパラメータを付与する
       const compressed = compressData(activeData);
       const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
@@ -410,6 +416,7 @@ export const useAppData = () => {
 
   const getShareUrl = () => {
     if (!activeData) return '';
+    // クラウドデータの場合もURLにdパラメータを付与する
     const compressed = compressData(activeData);
     const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
     const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;

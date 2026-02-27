@@ -26,6 +26,7 @@ import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
 import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconTrash } from './components/Icons';
+import { SharedProjectModal } from './components/SharedProjectModal'; // ★ モーダルのインポートを追加
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -157,7 +158,8 @@ function App() {
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
-    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
+    sharedProjectState, setSharedProjectState // ★ 共有プロジェクトのモーダル状態を追加
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -248,6 +250,21 @@ function App() {
           @keyframes spin { 100% { transform: rotate(360deg); } }
           .spin { animation: spin 1s linear infinite; }
         `}</style>
+
+        {/* ★ モーダルの表示処理を追加 */}
+        {sharedProjectState && (
+          <SharedProjectModal 
+            sharedState={sharedProjectState} 
+            onClose={() => setSharedProjectState(null)}
+            onOpenAsProject={(sharedData) => {
+               setData(sharedData);
+               switchProject(sharedData.id);
+            }}
+            onMergeProject={(sharedData) => {
+               setIncomingData(sharedData);
+            }}
+          />
+        )}
 
         <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
           {incomingData && targetLocalData && <MergeModal localData={targetLocalData} incomingData={incomingData} onConfirm={(merged) => { setData(merged); if (merged.id !== activeId) switchProject(merged.id); setIncomingData(null); alert('マージが完了しました'); }} onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} />}
