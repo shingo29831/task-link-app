@@ -54,6 +54,9 @@ export const useAppData = () => {
   
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced'>('idle');
 
+  // URL上書きガード用のRef（初回ロード時のみガードを有効にする）
+  const initialUrlGuardRef = useRef(true);
+
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
@@ -354,17 +357,21 @@ export const useAppData = () => {
 
   useEffect(() => {
     if (activeData) {
-      // ★ 修正箇所：URLが共有リンクであり、まだそのプロジェクトを開けていない間は URL の上書きを防止するガード条件
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const isSharedLink = pathParts.length === 1;
-      
-      if (isSharedLink) {
-         const urlShortId = pathParts[0];
-         // 現在アクティブなデータが、URLが示す共有プロジェクト自身ではない場合、URLの上書きを待つ
-         if (activeData.shortId !== urlShortId) {
-            console.log(`[useAppData] Waiting for shared project data. Skipping URL overwrite for shortId: ${urlShortId}`);
-            return;
-         }
+      if (initialUrlGuardRef.current) {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts.length === 1) {
+           const urlShortId = pathParts[0];
+           if (activeData.shortId !== urlShortId) {
+              console.log(`[useAppData] Waiting for shared project data. Skipping URL overwrite for shortId: ${urlShortId}`);
+              return; // 共有プロジェクトを開くまでは上書きを待つ
+           } else {
+              // activeData が共有プロジェクトと一致したらガードを解除する
+              initialUrlGuardRef.current = false;
+           }
+        } else {
+           // 共有リンク以外（またはマージ後など）は即座にガード解除
+           initialUrlGuardRef.current = false;
+        }
       }
 
       const compressed = compressData(activeData);
