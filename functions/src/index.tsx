@@ -287,4 +287,54 @@ app.delete('/api/projects/:id/members/:memberId', async (c) => {
     return c.json({ success: true })
 })
 
+// index.tsx の最後あたりに追加
+
+// 共有プロジェクトの取得 (shortIdベース)
+app.get('/api/projects/shared/:shortId', async (c) => {
+  const auth = getAuth(c) // ログインしていない場合は undefined/null になる
+  const shortId = c.req.param('shortId')
+  const db = getDb(c.env.DATABASE_URL)
+
+  // プロジェクトを shortId で検索
+  const proj = await db.select().from(projects).where(eq(projects.shortId, shortId))
+  
+  if (proj.length === 0) {
+    return c.json({ error: 'Project not found' }, 404)
+  }
+
+  const project = proj[0]
+
+  // 全体公開設定の場合は権限チェックをパス
+  if (project.isPublic) {
+    return c.json({ success: true, project: project.data, role: project.publicRole })
+  }
+
+  // 以下は非公開プロジェクトの場合の権限チェック
+  if (!auth?.userId) {
+    // ログインしていない場合は権限なし
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (project.ownerId === auth.userId) {
+    // オーナーの場合はアクセス可能
+    return c.json({ success: true, project: project.data, role: 'owner' })
+  }
+
+  // メンバーとして登録されているかチェック
+  const memberRecord = await db.select()
+    .from(projectMembers)
+    .where(and(
+      eq(projectMembers.projectId, project.id),
+      eq(projectMembers.userId, auth.userId)
+    ))
+
+  if (memberRecord.length > 0) {
+    // メンバーの場合はアクセス可能
+    return c.json({ success: true, project: project.data, role: memberRecord[0].role })
+  }
+
+  // いずれの条件も満たさない場合は権限なし
+  return c.json({ error: 'Forbidden' }, 403)
+})
+
 export default app
