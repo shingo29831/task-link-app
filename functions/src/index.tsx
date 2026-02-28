@@ -91,24 +91,59 @@ app.post('/api/projects', async (c) => {
     return c.json({ success: true, newId: newId, shortId: newShortId })
   } else {
     let finalShortId = shortId;
-    const existing = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)));
+    const existingList = await db.select().from(projects).where(eq(projects.id, id));
     
-    if (existing.length > 0) {
-      finalShortId = existing[0].shortId;
-    } else if (!finalShortId) {
-      const updateResult = await db.execute(sql`
-        INSERT INTO sequences (name, value) VALUES ('projectId', 1)
-        ON CONFLICT (name) DO UPDATE SET value = sequences.value + 1
-        RETURNING value;
-      `);
-      finalShortId = toBase64Url(Number(updateResult.rows[0].value) - 1);
-    }
+    if (existingList.length > 0) {
+      // 既存のプロジェクトを更新する場合（権限チェックを行う）
+      const existing = existingList[0];
+      finalShortId = existing.shortId;
 
-    await db.insert(projects)
-      .values({ id: id, shortId: finalShortId, ownerId: auth.userId, projectName, data, isPublic, publicRole, updatedAt: new Date() })
-      .onConflictDoUpdate({ target: projects.id, set: { projectName, data, isPublic, publicRole, updatedAt: new Date() } })
+      let role = 'none';
+      if (existing.ownerId === auth.userId) {
+        role = 'owner';
+      } else {
+        const memberRecord = await db.select()
+          .from(projectMembers)
+          .where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, auth.userId)));
+        if (memberRecord.length > 0) {
+          role = memberRecord[0].role;
+        } else if (existing.isPublic) {
+          role = existing.publicRole || 'viewer';
+        }
+      }
+
+      // 編集・管理権限がない場合は保存を拒否し、現在のロールを返す
+      if (role !== 'owner' && role !== 'admin' && role !== 'editor') {
+        return c.json({ error: 'Forbidden', role: role }, 403);
+      }
+
+      const updateData: any = { data, updatedAt: new Date() };
       
-    return c.json({ success: true, id: id, shortId: finalShortId })
+      // プロジェクト名や公開設定の変更はオーナーと管理者のみ可能
+      if (role === 'owner' || role === 'admin') {
+        if (projectName !== undefined) updateData.projectName = projectName;
+        if (body.isPublic !== undefined) updateData.isPublic = body.isPublic;
+        if (body.publicRole !== undefined) updateData.publicRole = body.publicRole;
+      }
+
+      await db.update(projects).set(updateData).where(eq(projects.id, id));
+      return c.json({ success: true, id: id, shortId: finalShortId, role: role });
+    } else {
+      // 新規で指定IDを用いて作成される場合
+      if (!finalShortId) {
+        const updateResult = await db.execute(sql`
+          INSERT INTO sequences (name, value) VALUES ('projectId', 1)
+          ON CONFLICT (name) DO UPDATE SET value = sequences.value + 1
+          RETURNING value;
+        `);
+        finalShortId = toBase64Url(Number(updateResult.rows[0].value) - 1);
+      }
+
+      await db.insert(projects)
+        .values({ id: id, shortId: finalShortId, ownerId: auth.userId, projectName, data, isPublic, publicRole, updatedAt: new Date() });
+        
+      return c.json({ success: true, id: id, shortId: finalShortId, role: 'owner' });
+    }
   }
 })
 
@@ -224,7 +259,6 @@ app.get('/api/projects/shared/:shortId', async (c) => {
   const project = proj[0]
   let role = 'none';
 
-  // フロー2: ログイン中であれば閲覧以上の権限があるか確認
   if (auth?.userId) {
     if (project.ownerId === auth.userId) {
       role = 'owner';
@@ -246,14 +280,13 @@ app.get('/api/projects/shared/:shortId', async (c) => {
     }
   }
 
-  // フロー3: 権限がない場合は公開設定か否か確認
   if (role === 'none') {
     if (project.isPublic) {
       role = project.publicRole || 'viewer';
       console.log(`[SharedProject Check] Project is public. Granted role: ${role}`);
     } else {
       console.log(`[SharedProject Check] Project is private and user has no access. Forbidden.`);
-      return c.json({ error: 'Forbidden' }, 403) // ここで403が返るとフロントでエラーモーダルが出る
+      return c.json({ error: 'Forbidden' }, 403) 
     }
   }
 

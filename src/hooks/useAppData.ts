@@ -266,21 +266,76 @@ export const useAppData = () => {
       try {
         const token = await getToken();
         
-        const getRes = await fetch('http://localhost:5174/api/projects', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // 1. アップロード前にクラウドから最新のプロジェクト情報を取得し、権限を検証
+        let cloudProject = null;
+        let fetchedRole = activeData.role;
+
+        if (activeData.shortId) {
+            const sharedRes = await fetch(`http://localhost:5174/api/projects/shared/${activeData.shortId}`, {
+               headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (sharedRes.ok) {
+               const sharedResult = await sharedRes.json();
+               if (sharedResult.success && sharedResult.project) {
+                   cloudProject = sharedResult.project;
+                   fetchedRole = sharedResult.role;
+               } else if (sharedRes.status === 403 || sharedRes.status === 404) {
+                   fetchedRole = 'none'; // 権限剥奪または削除された
+               }
+            } else {
+               fetchedRole = 'none';
+            }
+        } else {
+            const getRes = await fetch('http://localhost:5174/api/projects', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (getRes.ok) {
+              const { projects: dbProjects } = await getRes.json();
+              const found = dbProjects.find((p: any) => p.id === activeData.id);
+              if (found) {
+                  cloudProject = found;
+                  fetchedRole = found.role || 'owner';
+              } else {
+                  fetchedRole = 'none';
+              }
+            }
+        }
+
+        // ★ 権限がない(閲覧者や権限喪失)と判定された場合、変更をクラウドの最新データへロールバックする
+        if (fetchedRole === 'viewer' || fetchedRole === 'none') {
+            let rollbackTasks = activeData.tasks;
+            let rollbackName = activeData.projectName;
+            
+            if (cloudProject) {
+                rollbackTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+                rollbackName = cloudProject.projectName || activeData.projectName;
+            }
+
+            setProjects(prev => prev.map(p => p.id === activeData.id ? { 
+                ...p, 
+                role: fetchedRole, 
+                tasks: rollbackTasks, 
+                projectName: rollbackName,
+                lastSynced: Date.now()
+            } : p));
+            
+            setSyncState('idle');
+            alert('編集権限がないため、変更は保存されずクラウドの最新状態にリセットされました。');
+            return;
+        }
+
+        // 権限があるがロールだけ変わった場合は更新
+        if (fetchedRole !== activeData.role) {
+            setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, role: fetchedRole } : p));
+        }
 
         let mergedTasks = [...activeData.tasks];
         let mergedProjectName = activeData.projectName;
         let requiresLocalUpdate = false;
         let isSameAsCloud = false;
 
-        if (getRes.ok) {
-          const { projects: dbProjects } = await getRes.json();
-          const cloudProject = dbProjects.find((p: any) => p.id === activeData.id);
-          
-          if (cloudProject) {
-            const cloudTasks = cloudProject.data.tasks || [];
+        if (cloudProject) {
+            const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
             
             const taskMap = new Map<string, Task>();
             cloudTasks.forEach((t: Task) => taskMap.set(t.id, t));
@@ -304,7 +359,6 @@ export const useAppData = () => {
             if (mergedHash === cloudHash) {
                 isSameAsCloud = true;
             }
-          }
         }
 
         const mergedProjectData = { ...activeData, projectName: mergedProjectName, tasks: mergedTasks };
@@ -321,6 +375,7 @@ export const useAppData = () => {
 
         const dataToUpload = { 
           id: activeData.id, 
+          shortId: activeData.shortId,
           projectName: mergedProjectName, 
           data: { tasks: mergedTasks, lastSynced: Date.now() } 
         };
@@ -339,6 +394,13 @@ export const useAppData = () => {
           }
           
           setSyncState('synced');
+        } else if (res.status === 403) {
+          // バックエンド側で権限エラーとして弾かれた場合の保険のロールバック
+          const errData = await res.json().catch(() => ({}));
+          const newRole = errData.role || 'viewer';
+          setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, role: newRole } : p));
+          setSyncState('idle');
+          alert('権限が変更されたため、変更を保存できませんでした。最新の権限状態を反映します。');
         } else {
           setSyncState('idle');
         }
@@ -413,7 +475,6 @@ export const useAppData = () => {
     setIncomingData(null);
   };
 
-  // ★ プロジェクト切り替え時にDBと照合して検証する
   const switchProject = async (id: string) => { 
     const targetProject = projects.find(p => p.id === id);
     if (!targetProject) return;
@@ -423,7 +484,6 @@ export const useAppData = () => {
       return;
     }
 
-    // App.tsx側にローディング表示を促すイベントを発行
     window.dispatchEvent(new CustomEvent('project-verifying', { detail: true }));
 
     try {
