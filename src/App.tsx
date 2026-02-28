@@ -219,6 +219,8 @@ function App() {
   const { windowWidth, isMobile } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isVerifyingProject, setIsVerifyingProject] = useState(false); // ★ プロジェクト検証中の状態
+
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
@@ -244,6 +246,13 @@ function App() {
       dataRole: data?.role
     });
   }, [currentUserRole, isViewer, isAdmin, isCloudProject, sharedProjectState, hasEditPermission, data?.role]);
+
+  // ★ カスタムイベントで検証中のローディングを表示するリスナー
+  useEffect(() => {
+    const handler = (e: any) => setIsVerifyingProject(e.detail);
+    window.addEventListener('project-verifying', handler);
+    return () => window.removeEventListener('project-verifying', handler);
+  }, []);
 
   useEffect(() => {
     const syncUserToDatabase = async () => {
@@ -281,11 +290,12 @@ function App() {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
   }
 
-  if (isCheckingShared) {
+  // ★ 検証中もローディングを表示
+  if (isCheckingShared || isVerifyingProject) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
         <IconLoader size={48} />
-        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>プロジェクトの権限を確認中...</p>
+        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>{isVerifyingProject ? 'プロジェクトを検証中...' : 'プロジェクトの権限を確認中...'}</p>
       </div>
     );
   }

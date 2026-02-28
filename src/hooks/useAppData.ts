@@ -413,9 +413,92 @@ export const useAppData = () => {
     setIncomingData(null);
   };
 
-  const switchProject = (id: string) => { if (projects.some(p => p.id === id)) setActiveId(id); };
+  // ★ プロジェクト切り替え時にDBと照合して検証する
+  const switchProject = async (id: string) => { 
+    const targetProject = projects.find(p => p.id === id);
+    if (!targetProject) return;
 
-  // ★ クラウドから削除するかどうかを第2引数で受け取るように変更
+    if (String(id).startsWith('local_') || targetProject.isCloudSync === false) {
+      setActiveId(id);
+      return;
+    }
+
+    // App.tsx側にローディング表示を促すイベントを発行
+    window.dispatchEvent(new CustomEvent('project-verifying', { detail: true }));
+
+    try {
+      let token: string | null = null;
+      if (isSignedIn) {
+        token = await getToken();
+      }
+
+      let hasAccess = false;
+      let fetchedRole = targetProject.role;
+      let targetTasks = targetProject.tasks;
+      let isPublic = targetProject.isPublic;
+      
+      if (targetProject.shortId) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(`http://localhost:5174/api/projects/shared/${targetProject.shortId}`, { headers });
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          hasAccess = true;
+          fetchedRole = result.role;
+          if (result.project && result.project.data && result.project.data.tasks) {
+              targetTasks = result.project.data.tasks;
+          } else if (result.project && result.project.tasks) {
+              targetTasks = result.project.tasks;
+          }
+          if (result.project?.isPublic !== undefined) {
+              isPublic = result.project.isPublic;
+          }
+        }
+      } else if (token) {
+        const response = await fetch(`http://localhost:5174/api/projects`, {
+           headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+           const { projects: dbProjects } = await response.json();
+           const found = dbProjects.find((p: any) => p.id === id);
+           if (found) {
+              hasAccess = true;
+              fetchedRole = found.role || 'owner';
+              if (found.data && found.data.tasks) {
+                  targetTasks = found.data.tasks;
+              } else if (found.tasks) {
+                  targetTasks = found.tasks;
+              }
+              if (found.isPublic !== undefined) {
+                  isPublic = found.isPublic;
+              }
+           }
+        }
+      }
+
+      if (hasAccess) {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, role: fetchedRole, tasks: targetTasks, isPublic } : p));
+        setActiveId(id);
+      } else {
+        alert("このプロジェクトは削除されたか、アクセス権限がありません。リストから削除します。");
+        setProjects(prev => {
+            const nextProjects = prev.filter(p => p.id !== id);
+            if (activeId === id && nextProjects.length > 0) {
+               setActiveId(nextProjects[0].id);
+            }
+            return nextProjects;
+        });
+      }
+    } catch (e) {
+      console.error("Verification failed", e);
+      alert("プロジェクトの検証に失敗しました。ネットワークを確認してください。");
+    } finally {
+      window.dispatchEvent(new CustomEvent('project-verifying', { detail: false }));
+    }
+  };
+
   const deleteProject = async (id: string, deleteFromCloud: boolean = true) => {
     if (projects.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
     
