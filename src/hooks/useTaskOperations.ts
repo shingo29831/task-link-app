@@ -19,7 +19,7 @@ export const useTaskOperations = () => {
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject
+    addOrUpdateProject, mergeCloudDataToHistory
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -35,7 +35,6 @@ export const useTaskOperations = () => {
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
-  // タイマーと最新状態保持用のRef
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
@@ -197,13 +196,11 @@ export const useTaskOperations = () => {
 
   const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
 
-  // ★ ローカルの即時更新と15秒後のクラウド同期を行う関数
   const applyCloudSyncForStatusChange = useCallback((targetProjId: string, applyChanges: (tasks: Task[]) => Task[]) => {
       const currentProjects = projectsRef.current;
       const targetProject = currentProjects.find(p => p.id === targetProjId);
       if (!targetProject) return;
 
-      // 1. ローカルデータを即時更新する
       const updatedTasks = applyChanges(targetProject.tasks);
       const calculatedTasks = recalculateStatus(updatedTasks);
       const now = Date.now();
@@ -219,13 +216,11 @@ export const useTaskOperations = () => {
       const isCloud = !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false && targetProject.role !== 'viewer';
       if (!isCloud) return;
 
-      // 2. 15秒間のデバウンス処理を開始
       if (syncTimerRef.current) {
           clearTimeout(syncTimerRef.current);
       }
 
       syncTimerRef.current = setTimeout(async () => {
-          // 待機完了後の最新のローカル状態を取得
           const latestProjects = projectsRef.current;
           const latestProject = latestProjects.find(p => p.id === targetProjId);
           if (!latestProject) return;
@@ -244,12 +239,12 @@ export const useTaskOperations = () => {
               }
 
               let mergedTasks = [...latestProject.tasks];
+              let cloudTasks: Task[] = [];
 
               if (cloudProject) {
-                  const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+                  cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
                   mergedProjectName = cloudProject.projectName || mergedProjectName;
                   
-                  // ローカルとクラウドの変更をマージ
                   const taskMap = new Map<string, Task>();
                   cloudTasks.forEach((t: Task) => taskMap.set(t.id, t));
                   latestProject.tasks.forEach((localTask) => {
@@ -261,10 +256,14 @@ export const useTaskOperations = () => {
                   mergedTasks = Array.from(taskMap.values());
               }
 
+              // ★ 15秒待機後に取得したクラウドの最新データを、UNDO・REDOの履歴内のタスクにもマージさせる
+              if (cloudTasks.length > 0) {
+                  mergeCloudDataToHistory(latestProject.id, cloudTasks);
+              }
+
               const finalCalculatedTasks = recalculateStatus(mergedTasks);
               const syncNow = Date.now();
 
-              // マージしたデータをクラウドにアップロード
               await fetch('http://localhost:5174/api/projects', {
                   method: 'POST',
                   headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -274,14 +273,13 @@ export const useTaskOperations = () => {
                   })
               });
 
-              // 最新のマージ結果をローカルにも反映
               updateProject({ ...latestProject, projectName: mergedProjectName, tasks: finalCalculatedTasks, lastSynced: syncNow });
 
           } catch(e) {
               console.error('クラウドへの同期処理に失敗しました', e);
           }
       }, 15000);
-  }, [activeId, data, setData, updateProject, getToken]);
+  }, [activeId, data, setData, updateProject, getToken, mergeCloudDataToHistory]);
 
   const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
     let targetProjId = data?.id;

@@ -59,7 +59,6 @@ export const useAppData = () => {
         const { lastUpdated: l1, ...restNext } = nextTask;
         const { lastUpdated: l2, ...restCurr } = currTask;
         
-        // lastUpdated以外のタスク内容に差分があるか比較
         if (JSON.stringify(restNext) !== JSON.stringify(restCurr)) {
           isProjectChanged = true;
           return { ...nextTask, lastUpdated: now };
@@ -74,7 +73,7 @@ export const useAppData = () => {
     });
   }, []);
 
-  const { state: projects, setState: setProjects, resetState: resetProjects, undo, redo, canUndo, canRedo } = useHistory<AppData[]>([], handleUndoRedo);
+  const { state: projects, setState: setProjects, resetState: resetProjects, undo, redo, canUndo, canRedo, modifyHistory } = useHistory<AppData[]>([], handleUndoRedo);
 
   const [activeId, setActiveId] = useState<string>('');
   const activeData = projects.find(p => p.id === activeId) || null;
@@ -89,6 +88,39 @@ export const useAppData = () => {
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced'>('idle');
 
   const initialUrlGuardRef = useRef(true);
+
+  // ★ クラウドデータを用いてUNDO/REDO履歴内の古いタスクを最新状態にマージする関数
+  const mergeCloudDataToHistory = useCallback((projectId: string, cloudTasks: Task[]) => {
+    modifyHistory(curr => {
+      const mergeTasks = (localProject: AppData) => {
+        if (localProject.id !== projectId) return localProject;
+        const taskMap = new Map<string, Task>();
+        cloudTasks.forEach(t => taskMap.set(t.id, t));
+        
+        let isChanged = false;
+        const merged = localProject.tasks.map(localTask => {
+          const cloudTask = taskMap.get(localTask.id);
+          // クラウドのタスクの更新日時が、履歴内のタスクの更新日時より新しい場合はクラウドを優先
+          if (cloudTask && cloudTask.lastUpdated > localTask.lastUpdated) {
+            isChanged = true;
+            return cloudTask;
+          }
+          return localTask;
+        });
+
+        if (isChanged) {
+           return { ...localProject, tasks: merged };
+        }
+        return localProject;
+      };
+
+      return {
+        past: curr.past.map(projectsList => projectsList.map(mergeTasks)),
+        present: curr.present, // presentの反映はupdateProject等の通常フローで行うためここでは触らない
+        future: curr.future.map(projectsList => projectsList.map(mergeTasks))
+      };
+    });
+  }, [modifyHistory]);
 
   useEffect(() => {
     if (isLoaded.current) return;
@@ -299,7 +331,6 @@ export const useAppData = () => {
       try {
         const token = await getToken();
         
-        // 1. アップロード前にクラウドから最新のプロジェクト情報を取得し、権限を検証
         let cloudProject = null;
         let fetchedRole = activeData.role;
 
@@ -313,7 +344,7 @@ export const useAppData = () => {
                    cloudProject = sharedResult.project;
                    fetchedRole = sharedResult.role;
                } else if (sharedRes.status === 403 || sharedRes.status === 404) {
-                   fetchedRole = 'none'; // 権限剥奪または削除された
+                   fetchedRole = 'none';
                }
             } else {
                fetchedRole = 'none';
@@ -334,7 +365,6 @@ export const useAppData = () => {
             }
         }
 
-        // ★ 権限がない(閲覧者や権限喪失)と判定された場合、変更をクラウドの最新データへロールバックする
         if (fetchedRole === 'viewer' || fetchedRole === 'none') {
             let rollbackTasks = activeData.tasks;
             let rollbackName = activeData.projectName;
@@ -357,7 +387,6 @@ export const useAppData = () => {
             return;
         }
 
-        // 権限があるがロールだけ変わった場合は更新
         if (fetchedRole !== activeData.role) {
             setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, role: fetchedRole } : p));
         }
@@ -392,6 +421,9 @@ export const useAppData = () => {
             if (mergedHash === cloudHash) {
                 isSameAsCloud = true;
             }
+
+            // ★ 同期ついでにUNDO履歴側のタスクも最新クラウド状態で更新する
+            mergeCloudDataToHistory(activeData.id, cloudTasks);
         }
 
         const mergedProjectData = { ...activeData, projectName: mergedProjectName, tasks: mergedTasks };
@@ -428,7 +460,6 @@ export const useAppData = () => {
           
           setSyncState('synced');
         } else if (res.status === 403) {
-          // バックエンド側で権限エラーとして弾かれた場合の保険のロールバック
           const errData = await res.json().catch(() => ({}));
           const newRole = errData.role || 'viewer';
           setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, role: newRole } : p));
@@ -445,7 +476,7 @@ export const useAppData = () => {
 
     const timeoutId = setTimeout(() => { syncToCloud(); }, 15000);
     return () => clearTimeout(timeoutId);
-  }, [activeData, isSignedIn, getToken, setProjects]);
+  }, [activeData, isSignedIn, getToken, setProjects, mergeCloudDataToHistory]);
 
   useEffect(() => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -626,6 +657,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState, addOrUpdateProject
+    syncState, addOrUpdateProject, mergeCloudDataToHistory
   };
 };

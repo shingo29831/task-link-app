@@ -46,6 +46,11 @@ export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, nex
     });
   }, []);
 
+  // 履歴全体を外部から直接改変・マージするための関数（クラウド同期用）
+  const modifyHistory = useCallback((modifier: (curr: { past: T[]; present: T; future: T[] }) => { past: T[]; present: T; future: T[] }) => {
+    setHistory(curr => modifier(curr));
+  }, []);
+
   // 元に戻す (Undo)
   const undo = useCallback(() => {
     setHistory(curr => {
@@ -86,6 +91,7 @@ export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, nex
     state: history.present,
     setState,
     resetState,
+    modifyHistory, // ★追加
     undo,
     redo,
     canUndo: history.past.length > 0,
