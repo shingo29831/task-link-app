@@ -38,42 +38,17 @@ const calculateHash = (project: AppData): number => {
   return hash >>> 0;
 };
 
+type CloudDiffInfo = {
+    cloudTask: Task;
+    applyStatusToHistory: boolean;
+    applyStatusToPresent: boolean;
+    applyOrderToPresent: boolean;
+};
+
 export const useAppData = () => {
   const { getToken, isSignedIn } = useAuth();
 
-  const handleUndoRedo = useCallback((currState: AppData[], nextState: AppData[]) => {
-    const now = Date.now();
-    return nextState.map(nextProj => {
-      const currProj = currState.find(p => p.id === nextProj.id);
-      if (!currProj) return { ...nextProj, lastSynced: now };
-
-      let isProjectChanged = false;
-      
-      const updatedTasks = nextProj.tasks.map(nextTask => {
-        const currTask = currProj.tasks.find(t => t.id === nextTask.id);
-        if (!currTask) {
-          isProjectChanged = true;
-          return { ...nextTask, lastUpdated: now };
-        }
-
-        const { lastUpdated: l1, ...restNext } = nextTask;
-        const { lastUpdated: l2, ...restCurr } = currTask;
-        
-        if (JSON.stringify(restNext) !== JSON.stringify(restCurr)) {
-          isProjectChanged = true;
-          return { ...nextTask, lastUpdated: now };
-        }
-        return nextTask;
-      });
-
-      if (isProjectChanged) {
-        return { ...nextProj, tasks: updatedTasks, lastSynced: now };
-      }
-      return nextProj;
-    });
-  }, []);
-
-  const { state: projects, setState: setProjects, resetState: resetProjects, undo, redo, canUndo, canRedo, modifyHistory } = useHistory<AppData[]>([], handleUndoRedo);
+  const { state: projects, setState: setProjects, resetState: resetProjects, undo: baseUndo, redo: baseRedo, canUndo, canRedo, modifyHistory } = useHistory<AppData[]>([]);
 
   const [activeId, setActiveId] = useState<string>('');
   const activeData = projects.find(p => p.id === activeId) || null;
@@ -81,31 +56,129 @@ export const useAppData = () => {
   const isLoaded = useRef(false);
   
   const lastSyncedHashMap = useRef<Record<string, number>>({});
+  
+  const lastSyncedProjectsRef = useRef<AppData[]>([]);
+
+  const updateLastSynced = useCallback((projectsToSync: AppData[]) => {
+      lastSyncedProjectsRef.current = projectsToSync.map(p => ({
+          ...p,
+          tasks: p.tasks.map(t => ({...t}))
+      }));
+  }, []);
 
   const [currentLimit, setCurrentLimit] = useState<number>(3);
   const [syncLimitState, setSyncLimitState] = useState<{ isOverLimit: boolean, limit: number, cloudProjects: any[] } | null>(null);
-  
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced'>('idle');
 
   const initialUrlGuardRef = useRef(true);
 
-  // ★ クラウドデータを用いてUNDO/REDO履歴内の古いタスクを最新状態にマージする関数
-  const mergeCloudDataToHistory = useCallback((projectId: string, cloudTasks: Task[]) => {
+  const extractTrueCloudDiffs = useCallback((projectId: string, currentTasks: Task[], cloudTasks: Task[]) => {
+      const lastSyncedProject = lastSyncedProjectsRef.current.find(p => p.id === projectId);
+      const lastSyncedTasks = lastSyncedProject?.tasks || [];
+
+      const diffs = new Map<string, CloudDiffInfo>();
+      
+      cloudTasks.forEach((cTask) => {
+          const syncedTask = lastSyncedTasks.find(t => t.id === cTask.id);
+          const localTask = currentTasks.find(t => t.id === cTask.id);
+
+          if (!syncedTask || !localTask) {
+              diffs.set(cTask.id, {
+                  cloudTask: cTask,
+                  applyStatusToHistory: true,
+                  applyStatusToPresent: true,
+                  applyOrderToPresent: true
+              });
+              return;
+          }
+
+          const isLocalOrderChanged = localTask.order !== syncedTask.order || localTask.parentId !== syncedTask.parentId;
+          const isLocalStatusChanged = 
+              localTask.status !== syncedTask.status ||
+              localTask.name !== syncedTask.name ||
+              localTask.deadline !== syncedTask.deadline ||
+              localTask.isDeleted !== syncedTask.isDeleted;
+
+          const isCloudOrderChanged = cTask.order !== syncedTask.order || cTask.parentId !== syncedTask.parentId;
+          const isCloudStatusChanged = 
+              cTask.status !== syncedTask.status ||
+              cTask.name !== syncedTask.name ||
+              cTask.deadline !== syncedTask.deadline ||
+              cTask.isDeleted !== syncedTask.isDeleted;
+
+          let applyStatusToHistory = false;
+          let applyStatusToPresent = false;
+          let applyOrderToPresent = false;
+
+          if (cTask.lastUpdated > syncedTask.lastUpdated || isCloudOrderChanged || isCloudStatusChanged) {
+              
+              if (isCloudStatusChanged) {
+                  if (!isLocalStatusChanged || cTask.lastUpdated > localTask.lastUpdated) {
+                      applyStatusToHistory = true;
+                      applyStatusToPresent = true;
+                  }
+              }
+
+              if (isCloudOrderChanged) {
+                  if (!isLocalOrderChanged) {
+                      applyOrderToPresent = true; 
+                  } else if (isLocalOrderChanged && !isLocalStatusChanged) {
+                      if (isCloudStatusChanged) {
+                          applyOrderToPresent = true;
+                      } else {
+                          applyOrderToPresent = false;
+                      }
+                  } else if (isLocalOrderChanged && isLocalStatusChanged) {
+                      if (!isCloudStatusChanged) {
+                          applyOrderToPresent = true;
+                      } else {
+                          if (cTask.lastUpdated > localTask.lastUpdated) {
+                              applyOrderToPresent = true;
+                          }
+                      }
+                  }
+              }
+
+              if (applyStatusToHistory || applyStatusToPresent || applyOrderToPresent) {
+                  diffs.set(cTask.id, {
+                      cloudTask: cTask,
+                      applyStatusToHistory,
+                      applyStatusToPresent,
+                      applyOrderToPresent
+                  });
+              }
+          }
+      });
+      return diffs;
+  }, []);
+
+  // ★ 履歴を進めずに現在の状態と履歴を同期結果で上書きする関数
+  const applyCloudSyncResult = useCallback((projectId: string, diffsMap: Map<string, CloudDiffInfo>, finalPresentTasks: Task[], newProjectName: string, newLastSynced: number) => {
     modifyHistory(curr => {
-      const mergeTasks = (localProject: AppData) => {
+      // 履歴（過去・未来）へのマージ：applyStatusToHistoryがtrueの場合のみ状態を更新し、当時の順序は維持する
+      const mergeTasksForHistory = (localProject: AppData) => {
         if (localProject.id !== projectId) return localProject;
-        const taskMap = new Map<string, Task>();
-        cloudTasks.forEach(t => taskMap.set(t.id, t));
+        if (diffsMap.size === 0) return localProject;
         
         let isChanged = false;
-        const merged = localProject.tasks.map(localTask => {
-          const cloudTask = taskMap.get(localTask.id);
-          // クラウドのタスクの更新日時が、履歴内のタスクの更新日時より新しい場合はクラウドを優先
-          if (cloudTask && cloudTask.lastUpdated > localTask.lastUpdated) {
-            isChanged = true;
-            return cloudTask;
-          }
-          return localTask;
+        const merged = localProject.tasks.map(t => {
+           const diff = diffsMap.get(t.id);
+           if (diff && diff.applyStatusToHistory) {
+               isChanged = true;
+               return {
+                   ...diff.cloudTask,
+                   order: t.order, 
+                   parentId: t.parentId
+               };
+           }
+           return t;
+        });
+
+        diffsMap.forEach(diff => {
+            if (!localProject.tasks.some(t => t.id === diff.cloudTask.id)) {
+                merged.push(diff.cloudTask);
+                isChanged = true;
+            }
         });
 
         if (isChanged) {
@@ -114,13 +187,36 @@ export const useAppData = () => {
         return localProject;
       };
 
-      return {
-        past: curr.past.map(projectsList => projectsList.map(mergeTasks)),
-        present: curr.present, // presentの反映はupdateProject等の通常フローで行うためここでは触らない
-        future: curr.future.map(projectsList => projectsList.map(mergeTasks))
+      // 現在のデータ（present）へのマージ：手動で作成した finalPresentTasks をそのまま適用する
+      const applyToPresent = (localProject: AppData) => {
+        if (localProject.id !== projectId) return localProject;
+        return {
+            ...localProject,
+            projectName: newProjectName,
+            tasks: finalPresentTasks,
+            lastSynced: newLastSynced
+        };
       };
+
+      const nextState = {
+        past: curr.past.map(projectsList => projectsList.map(mergeTasksForHistory)),
+        present: curr.present.map(applyToPresent), 
+        future: curr.future.map(projectsList => projectsList.map(mergeTasksForHistory))
+      };
+
+      updateLastSynced(nextState.present);
+      return nextState;
     });
-  }, [modifyHistory]);
+  }, [modifyHistory, updateLastSynced]);
+
+  const undo = useCallback(() => {
+    baseUndo();
+  }, [baseUndo]);
+
+  const redo = useCallback(() => {
+    baseRedo();
+  }, [baseRedo]);
+
 
   useEffect(() => {
     if (isLoaded.current) return;
@@ -178,9 +274,10 @@ export const useAppData = () => {
 
       resetProjects(loadedProjects);
       setActiveId(initialActiveId);
+      updateLastSynced(loadedProjects); 
     };
     load();
-  }, []);
+  }, [resetProjects, updateLastSynced]);
 
   const applyCloudProjects = useCallback((dbProjects: any[]) => {
     const loadedCloud = dbProjects.map((row: any) => {
@@ -204,11 +301,12 @@ export const useAppData = () => {
         if (existingIdx >= 0) newProjects[existingIdx] = cp;
         else newProjects.push(cp);
       });
+      updateLastSynced(newProjects); 
       return newProjects;
     });
     
     return loadedCloud;
-  }, [setProjects]);
+  }, [setProjects, updateLastSynced]);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -264,7 +362,11 @@ export const useAppData = () => {
       isCloudSync: false,
       role: 'owner'
     }));
-    setProjects(prev => [...prev, ...downgradedLocal]);
+    setProjects(prev => {
+        const newProj = [...prev, ...downgradedLocal];
+        updateLastSynced(newProj);
+        return newProj;
+    });
     setSyncLimitState(null);
   };
 
@@ -293,7 +395,11 @@ export const useAppData = () => {
         const finalShortId = resData.shortId || target.shortId;
         lastSyncedHashMap.current[finalId] = calculateHash(target);
         
-        setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true, role: 'owner' } : p));
+        setProjects(prev => {
+            const next = prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true, role: 'owner' } : p);
+            updateLastSynced(next); 
+            return next;
+        });
         if (activeId === localId && resData.newId) setActiveId(finalId);
         setSyncState('synced');
         alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
@@ -395,18 +501,38 @@ export const useAppData = () => {
         let mergedProjectName = activeData.projectName;
         let requiresLocalUpdate = false;
         let isSameAsCloud = false;
+        const trueCloudDiffsMap = new Map<string, CloudDiffInfo>();
 
         if (cloudProject) {
             const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+            mergedProjectName = cloudProject.projectName || activeData.projectName;
+            
+            const diffs = extractTrueCloudDiffs(activeData.id, activeData.tasks, cloudTasks);
+            diffs.forEach((v, k) => trueCloudDiffsMap.set(k, v));
             
             const taskMap = new Map<string, Task>();
-            cloudTasks.forEach((t: Task) => taskMap.set(t.id, t));
+            activeData.tasks.forEach(t => taskMap.set(t.id, t));
 
-            activeData.tasks.forEach((localTask) => {
-              const cloudTask = taskMap.get(localTask.id);
-              if (!cloudTask || localTask.lastUpdated > cloudTask.lastUpdated) {
-                 taskMap.set(localTask.id, localTask);
-              }
+            trueCloudDiffsMap.forEach((diff, id) => {
+                const t = taskMap.get(id);
+                if (!t) {
+                    taskMap.set(id, diff.cloudTask);
+                } else {
+                    const nextTask = { ...t };
+                    if (diff.applyStatusToPresent) {
+                        Object.assign(nextTask, {
+                            ...diff.cloudTask,
+                            order: nextTask.order,
+                            parentId: nextTask.parentId
+                        });
+                    }
+                    if (diff.applyOrderToPresent) {
+                        nextTask.order = diff.cloudTask.order;
+                        nextTask.parentId = diff.cloudTask.parentId;
+                    }
+                    nextTask.lastUpdated = Math.max(t.lastUpdated, diff.cloudTask.lastUpdated);
+                    taskMap.set(id, nextTask);
+                }
             });
 
             mergedTasks = Array.from(taskMap.values());
@@ -421,19 +547,15 @@ export const useAppData = () => {
             if (mergedHash === cloudHash) {
                 isSameAsCloud = true;
             }
-
-            // ★ 同期ついでにUNDO履歴側のタスクも最新クラウド状態で更新する
-            mergeCloudDataToHistory(activeData.id, cloudTasks);
         }
 
         const mergedProjectData = { ...activeData, projectName: mergedProjectName, tasks: mergedTasks };
         const newMergedHash = calculateHash(mergedProjectData);
+        const syncNow = Date.now();
 
         if (isSameAsCloud) {
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
-          if (requiresLocalUpdate) {
-            setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, tasks: mergedTasks, projectName: mergedProjectName, lastSynced: Date.now() } : p));
-          }
+          applyCloudSyncResult(activeData.id, trueCloudDiffsMap, mergedTasks, mergedProjectName, syncNow);
           setSyncState('synced');
           return;
         }
@@ -442,7 +564,7 @@ export const useAppData = () => {
           id: activeData.id, 
           shortId: activeData.shortId,
           projectName: mergedProjectName, 
-          data: { tasks: mergedTasks, lastSynced: Date.now() } 
+          data: { tasks: mergedTasks, lastSynced: syncNow } 
         };
 
         const res = await fetch('http://localhost:5174/api/projects', {
@@ -453,11 +575,7 @@ export const useAppData = () => {
 
         if (res.ok) {
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
-
-          if (requiresLocalUpdate) {
-             setProjects(prev => prev.map(p => p.id === activeData.id ? { ...p, tasks: mergedTasks, projectName: mergedProjectName, lastSynced: Date.now() } : p));
-          }
-          
+          applyCloudSyncResult(activeData.id, trueCloudDiffsMap, mergedTasks, mergedProjectName, syncNow);
           setSyncState('synced');
         } else if (res.status === 403) {
           const errData = await res.json().catch(() => ({}));
@@ -476,7 +594,7 @@ export const useAppData = () => {
 
     const timeoutId = setTimeout(() => { syncToCloud(); }, 15000);
     return () => clearTimeout(timeoutId);
-  }, [activeData, isSignedIn, getToken, setProjects, mergeCloudDataToHistory]);
+  }, [activeData, isSignedIn, getToken, setProjects, applyCloudSyncResult, extractTrueCloudDiffs]);
 
   useEffect(() => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -657,6 +775,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState, addOrUpdateProject, mergeCloudDataToHistory
+    syncState, addOrUpdateProject, extractTrueCloudDiffs, applyCloudSyncResult
   };
 };

@@ -80,7 +80,8 @@ export const from185 = (str: string): number => {
 const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const applyDictionaryAndEscape = (str: string): string => {
-  let res = str;
+  if (!str) return ''; // undefinedやnullの場合は空文字を返す
+  let res = String(str);
   res = res.replace(/\\/g, '\\\\');
   
   const symbolsPattern = Array.from(DICT_SYMBOLS).map(escapeRegExp).join('|');
@@ -99,7 +100,8 @@ const applyDictionaryAndEscape = (str: string): string => {
 };
 
 const restoreDictionaryAndEscape = (str: string): string => {
-  let res = str;
+  if (!str) return ''; // undefinedやnullの場合は空文字を返す
+  let res = String(str);
   res = res.replace(new RegExp(ESCAPE_MAP['['], 'g'), '[')
            .replace(new RegExp(ESCAPE_MAP[']'], 'g'), ']')
            .replace(new RegExp(ESCAPE_MAP[','], 'g'), ',');
@@ -138,6 +140,7 @@ const initSwapCache = (groupId: number) => {
 };
 
 const swapChars = (str: string, groupId: number): string => {
+  if (!str) return '';
   if (!MAPPING_GROUPS[groupId]) return str;
   initSwapCache(groupId);
   const map = SWAP_MAP_CACHE.get(groupId);
@@ -149,6 +152,7 @@ const swapChars = (str: string, groupId: number): string => {
 };
 
 const analyzeBestGroup = (sampleText: string): number => {
+  if (!sampleText) return 0;
   const scores = MAPPING_GROUPS.map((group, index) => {
     const pSet = new Set(group.primary);
     const sSet = new Set(group.secondary);
@@ -219,12 +223,12 @@ const calculateOptimalRefDate = (deadlines: number[]): number => {
 // ==========================================
 
 export const getIntermediateJson = (data: AppData): string => {
-  const rawProjectName = applyDictionaryAndEscape(data.projectName);
+  const rawProjectName = applyDictionaryAndEscape(data.projectName || '');
   
   const activeTasks = data.tasks.filter(t => !t.isDeleted);
 
   const activeTaskNames = activeTasks
-    .map(t => applyDictionaryAndEscape(t.name))
+    .map(t => applyDictionaryAndEscape(t.name || ''))
     .join('');
   
   const sampleText = rawProjectName + activeTaskNames;
@@ -251,7 +255,7 @@ export const getIntermediateJson = (data: AppData): string => {
   const tasksStr = activeTasks
     .map((t) => {
       const vId = to185(parseInt(t.id, 36));
-      const rawName = applyDictionaryAndEscape(t.name);
+      const rawName = applyDictionaryAndEscape(t.name || '');
       const vName = swapChars(rawName, groupId);
       const vOrder = to185(t.order ?? 0);
       const vUpdated = to185(Math.floor(t.lastUpdated / 60000 - EPOCH_2026_MIN));
@@ -287,11 +291,13 @@ export const getIntermediateJson = (data: AppData): string => {
 };
 
 export const compressData = (data: AppData): string => {
+  if (!data) return '';
   return LZString.compressToEncodedURIComponent(getIntermediateJson(data));
 };
 
 export const decompressData = (compressed: string): AppData | null => {
   try {
+    if (!compressed) return null;
     const QX = LZString.decompressFromEncodedURIComponent(compressed);
     if (!QX) return null;
     const raw = QX;

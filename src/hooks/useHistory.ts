@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 // 履歴の最大保持数
 const HISTORY_LIMIT = 50;
 
-export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, next: T) => T) {
+export function useHistory<T>(initialState: T) {
   const [history, setHistory] = useState<{
     past: T[];
     present: T;
@@ -59,17 +59,15 @@ export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, nex
       const previous = curr.past[curr.past.length - 1];
       const newPast = curr.past.slice(0, curr.past.length - 1);
 
-      const nextPresent = transformUndoRedo ? transformUndoRedo(curr.present, previous) : previous;
-
       return {
         past: newPast,
-        present: nextPresent,
+        present: previous,
         future: [curr.present, ...curr.future],
       };
     });
-  }, [transformUndoRedo]);
+  }, []);
 
-  // やり直す (Redo) - 必要であれば
+  // やり直す (Redo)
   const redo = useCallback(() => {
     setHistory(curr => {
       if (curr.future.length === 0) return curr;
@@ -77,24 +75,23 @@ export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, nex
       const next = curr.future[0];
       const newFuture = curr.future.slice(1);
 
-      const nextPresent = transformUndoRedo ? transformUndoRedo(curr.present, next) : next;
-
       return {
         past: [...curr.past, curr.present],
-        present: nextPresent,
+        present: next,
         future: newFuture,
       };
     });
-  }, [transformUndoRedo]);
+  }, []);
 
   return {
     state: history.present,
     setState,
     resetState,
-    modifyHistory, // ★追加
+    modifyHistory,
     undo,
     redo,
     canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0
+    canRedo: history.future.length > 0,
+    history // 現在の履歴全体を参照するためにエクスポート
   };
 }

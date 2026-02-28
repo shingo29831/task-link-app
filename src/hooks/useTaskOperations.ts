@@ -19,7 +19,7 @@ export const useTaskOperations = () => {
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject, mergeCloudDataToHistory
+    addOrUpdateProject, extractTrueCloudDiffs, applyCloudSyncResult
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -239,26 +239,41 @@ export const useTaskOperations = () => {
               }
 
               let mergedTasks = [...latestProject.tasks];
-              let cloudTasks: Task[] = [];
+              const trueCloudDiffsMap = new Map();
 
               if (cloudProject) {
-                  cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+                  const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
                   mergedProjectName = cloudProject.projectName || mergedProjectName;
                   
-                  const taskMap = new Map<string, Task>();
-                  cloudTasks.forEach((t: Task) => taskMap.set(t.id, t));
-                  latestProject.tasks.forEach((localTask) => {
-                     const cloudTask = taskMap.get(localTask.id);
-                     if (!cloudTask || localTask.lastUpdated > cloudTask.lastUpdated) {
-                        taskMap.set(localTask.id, localTask);
-                     }
-                  });
-                  mergedTasks = Array.from(taskMap.values());
-              }
+                  const diffs = extractTrueCloudDiffs(latestProject.id, latestProject.tasks, cloudTasks);
+                  diffs.forEach((v, k) => trueCloudDiffsMap.set(k, v));
 
-              // ★ 15秒待機後に取得したクラウドの最新データを、UNDO・REDOの履歴内のタスクにもマージさせる
-              if (cloudTasks.length > 0) {
-                  mergeCloudDataToHistory(latestProject.id, cloudTasks);
+                  const taskMap = new Map<string, Task>();
+                  latestProject.tasks.forEach(t => taskMap.set(t.id, t));
+
+                  trueCloudDiffsMap.forEach((diff, id) => {
+                      const t = taskMap.get(id);
+                      if (!t) {
+                          taskMap.set(id, diff.cloudTask);
+                      } else {
+                          const nextTask = { ...t };
+                          if (diff.applyStatusToPresent) {
+                              Object.assign(nextTask, {
+                                  ...diff.cloudTask,
+                                  order: nextTask.order,
+                                  parentId: nextTask.parentId
+                              });
+                          }
+                          if (diff.applyOrderToPresent) {
+                              nextTask.order = diff.cloudTask.order;
+                              nextTask.parentId = diff.cloudTask.parentId;
+                          }
+                          nextTask.lastUpdated = Math.max(t.lastUpdated, diff.cloudTask.lastUpdated);
+                          taskMap.set(id, nextTask);
+                      }
+                  });
+
+                  mergedTasks = Array.from(taskMap.values());
               }
 
               const finalCalculatedTasks = recalculateStatus(mergedTasks);
@@ -273,13 +288,14 @@ export const useTaskOperations = () => {
                   })
               });
 
-              updateProject({ ...latestProject, projectName: mergedProjectName, tasks: finalCalculatedTasks, lastSynced: syncNow });
+              // ★ 履歴を進めずに現在の状態のみを上書きする
+              applyCloudSyncResult(latestProject.id, trueCloudDiffsMap, finalCalculatedTasks, mergedProjectName, syncNow);
 
           } catch(e) {
               console.error('クラウドへの同期処理に失敗しました', e);
           }
       }, 15000);
-  }, [activeId, data, setData, updateProject, getToken, mergeCloudDataToHistory]);
+  }, [activeId, data, setData, updateProject, getToken, extractTrueCloudDiffs, applyCloudSyncResult]);
 
   const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
     let targetProjId = data?.id;
