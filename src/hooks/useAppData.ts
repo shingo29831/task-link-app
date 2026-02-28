@@ -40,9 +40,8 @@ const calculateHash = (project: AppData): number => {
 
 type CloudDiffInfo = {
     cloudTask: Task;
-    applyStatusToHistory: boolean;
-    applyStatusToPresent: boolean;
-    applyOrderToPresent: boolean;
+    applyStatus: boolean;
+    applyOrder: boolean;
 };
 
 export const useAppData = () => {
@@ -85,9 +84,8 @@ export const useAppData = () => {
           if (!syncedTask || !localTask) {
               diffs.set(cTask.id, {
                   cloudTask: cTask,
-                  applyStatusToHistory: true,
-                  applyStatusToPresent: true,
-                  applyOrderToPresent: true
+                  applyStatus: true,
+                  applyOrder: true
               });
               return;
           }
@@ -106,45 +104,42 @@ export const useAppData = () => {
               cTask.deadline !== syncedTask.deadline ||
               cTask.isDeleted !== syncedTask.isDeleted;
 
-          let applyStatusToHistory = false;
-          let applyStatusToPresent = false;
-          let applyOrderToPresent = false;
+          let applyStatus = false;
+          let applyOrder = false;
 
           if (cTask.lastUpdated > syncedTask.lastUpdated || isCloudOrderChanged || isCloudStatusChanged) {
               
               if (isCloudStatusChanged) {
                   if (!isLocalStatusChanged || cTask.lastUpdated > localTask.lastUpdated) {
-                      applyStatusToHistory = true;
-                      applyStatusToPresent = true;
+                      applyStatus = true;
                   }
               }
 
               if (isCloudOrderChanged) {
                   if (!isLocalOrderChanged) {
-                      applyOrderToPresent = true; 
+                      applyOrder = true; 
                   } else if (isLocalOrderChanged && !isLocalStatusChanged) {
                       if (isCloudStatusChanged) {
-                          applyOrderToPresent = true;
+                          applyOrder = true;
                       } else {
-                          applyOrderToPresent = false;
+                          applyOrder = false;
                       }
                   } else if (isLocalOrderChanged && isLocalStatusChanged) {
                       if (!isCloudStatusChanged) {
-                          applyOrderToPresent = true;
+                          applyOrder = true;
                       } else {
                           if (cTask.lastUpdated > localTask.lastUpdated) {
-                              applyOrderToPresent = true;
+                              applyOrder = true;
                           }
                       }
                   }
               }
 
-              if (applyStatusToHistory || applyStatusToPresent || applyOrderToPresent) {
+              if (applyStatus || applyOrder) {
                   diffs.set(cTask.id, {
                       cloudTask: cTask,
-                      applyStatusToHistory,
-                      applyStatusToPresent,
-                      applyOrderToPresent
+                      applyStatus,
+                      applyOrder
                   });
               }
           }
@@ -152,24 +147,35 @@ export const useAppData = () => {
       return diffs;
   }, []);
 
-  // ★ 履歴を進めずに現在の状態と履歴を同期結果で上書きする関数
   const applyCloudSyncResult = useCallback((projectId: string, diffsMap: Map<string, CloudDiffInfo>, finalPresentTasks: Task[], newProjectName: string, newLastSynced: number) => {
     modifyHistory(curr => {
-      // 履歴（過去・未来）へのマージ：applyStatusToHistoryがtrueの場合のみ状態を更新し、当時の順序は維持する
-      const mergeTasksForHistory = (localProject: AppData) => {
+      
+      const applyDiffsToHistory = (localProject: AppData) => {
         if (localProject.id !== projectId) return localProject;
         if (diffsMap.size === 0) return localProject;
         
         let isChanged = false;
         const merged = localProject.tasks.map(t => {
            const diff = diffsMap.get(t.id);
-           if (diff && diff.applyStatusToHistory) {
+           if (diff) {
                isChanged = true;
-               return {
-                   ...diff.cloudTask,
-                   order: t.order, 
-                   parentId: t.parentId
-               };
+               const nextTask = { ...t };
+               
+               if (diff.applyStatus) {
+                   Object.assign(nextTask, {
+                       ...diff.cloudTask,
+                       order: nextTask.order,
+                       parentId: nextTask.parentId
+                   });
+               }
+               
+               if (diff.applyOrder) {
+                   nextTask.order = diff.cloudTask.order;
+                   nextTask.parentId = diff.cloudTask.parentId;
+               }
+
+               nextTask.lastUpdated = Math.max(t.lastUpdated, diff.cloudTask.lastUpdated);
+               return nextTask;
            }
            return t;
         });
@@ -187,7 +193,6 @@ export const useAppData = () => {
         return localProject;
       };
 
-      // 現在のデータ（present）へのマージ：手動で作成した finalPresentTasks をそのまま適用する
       const applyToPresent = (localProject: AppData) => {
         if (localProject.id !== projectId) return localProject;
         return {
@@ -199,9 +204,9 @@ export const useAppData = () => {
       };
 
       const nextState = {
-        past: curr.past.map(projectsList => projectsList.map(mergeTasksForHistory)),
+        past: curr.past.map(projectsList => projectsList.map(applyDiffsToHistory)),
         present: curr.present.map(applyToPresent), 
-        future: curr.future.map(projectsList => projectsList.map(mergeTasksForHistory))
+        future: curr.future.map(projectsList => projectsList.map(applyDiffsToHistory))
       };
 
       updateLastSynced(nextState.present);
@@ -519,14 +524,14 @@ export const useAppData = () => {
                     taskMap.set(id, diff.cloudTask);
                 } else {
                     const nextTask = { ...t };
-                    if (diff.applyStatusToPresent) {
+                    if (diff.applyStatus) {
                         Object.assign(nextTask, {
                             ...diff.cloudTask,
                             order: nextTask.order,
                             parentId: nextTask.parentId
                         });
                     }
-                    if (diff.applyOrderToPresent) {
+                    if (diff.applyOrder) {
                         nextTask.order = diff.cloudTask.order;
                         nextTask.parentId = diff.cloudTask.parentId;
                     }
@@ -555,7 +560,9 @@ export const useAppData = () => {
 
         if (isSameAsCloud) {
           lastSyncedHashMap.current[activeData.id] = newMergedHash;
-          applyCloudSyncResult(activeData.id, trueCloudDiffsMap, mergedTasks, mergedProjectName, syncNow);
+          if (requiresLocalUpdate) {
+              applyCloudSyncResult(activeData.id, trueCloudDiffsMap, mergedTasks, mergedProjectName, syncNow);
+          }
           setSyncState('synced');
           return;
         }
@@ -775,6 +782,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState, addOrUpdateProject, extractTrueCloudDiffs, applyCloudSyncResult
+    syncState, addOrUpdateProject
   };
 };

@@ -19,7 +19,7 @@ export const useTaskOperations = () => {
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject, extractTrueCloudDiffs, applyCloudSyncResult
+    addOrUpdateProject
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -35,7 +35,6 @@ export const useTaskOperations = () => {
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
 
@@ -196,6 +195,7 @@ export const useTaskOperations = () => {
 
   const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
 
+  // ★ 余分な15秒同期処理を完全に削除し、純粋にローカル状態（tasks）を更新するだけの関数に変更しました。
   const applyCloudSyncForStatusChange = useCallback((targetProjId: string, applyChanges: (tasks: Task[]) => Task[]) => {
       const currentProjects = projectsRef.current;
       const targetProject = currentProjects.find(p => p.id === targetProjId);
@@ -212,90 +212,7 @@ export const useTaskOperations = () => {
       } else {
           updateProject(newProjectData);
       }
-
-      const isCloud = !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false && targetProject.role !== 'viewer';
-      if (!isCloud) return;
-
-      if (syncTimerRef.current) {
-          clearTimeout(syncTimerRef.current);
-      }
-
-      syncTimerRef.current = setTimeout(async () => {
-          const latestProjects = projectsRef.current;
-          const latestProject = latestProjects.find(p => p.id === targetProjId);
-          if (!latestProject) return;
-
-          try {
-              const token = await getToken();
-              let cloudProject = null;
-              let mergedProjectName = latestProject.projectName;
-              
-              if (latestProject.shortId) {
-                  const res = await fetch(`http://localhost:5174/api/projects/shared/${latestProject.shortId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                  if (res.ok) { const result = await res.json(); if (result.success && result.project) cloudProject = result.project; }
-              } else {
-                  const res = await fetch('http://localhost:5174/api/projects', { headers: { 'Authorization': `Bearer ${token}` } });
-                  if (res.ok) { const { projects: dbProjects } = await res.json(); cloudProject = dbProjects.find((p: any) => p.id === latestProject.id); }
-              }
-
-              let mergedTasks = [...latestProject.tasks];
-              const trueCloudDiffsMap = new Map();
-
-              if (cloudProject) {
-                  const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
-                  mergedProjectName = cloudProject.projectName || mergedProjectName;
-                  
-                  const diffs = extractTrueCloudDiffs(latestProject.id, latestProject.tasks, cloudTasks);
-                  diffs.forEach((v, k) => trueCloudDiffsMap.set(k, v));
-
-                  const taskMap = new Map<string, Task>();
-                  latestProject.tasks.forEach(t => taskMap.set(t.id, t));
-
-                  trueCloudDiffsMap.forEach((diff, id) => {
-                      const t = taskMap.get(id);
-                      if (!t) {
-                          taskMap.set(id, diff.cloudTask);
-                      } else {
-                          const nextTask = { ...t };
-                          if (diff.applyStatusToPresent) {
-                              Object.assign(nextTask, {
-                                  ...diff.cloudTask,
-                                  order: nextTask.order,
-                                  parentId: nextTask.parentId
-                              });
-                          }
-                          if (diff.applyOrderToPresent) {
-                              nextTask.order = diff.cloudTask.order;
-                              nextTask.parentId = diff.cloudTask.parentId;
-                          }
-                          nextTask.lastUpdated = Math.max(t.lastUpdated, diff.cloudTask.lastUpdated);
-                          taskMap.set(id, nextTask);
-                      }
-                  });
-
-                  mergedTasks = Array.from(taskMap.values());
-              }
-
-              const finalCalculatedTasks = recalculateStatus(mergedTasks);
-              const syncNow = Date.now();
-
-              await fetch('http://localhost:5174/api/projects', {
-                  method: 'POST',
-                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      id: latestProject.id, shortId: latestProject.shortId,
-                      projectName: mergedProjectName, data: { tasks: finalCalculatedTasks, lastSynced: syncNow }
-                  })
-              });
-
-              // ★ 履歴を進めずに現在の状態のみを上書きする
-              applyCloudSyncResult(latestProject.id, trueCloudDiffsMap, finalCalculatedTasks, mergedProjectName, syncNow);
-
-          } catch(e) {
-              console.error('クラウドへの同期処理に失敗しました', e);
-          }
-      }, 15000);
-  }, [activeId, data, setData, updateProject, getToken, extractTrueCloudDiffs, applyCloudSyncResult]);
+  }, [activeId, data, setData, updateProject]);
 
   const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
     let targetProjId = data?.id;
