@@ -224,19 +224,15 @@ function App() {
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
 
-  // ★ 共有リンク経由または data 内の role を優先して権限を判定する
   const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
   
-  // 共有から開いた場合は sharedProjectState、一覧から開いた場合は data.role を参照（両方なければ 'owner'）
   const currentUserRole = sharedProjectState?.role || data?.role || 'owner';
   
   const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
   
-  // クラウドプロジェクトであり、かつ編集権限がない場合に閲覧者とする
   const isViewer = isCloudProject ? !hasEditPermission : false;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
 
-  // ★ 権限のフラグをコンソールに出力して確認
   useEffect(() => {
     console.log('[Permission Check]', {
       role: currentUserRole,
@@ -335,7 +331,12 @@ function App() {
                     {projects.map(p => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
-                <div onClick={() => { deleteProject(activeId); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-danger-text)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconTrash size={16} /><span>このプロジェクトを削除</span></div>
+                <div onClick={() => { 
+                  if(window.confirm('このプロジェクトをリストから削除しますか？\n(クラウド同期中の場合はクラウドからも削除されます)')) { 
+                    deleteProject(activeId, true); 
+                    setShowProjectMenu(false); 
+                  } 
+                }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-danger-text)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconTrash size={16} /><span>このプロジェクトを削除</span></div>
             </div>
         )}
     </div>
@@ -367,6 +368,8 @@ function App() {
           isPublic={!!data.isPublic}
           members={data.members || []}
           isAdmin={isAdmin}
+          currentUserRole={currentUserRole}
+          isCloudProject={isCloudProject}
           onClose={() => setShowSettingsModal(false)} 
           onSaveName={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowSettingsModal(false); }} 
           onToggleSync={handleToggleSync}
@@ -374,7 +377,7 @@ function App() {
           onInviteUser={handleInviteUser}
           onChangeRole={handleChangeRole}
           onRemoveMember={handleRemoveMember}
-          onDeleteProject={() => { deleteProject(data.id); setShowSettingsModal(false); }}
+          onDeleteProject={(isCloudDelete) => { deleteProject(data.id, isCloudDelete); setShowSettingsModal(false); }}
         />
       )}
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}

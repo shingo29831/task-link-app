@@ -16,7 +16,7 @@ const createDefaultProject = (): AppData => ({
   tasks: [],
   lastSynced: Date.now(),
   isCloudSync: false,
-  role: 'owner' // デフォルトはオーナー
+  role: 'owner'
 });
 
 const calculateHash = (project: AppData): number => {
@@ -126,7 +126,7 @@ export const useAppData = () => {
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now(),
         isCloudSync: true,
-        role: row.role || 'owner', // ★ APIからのロールを保存。なければowner
+        role: row.role || 'owner',
       };
       lastSyncedHashMap.current[p.id] = calculateHash(p);
       return p;
@@ -415,12 +415,12 @@ export const useAppData = () => {
 
   const switchProject = (id: string) => { if (projects.some(p => p.id === id)) setActiveId(id); };
 
-  const deleteProject = async (id: string) => {
+  // ★ クラウドから削除するかどうかを第2引数で受け取るように変更
+  const deleteProject = async (id: string, deleteFromCloud: boolean = true) => {
     if (projects.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
-    if (!confirm("このプロジェクトを削除しますか？")) return;
     
     const targetProject = projects.find(p => p.id === id);
-    if (targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
+    if (deleteFromCloud && targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
        try {
           const token = await getToken();
           await fetch(`http://localhost:5174/api/projects/${id}`, {

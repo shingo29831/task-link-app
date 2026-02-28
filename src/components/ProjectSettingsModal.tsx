@@ -11,6 +11,8 @@ interface Props {
   isPublic: boolean;
   members: ProjectMember[];
   isAdmin: boolean;
+  currentUserRole: string; // ★ 追加
+  isCloudProject: boolean; // ★ 追加
   
   onClose: () => void;
   onSaveName: (newName: string) => void;
@@ -19,7 +21,7 @@ interface Props {
   onInviteUser: (username: string) => void;
   onChangeRole: (memberId: string, newRole: UserRole) => void;
   onRemoveMember: (memberId: string) => void;
-  onDeleteProject: () => void;
+  onDeleteProject: (isCloudDelete: boolean) => void; // ★ 引数を追加
 }
 
 export const ProjectSettingsModal: React.FC<Props> = ({ 
@@ -30,6 +32,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   isPublic,
   members,
   isAdmin,
+  currentUserRole,
+  isCloudProject,
   onClose, 
   onSaveName,
   onToggleSync,
@@ -43,6 +47,10 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [nameError, setNameError] = useState('');
   
   const [inviteUsername, setInviteUsername] = useState('');
+
+  // ★ 削除確認モーダル用のState
+  const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
 
   useEffect(() => {
     const trimmedValue = nameValue.trim();
@@ -80,6 +88,22 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     if (!inviteUsername.trim()) return;
     onInviteUser(inviteUsername.trim());
     setInviteUsername('');
+  };
+
+  // ★ 削除権限の判定とハンドラー
+  const canDeleteCloud = currentUserRole === 'owner' || currentUserRole === 'admin';
+  const showLocalDelete = !(currentUserRole === 'owner' && isCloudProject);
+
+  const handleCloudDeleteConfirm = () => {
+    if (confirmName === currentName) {
+      onDeleteProject(true);
+    }
+  };
+
+  const handleLocalDeleteClick = () => {
+    if (window.confirm('このプロジェクトをローカルから削除しますか？\n(クラウド上のデータは削除されません)')) {
+      onDeleteProject(false);
+    }
   };
 
   return (
@@ -257,23 +281,60 @@ export const ProjectSettingsModal: React.FC<Props> = ({
         {/* 6. プロジェクト削除セクション */}
         <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: (isAdmin && isSyncEnabled) ? '20px' : '0' }}>
           <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>危険な操作</h4>
-          <button 
-            onClick={() => {
-              if (window.confirm('このプロジェクトを削除しますか？\n(※クラウドデータも削除される場合があります)')) {
-                onDeleteProject();
-              }
-            }}
-            style={{
-              padding: '8px 16px', backgroundColor: 'transparent', color: 'var(--color-danger-text)', 
-              border: '1px solid var(--color-danger-text)', borderRadius: '4px', cursor: 'pointer',
-              fontSize: '0.9em'
-            }}
-          >
-            {isAdmin ? 'プロジェクトを完全に削除' : 'リストからプロジェクトを削除'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {canDeleteCloud && (
+              <button 
+                onClick={() => setShowCloudDeleteModal(true)}
+                style={{
+                  padding: '8px 16px', backgroundColor: 'transparent', color: 'var(--color-danger-text)', 
+                  border: '1px solid var(--color-danger-text)', borderRadius: '4px', cursor: 'pointer',
+                  fontSize: '0.9em', textAlign: 'center', width: 'fit-content'
+                }}
+              >
+                クラウドデータを削除
+              </button>
+            )}
+            
+            {showLocalDelete && (
+              <button 
+                onClick={handleLocalDeleteClick}
+                style={{
+                  padding: '8px 16px', backgroundColor: 'transparent', color: 'var(--text-secondary)', 
+                  border: '1px solid var(--text-secondary)', borderRadius: '4px', cursor: 'pointer',
+                  fontSize: '0.9em', textAlign: 'center', width: 'fit-content'
+                }}
+              >
+                ローカルからプロジェクト削除
+              </button>
+            )}
+          </div>
         </section>
 
       </div>
+
+      {/* クラウドデータ削除の確認モーダル */}
+      {showCloudDeleteModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowCloudDeleteModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>クラウドからプロジェクトを削除</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
+               この操作は取り消せません。プロジェクトに関連するすべてのタスクと共有設定がクラウドから完全に削除されます。<br/><br/>
+               確認のため、プロジェクト名 <strong>{currentName}</strong> を入力してください。
+             </p>
+             <input 
+               type="text" 
+               value={confirmName} 
+               onChange={e => setConfirmName(e.target.value)} 
+               placeholder={currentName}
+               style={{ width: '100%', padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
+             />
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
+               <button onClick={handleCloudDeleteConfirm} disabled={confirmName !== currentName} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: confirmName === currentName ? 'pointer' : 'not-allowed', opacity: confirmName === currentName ? 1 : 0.5, fontWeight: 'bold' }}>完全に削除する</button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
