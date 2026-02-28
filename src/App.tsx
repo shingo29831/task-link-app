@@ -86,22 +86,59 @@ const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve:
   );
 };
 
-const BoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
+function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => void) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef]);
-  const [isDragging, setIsDragging] = useState(false);
-  const pointerRef = useRef({ x: 0, y: 0 });
-  useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
   const [isPanning, setIsPanning] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [scrollPos, setScrollPos] = useState({ left: 0, top: 0 });
   const hasMovedRef = useRef(false);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => { if (isMobile || isDragging || e.button !== 0) return; if ((e.target as Element).closest('[data-task-id]')) return; setIsPanning(true); hasMovedRef.current = false; setStartPos({ x: e.clientX, y: e.clientY }); if (scrollRef.current) setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop }); (e.target as Element).setPointerCapture(e.pointerId); };
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => { if (!isPanning || !scrollRef.current) return; const dx = e.clientX - startPos.x; const dy = e.clientY - startPos.y; if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true; scrollRef.current.scrollLeft = scrollPos.left - dx; scrollRef.current.scrollTop = scrollPos.top - dy; };
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => { if (!isPanning) return; setIsPanning(false); (e.target as Element).releasePointerCapture(e.pointerId); };
-  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => { if (!isPanning) return; setIsPanning(false); (e.target as Element).releasePointerCapture(e.pointerId); };
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
+    if (isMobile || isDragging || e.button !== 0) return; 
+    if ((e.target as Element).closest('[data-task-id]')) return; 
+    setIsPanning(true); 
+    hasMovedRef.current = false; 
+    setStartPos({ x: e.clientX, y: e.clientY }); 
+    if (scrollRef.current) setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop }); 
+    (e.target as Element).setPointerCapture(e.pointerId); 
+  }, [isMobile, isDragging]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
+    if (!isPanning || !scrollRef.current) return; 
+    const dx = e.clientX - startPos.x; 
+    const dy = e.clientY - startPos.y; 
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true; 
+    scrollRef.current.scrollLeft = scrollPos.left - dx; 
+    scrollRef.current.scrollTop = scrollPos.top - dy; 
+  }, [isPanning, startPos, scrollPos]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
+    if (!isPanning) return; 
+    setIsPanning(false); 
+    (e.target as Element).releasePointerCapture(e.pointerId); 
+  }, [isPanning]);
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
+    if (!isPanning) return; 
+    setIsPanning(false); 
+    (e.target as Element).releasePointerCapture(e.pointerId); 
+  }, [isPanning]);
+
+  const handleClick = useCallback(() => {
+    if (!hasMovedRef.current) onBoardClick();
+  }, [onBoardClick]);
+
+  return { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick };
+}
+
+const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
+  const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
+  const [isDragging, setIsDragging] = useState(false);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
+  
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, isDragging, onBoardClick);
+  const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef, scrollRef]);
 
   useEffect(() => {
     if (!isDragging || !isMobile) return;
@@ -126,7 +163,7 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddMod
   }, [isDragging, isMobile]);
 
   return (
-    <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={() => { if (!hasMovedRef.current) onBoardClick(); }} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', padding: isMobile ? '8px' : '16px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', minHeight: '200px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto', position: 'relative' }}>
+    <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', padding: isMobile ? '8px' : '16px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', minHeight: '200px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto', position: 'relative' }}>
       {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
       {isMobile && !isDragging && (
         <>
@@ -136,6 +173,22 @@ const BoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddMod
           </div>
           <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'fixed', bottom: 'max(20px, env(safe-area-bottom))', right: 'max(20px, env(safe-area-inset-right))', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
         </>
+      )}
+    </div>
+  );
+};
+
+const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onUndo, onRedo, canUndo, canRedo }: any) => { 
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, false, onBoardClick);
+
+  return (
+    <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', border: '1px solid var(--border-color)', borderRadius: '8px', padding: isMobile ? '8px' : '16px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', minHeight: '200px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto', position: 'relative' }}>
+      {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
+      {isMobile && (
+        <div style={{ position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', left: 'max(20px, env(safe-area-inset-left))', display: 'flex', gap: '10px', zIndex: 100 }}>
+          <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
+          <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
+        </div>
       )}
     </div>
   );
@@ -160,7 +213,7 @@ function App() {
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
-    addOrUpdateProject // ★ ここで受け取る
+    addOrUpdateProject
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -170,6 +223,31 @@ function App() {
   const isCompactSpacing = windowWidth < 1280;
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
+
+  // ★ 共有リンク経由または data 内の role を優先して権限を判定する
+  const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
+  
+  // 共有から開いた場合は sharedProjectState、一覧から開いた場合は data.role を参照（両方なければ 'owner'）
+  const currentUserRole = sharedProjectState?.role || data?.role || 'owner';
+  
+  const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
+  
+  // クラウドプロジェクトであり、かつ編集権限がない場合に閲覧者とする
+  const isViewer = isCloudProject ? !hasEditPermission : false;
+  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
+
+  // ★ 権限のフラグをコンソールに出力して確認
+  useEffect(() => {
+    console.log('[Permission Check]', {
+      role: currentUserRole,
+      isViewer,
+      isAdmin,
+      isCloudProject,
+      isShared: !!sharedProjectState,
+      hasEditPermission,
+      dataRole: data?.role
+    });
+  }, [currentUserRole, isViewer, isAdmin, isCloudProject, sharedProjectState, hasEditPermission, data?.role]);
 
   useEffect(() => {
     const syncUserToDatabase = async () => {
@@ -194,7 +272,10 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleDragStart = (event: DragStartEvent) => { setActiveDragId(event.active.id as string); if (navigator.vibrate) navigator.vibrate(50); };
+  const handleDragStart = (event: DragStartEvent) => { 
+    setActiveDragId(event.active.id as string); 
+    if (navigator.vibrate) navigator.vibrate(50); 
+  };
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
@@ -226,18 +307,24 @@ function App() {
     return max;
   };
 
-  const renderColumnChildren = (nodes: TaskNode[], depth = 0) => (
-    <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
-      {nodes.map(n => (
-        <React.Fragment key={n.id}>
-          <SortableTaskItem id={n.id} depth={depth}>
-              <TaskItem task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} />
-              {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
-          </SortableTaskItem>
-        </React.Fragment>
-      ))}
-    </SortableContext>
-  );
+  const renderColumnChildren = (nodes: TaskNode[], depth = 0) => {
+    const content = nodes.map(n => (
+      <React.Fragment key={n.id}>
+        <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
+            <TaskItem task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} />
+            {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
+        </SortableTaskItem>
+      </React.Fragment>
+    ));
+
+    return isViewer ? (
+      <>{content}</>
+    ) : (
+      <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
+        {content}
+      </SortableContext>
+    );
+  };
 
   const renderProjectMenu = () => (
     <div style={{ position: 'relative' }}>
@@ -254,162 +341,180 @@ function App() {
     </div>
   );
 
-  return (
-    <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
-        <style>{`
-          @keyframes spin { 100% { transform: rotate(360deg); } }
-          .spin { animation: spin 1s linear infinite; }
-        `}</style>
-
-        {sharedProjectState && (
-          <SharedProjectModal 
-            sharedState={sharedProjectState} 
-            onClose={() => setSharedProjectState(null)}
-            onOpenAsProject={(sharedData) => {
-               // ★ 修正: 直接プロジェクト一覧に追加（または更新）してアクティブにする
-               addOrUpdateProject(sharedData);
-            }}
-            onMergeProject={(sharedData) => {
-               setIncomingData(sharedData);
-            }}
-          />
-        )}
-
-        <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
-          {incomingData && targetLocalData && <MergeModal localData={targetLocalData} incomingData={incomingData} onConfirm={(merged) => { setData(merged); if (merged.id !== activeId) switchProject(merged.id); setIncomingData(null); alert('マージが完了しました'); }} onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} />}
-          {showSettingsModal && data && (
-            <ProjectSettingsModal 
-              currentName={data.projectName} 
-              currentId={data.id} 
-              projects={projects} 
-              isSyncEnabled={!String(data.id).startsWith('local_') && data.isCloudSync !== false}
-              isPublic={!!data.isPublic}
-              members={data.members || []}
-              onClose={() => setShowSettingsModal(false)} 
-              onSaveName={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowSettingsModal(false); }} 
-              onToggleSync={handleToggleSync}
-              onTogglePublic={handleTogglePublic}
-              onInviteUser={handleInviteUser}
-              onChangeRole={handleChangeRole}
-              onRemoveMember={handleRemoveMember}
-            />
-          )}
-          {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
-
-          <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' }}>
-              {isMobile ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
-                                  {renderProjectMenu()}
-                                  
-                                  {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
-                                      <IconCloudUpload size={16} />
-                                    </button>
-                                  ) : isSignedIn ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
-                                      {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={16} /> : <IconCheckCircle size={16} />}
-                                    </div>
-                                  ) : null}
-                              </div>
-                              <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold', marginTop: '4px' }}>(全進捗: {projectProgress}%)</span>
-                          </div>
-                      </div>
-                  </div>
-              ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
-                          {renderProjectMenu()}
-                          
-                          {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
-                              <IconCloudUpload size={16} /> 保存
-                            </button>
-                          ) : isSignedIn ? (
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title={syncState === 'waiting' || syncState === 'syncing' ? '同期待機中...' : 'クラウド同期済み'}>
-                              {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={18} /> : <IconCheckCircle size={18} />}
-                            </div>
-                          ) : null}
-
-                          <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
-                      </div>
-                  </div>
-              )}
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <ProjectControls onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }} onImport={handleFileImport} onImportFromUrl={handleImportFromUrl} />
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <SignedIn><UserButton /></SignedIn>
-                  <SignedOut>
-                    <div ref={authMenuRef} style={{ position: 'relative' }}>
-                      <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
-                      {isAuthMenuOpen && (
-                        <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
-                          <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
-                          <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>新規登録</button></SignUpButton>
-                        </div>
-                      )}
-                    </div>
-                  </SignedOut>
-                </div>
-              </div>
-          </header>
-
-          <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '23px' : '0' }}>
-            <div style={{ flex: showSidebar ? (isMobile ? '1 0 100%' : '0 0 35%') : '0 0 0px', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'flex 0.3s ease, opacity 0.3s ease', opacity: showSidebar ? 1 : 0, pointerEvents: showSidebar ? 'auto' : 'none', height: '100%', minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' }}>
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, marginBottom: isMobile ? '0px' : '21px' }}><label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><span>全プロジェクト表示</span><div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div></label></div>
-                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}><TaskCalendar tasks={calendarTasks} onStatusChange={updateTaskStatus} onParentStatusChange={updateParentStatus} /></div>
+  const rootNodesContent = rootNodes.map(root => {
+    const colWidth = calculateColumnWidth(root);
+    return (
+      <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
+        <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
+            <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
+                <TaskItem task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} />
             </div>
+            <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
+        </div>
+      </SortableTaskItem>
+    );
+  });
 
-            <div style={{ flex: 1, display: (isMobile && showSidebar) ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
-              {!isMobile && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
-              <BoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onShowAddModal={() => setShowAddModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
-                <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
-                    {rootNodes.map(root => {
-                        const colWidth = calculateColumnWidth(root);
-                        return (
-                          <SortableTaskItem key={root.id} id={root.id} depth={0}>
-                            <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: 'grab' }}>
-                                <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
-                                    <TaskItem task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} />
+  const mainAppContent = (
+    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+      {incomingData && targetLocalData && <MergeModal localData={targetLocalData} incomingData={incomingData} onConfirm={(merged) => { setData(merged); if (merged.id !== activeId) switchProject(merged.id); setIncomingData(null); alert('マージが完了しました'); }} onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} />}
+      {showSettingsModal && data && (
+        <ProjectSettingsModal 
+          currentName={data.projectName} 
+          currentId={data.id} 
+          projects={projects} 
+          isSyncEnabled={!String(data.id).startsWith('local_') && data.isCloudSync !== false}
+          isPublic={!!data.isPublic}
+          members={data.members || []}
+          isAdmin={isAdmin}
+          onClose={() => setShowSettingsModal(false)} 
+          onSaveName={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowSettingsModal(false); }} 
+          onToggleSync={handleToggleSync}
+          onTogglePublic={handleTogglePublic}
+          onInviteUser={handleInviteUser}
+          onChangeRole={handleChangeRole}
+          onRemoveMember={handleRemoveMember}
+          onDeleteProject={() => { deleteProject(data.id); setShowSettingsModal(false); }}
+        />
+      )}
+      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
+
+      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' }}>
+          {isMobile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
+                              {renderProjectMenu()}
+                              
+                              {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                                <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
+                                  <IconCloudUpload size={16} />
+                                </button>
+                              ) : isSignedIn ? (
+                                <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
+                                  {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={16} /> : <IconCheckCircle size={16} />}
                                 </div>
-                                <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
-                            </div>
-                          </SortableTaskItem>
-                        );
-                    })}
-                </SortableContext>
-              </BoardArea>
-              {!isMobile && (
-                <div style={{ marginTop: '10px', flexShrink: 0 }}>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '32px' }}>
-                    {isDev && <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: 'var(--text-placeholder)', background: 'transparent', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} >{showDebug ? 'デバッグを隠す' : 'デバッグを表示'}</button>}
-                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
-                      <button disabled={!canUndo} onClick={undo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canUndo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={18} /></button>
-                      <button disabled={!canRedo} onClick={redo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canRedo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={18} /></button>
-                    </div>
+                              ) : null}
+                          </div>
+                          <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold', marginTop: '4px' }}>(全進捗: {projectProgress}%)</span>
+                      </div>
                   </div>
-                  {isDev && showDebug && <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-button)', borderRadius: '8px', fontSize: '0.75em', color: 'var(--text-secondary)', maxHeight: '400px', overflowY: 'auto' }}><p><b>プロジェクト名:</b> {data.projectName}</p><p><b>適用マッピング:</b> <span style={{ color: 'var(--color-info)' }}>{debugInfo.mappingInfo}</span></p></div>}
+              </div>
+          ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                      {renderProjectMenu()}
+                      
+                      {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                        <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
+                          <IconCloudUpload size={16} /> 保存
+                        </button>
+                      ) : isSignedIn ? (
+                        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title={syncState === 'waiting' || syncState === 'syncing' ? '同期待機中...' : 'クラウド同期済み'}>
+                          {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={18} /> : <IconCheckCircle size={18} />}
+                        </div>
+                      ) : null}
+
+                      <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
+                  </div>
+              </div>
+          )}
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <ProjectControls onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }} onImport={handleFileImport} onImportFromUrl={handleImportFromUrl} />
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <SignedIn><UserButton /></SignedIn>
+              <SignedOut>
+                <div ref={authMenuRef} style={{ position: 'relative' }}>
+                  <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
+                  {isAuthMenuOpen && (
+                    <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
+                      <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
+                      <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>新規登録</button></SignUpButton>
+                    </div>
+                  )}
                 </div>
-              )}
+              </SignedOut>
             </div>
           </div>
+      </header>
+
+      <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '23px' : '0' }}>
+        <div style={{ flex: showSidebar ? (isMobile ? '1 0 100%' : '0 0 35%') : '0 0 0px', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'flex 0.3s ease, opacity 0.3s ease', opacity: showSidebar ? 1 : 0, pointerEvents: showSidebar ? 'auto' : 'none', height: '100%', minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' }}>
+            <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, marginBottom: isMobile ? '0px' : '21px' }}><label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><span>全プロジェクト表示</span><div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div></label></div>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}>
+              <TaskCalendar tasks={calendarTasks} onStatusChange={isViewer ? () => {} : updateTaskStatus} onParentStatusChange={isViewer ? () => {} : updateParentStatus} />
+            </div>
         </div>
 
-        <DragOverlay dropAnimation={null}>
-          {activeDragTask ? (
-            <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-              <TaskItem task={activeDragTask} tasks={data.tasks} depth={0} hasChildren={data.tasks.some(t => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+        <div style={{ flex: 1, display: (isMobile && showSidebar) ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {!isMobile && !isViewer && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
+          
+          {isViewer ? (
+            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+              <>{rootNodesContent}</>
+            </StaticBoardArea>
+          ) : (
+            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onShowAddModal={() => setShowAddModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+              <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
+                  {rootNodesContent}
+              </SortableContext>
+            </InteractiveBoardArea>
+          )}
+
+          {!isMobile && (
+            <div style={{ marginTop: '10px', flexShrink: 0 }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '32px' }}>
+                {isDev && <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: 'var(--text-placeholder)', background: 'transparent', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} >{showDebug ? 'デバッグを隠す' : 'デバッグを表示'}</button>}
+                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
+                  <button disabled={!canUndo} onClick={undo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canUndo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={18} /></button>
+                  <button disabled={!canRedo} onClick={redo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canRedo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={18} /></button>
+                </div>
+              </div>
+              {isDev && showDebug && <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-button)', borderRadius: '8px', fontSize: '0.75em', color: 'var(--text-secondary)', maxHeight: '400px', overflowY: 'auto' }}><p><b>プロジェクト名:</b> {data.projectName}</p><p><b>適用マッピング:</b> <span style={{ color: 'var(--color-info)' }}>{debugInfo.mappingInfo}</span></p></div>}
             </div>
-          ) : null}
-        </DragOverlay>
-    </DndContext>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <style>{`
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+      `}</style>
+
+      {sharedProjectState && (
+        <SharedProjectModal 
+          sharedState={sharedProjectState} 
+          onClose={() => setSharedProjectState(null)}
+          onOpenAsProject={(sharedData) => { addOrUpdateProject(sharedData); }}
+          onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
+        />
+      )}
+
+      {isViewer ? (
+        <>{mainAppContent}</>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
+          {mainAppContent}
+          <DragOverlay dropAnimation={null}>
+            {activeDragTask ? (
+              <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
+                <TaskItem task={activeDragTask} tasks={data.tasks} depth={0} hasChildren={data.tasks.some(t => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
+    </>
   );
 }
 

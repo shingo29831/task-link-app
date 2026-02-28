@@ -9,7 +9,7 @@ export interface Task {
   isDeleted?: boolean;
 }
 
-export type UserRole = 'viewer' | 'editor' | 'admin';
+export type UserRole = 'viewer' | 'editor' | 'admin' | 'owner';
 
 export interface ProjectMember {
   id: string; // userId
@@ -26,5 +26,6 @@ export interface AppData {
   isPublic?: boolean;
   publicRole?: UserRole;
   members?: ProjectMember[];
-  isCloudSync?: boolean; // ★ 追加: クラウド同期の状態フラグ
+  isCloudSync?: boolean; 
+  role?: UserRole | string; // ★ 追加: 現在のユーザーのこのプロジェクトに対する権限
 }

@@ -69,6 +69,7 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       isCloudSync: true,
       isPublic: projectData.isPublic,
       publicRole: projectData.publicRole || role,
+      role: role, // ★ DBから取得した権限(role)をAppDataに保存する
     };
 
     window.history.replaceState(null, '', `/${shortId}`);

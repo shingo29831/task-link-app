@@ -15,7 +15,8 @@ const createDefaultProject = (): AppData => ({
   projectName: 'マイプロジェクト',
   tasks: [],
   lastSynced: Date.now(),
-  isCloudSync: false
+  isCloudSync: false,
+  role: 'owner' // デフォルトはオーナー
 });
 
 const calculateHash = (project: AppData): number => {
@@ -54,7 +55,6 @@ export const useAppData = () => {
   
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced'>('idle');
 
-  // URL上書きガード用のRef（初回ロード時のみガードを有効にする）
   const initialUrlGuardRef = useRef(true);
 
   useEffect(() => {
@@ -125,7 +125,8 @@ export const useAppData = () => {
         projectName: row.projectName,
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now(),
-        isCloudSync: true
+        isCloudSync: true,
+        role: row.role || 'owner', // ★ APIからのロールを保存。なければowner
       };
       lastSyncedHashMap.current[p.id] = calculateHash(p);
       return p;
@@ -175,8 +176,7 @@ export const useAppData = () => {
     };
 
     loadFromCloud();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, getToken, applyCloudProjects, activeId]);
 
   const resolveSyncLimit = async (selectedCloudIds: string[]) => {
     if (!syncLimitState) return;
@@ -196,7 +196,8 @@ export const useAppData = () => {
       projectName: row.projectName + ' (オフライン)',
       tasks: row.data.tasks || [],
       lastSynced: Date.now(),
-      isCloudSync: false
+      isCloudSync: false,
+      role: 'owner'
     }));
     setProjects(prev => [...prev, ...downgradedLocal]);
     setSyncLimitState(null);
@@ -227,7 +228,7 @@ export const useAppData = () => {
         const finalShortId = resData.shortId || target.shortId;
         lastSyncedHashMap.current[finalId] = calculateHash(target);
         
-        setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true } : p));
+        setProjects(prev => prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true, role: 'owner' } : p));
         if (activeId === localId && resData.newId) setActiveId(finalId);
         setSyncState('synced');
         alert('クラウドにアップロードしました！\n今後は自動的に同期されます。');
@@ -247,7 +248,7 @@ export const useAppData = () => {
   };
 
   useEffect(() => {
-    if (!isSignedIn || !activeData || String(activeData.id).startsWith('local_') || activeData.isCloudSync === false) {
+    if (!isSignedIn || !activeData || String(activeData.id).startsWith('local_') || activeData.isCloudSync === false || activeData.role === 'viewer') {
       return;
     }
 
@@ -362,14 +363,11 @@ export const useAppData = () => {
         if (pathParts.length === 1) {
            const urlShortId = pathParts[0];
            if (activeData.shortId !== urlShortId) {
-              console.log(`[useAppData] Waiting for shared project data. Skipping URL overwrite for shortId: ${urlShortId}`);
-              return; // 共有プロジェクトを開くまでは上書きを待つ
+              return; 
            } else {
-              // activeData が共有プロジェクトと一致したらガードを解除する
               initialUrlGuardRef.current = false;
            }
         } else {
-           // 共有リンク以外（またはマージ後など）は即座にガード解除
            initialUrlGuardRef.current = false;
         }
       }
@@ -381,7 +379,6 @@ export const useAppData = () => {
     }
   }, [activeData]);
 
-  // 共有プロジェクトを一覧に安全に追加・更新し、アクティブにする処理
   const addOrUpdateProject = useCallback((newData: AppData) => {
     setProjects(prev => {
       const exists = prev.some(p => p.id === newData.id);

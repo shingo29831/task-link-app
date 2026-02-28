@@ -23,14 +23,49 @@ interface Props {
   isMenuOpen: boolean;
   onToggleMenu: () => void;
   isActiveParent?: boolean;
+  isViewer?: boolean;
 }
+
+// DnDが有効な場合のみマウントされるネスト用ドロップエリア
+const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }> = ({ task, tasks, depth }) => {
+  const { active } = useDndContext(); 
+  const isDropDisabled = (() => {
+    if (!active) return false;
+    const activeId = String(active.id);
+    if (activeId === task.id) return true;
+    let current = task;
+    while (current.parentId) {
+      if (current.parentId === activeId) return true;
+      const parent = tasks.find(t => t.id === current.parentId);
+      if (!parent) break;
+      current = parent;
+    }
+    return false;
+  })();
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: `nest-${task.id}`,
+    data: { type: 'nest', task },
+    disabled: isDropDisabled
+  });
+
+  return (
+    <>
+      {isOver && !isDropDisabled && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: '2px dashed var(--color-primary)', boxSizing: 'border-box', pointerEvents: 'none', zIndex: 20, borderRadius: '4px' }} />
+      )}
+      <div ref={setNodeRef} style={{ position: 'absolute', top: 0, left: depth === 0 ? '10%' : 'auto', right: depth === 0 ? 'auto' : 0, width: '80%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
+    </>
+  );
+};
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
   onStatusChange, onParentStatusChange, onDelete, onRename, onDeadlineChange, 
   isExpanded, onToggleExpand, onClick,
   isMenuOpen, onToggleMenu,
-  isActiveParent = false
+  isActiveParent = false,
+  isViewer = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -50,28 +85,6 @@ export const TaskItem: React.FC<Props> = ({
     }
     return { fontSize: '16px', indentWidth: 24, itemPadding: '10px 0', buttonPadding: '4px 12px', buttonFontSize: '0.85em' };
   }, [windowWidth]);
-
-  const { active } = useDndContext(); 
-
-  const isDropDisabled = (() => {
-    if (!active) return false;
-    const activeId = String(active.id);
-    if (activeId === task.id) return true;
-    let current = task;
-    while (current.parentId) {
-      if (current.parentId === activeId) return true;
-      const parent = tasks.find(t => t.id === current.parentId);
-      if (!parent) break;
-      current = parent;
-    }
-    return false;
-  })();
-
-  const { setNodeRef, isOver } = useDroppable({
-    id: `nest-${task.id}`,
-    data: { type: 'nest', task },
-    disabled: isDropDisabled 
-  });
 
   const config = { 
     0: { l: '未着手', c: 'var(--text-placeholder)' },
@@ -155,10 +168,6 @@ export const TaskItem: React.FC<Props> = ({
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none',
         }}
       >
-        {isOver && !isDropDisabled && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: '2px dashed var(--color-primary)', boxSizing: 'border-box', pointerEvents: 'none', zIndex: 20, borderRadius: '4px' }} />
-        )}
-
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
           style={{
@@ -174,44 +183,49 @@ export const TaskItem: React.FC<Props> = ({
         <button 
           onClick={(e) => { 
             e.stopPropagation(); 
+            if (isViewer) return;
             if (hasChildren) { setShowStatusModal(true); } else { onStatusChange(((task.status + 1) % 4) as 0|1|2|3); }
           }}
-          style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? 'auto' : '80px', fontSize: buttonFontSize, cursor: 'pointer', opacity: hasChildren ? 0.9 : 1, border: hasChildren ? '1px dashed var(--text-inverse)' : 'none', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap' }}
+          style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? 'auto' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', opacity: hasChildren ? 0.9 : 1, border: hasChildren ? '1px dashed var(--text-inverse)' : 'none', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap' }}
         >
           {config.l}
         </button>
         
         <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: '2px' }}>
-          <div ref={setNodeRef} style={{ position: 'absolute', top: 0, left: depth === 0 ? '10%' : 'auto', right: depth === 0 ? 'auto' : 0, width: '80%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
+          
+          {/* 閲覧者でない場合のみドロップエリアをマウント */}
+          {!isViewer && <NestDroppableInner task={task} tasks={tasks} depth={depth} />}
 
           {isEditing ? (
             <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: isMobile ? '4px' : '2px 4px', borderRadius: '4px', width: 'calc(100% - 20px)', fontSize: isMobile ? '16px' : 'inherit' }} />
           ) : (
             <>
-              <span onDoubleClick={(e) => { e.stopPropagation(); setEditName(task.name); setIsEditing(true); }} title="ダブルクリックで編集" style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
+              <span onDoubleClick={(e) => { e.stopPropagation(); if (isViewer) return; setEditName(task.name); setIsEditing(true); }} title={isViewer ? "" : "ダブルクリックで編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
               {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
-              {isEditingDeadline ? (
+              {isEditingDeadline && !isViewer ? (
                   <input type="date" defaultValue={currentDeadlineStr} className={isNarrowLayout ? "date-input-mobile" : ""} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: isNarrowLayout ? 'transparent' : 'var(--text-primary)', colorScheme: 'dark', fontSize: isMobile ? '16px' : 'inherit', width: isNarrowLayout ? '36px' : 'auto' }} />
               ) : ( getDeadline() )}
             </>
           )}
         </div>
         
-        <div style={{ display: 'flex', gap: isMobile ? '6px' : '4px', opacity: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
-          {isNarrowLayout ? (
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <button title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-              <input type="date" onChange={(e) => onDeadlineChange(e.target.value)} onPointerDown={stopPropagation} value={currentDeadlineStr} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
-            </div>
-          ) : (
-            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-          )}
-          
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
-        </div>
+        {!isViewer && (
+          <div style={{ display: 'flex', gap: isMobile ? '6px' : '4px', opacity: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
+            {isNarrowLayout ? (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <button title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
+                <input type="date" onChange={(e) => onDeadlineChange(e.target.value)} onPointerDown={stopPropagation} value={currentDeadlineStr} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
+              </div>
+            ) : (
+              <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
+            )}
+            
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
+          </div>
+        )}
       </div>
 
-      {showStatusModal && (
+      {showStatusModal && !isViewer && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }} onClick={(e) => { e.stopPropagation(); setShowStatusModal(false); }}>
           <div style={{ backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid var(--border-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>状態を一括変更</h4>

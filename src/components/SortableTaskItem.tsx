@@ -5,10 +5,12 @@ import { CSS } from '@dnd-kit/utilities';
 interface Props {
   id: string;
   depth?: number;
+  disabled?: boolean;
   children: React.ReactNode;
 }
 
-export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) => {
+// DnDが有効な場合のみマウントされる内部コンポーネント
+const SortableInner: React.FC<Omit<Props, 'disabled'>> = ({ id, depth = 0, children }) => {
   const {
     attributes,
     listeners,
@@ -17,23 +19,17 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
     isDragging,
   } = useSortable({ 
     id,
-    data: { 
-      type: 'task', 
-      depth 
-    } 
+    data: { type: 'task', depth } 
   });
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    // ドラッグ中のアイテム（リストに残る方）はプレースホルダーとして薄く表示
     opacity: isDragging ? 0.3 : 1, 
     touchAction: 'manipulation', 
     position: 'relative',
-    zIndex: isDragging ? 0 : 'auto', // 重なり順を下げる
-    // ドラッグ元の背景色（薄く残る部分）
+    zIndex: isDragging ? 0 : 'auto', 
     backgroundColor: isDragging ? 'var(--bg-item-hover)' : undefined, 
     borderRadius: isDragging ? '8px' : undefined,
-    // ドラッグ中はボーダーを表示して「ここに入る」感を出しても良い
     border: isDragging ? '1px dashed var(--text-secondary)' : 'none',
   };
 
@@ -42,4 +38,16 @@ export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, children }) =
       {children}
     </div>
   );
+};
+
+// 閲覧者時は SortableContext に依存しないピュアな div を返す
+export const SortableTaskItem: React.FC<Props> = ({ id, depth = 0, disabled = false, children }) => {
+  if (disabled) {
+    return (
+      <div data-task-id={id} style={{ position: 'relative' }}>
+        {children}
+      </div>
+    );
+  }
+  return <SortableInner id={id} depth={depth}>{children}</SortableInner>;
 };

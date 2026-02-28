@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import type { AppData } from '../types';
+import type { AppData, UserRole, ProjectMember } from '../types';
 import { IconWarning } from './Icons';
-
-// ※ ../types/index.ts に以下の型定義を追加または調整してください
-export type UserRole = 'viewer' | 'editor' | 'admin';
-export interface ProjectMember {
-  id: string; // 内部管理用UUIDなど
-  username: string;
-  role: UserRole;
-}
 
 interface Props {
   currentName: string;
   currentId: string;
   projects: AppData[];
   
-  // 同期・共有に関するProps
   isSyncEnabled: boolean;
   isPublic: boolean;
   members: ProjectMember[];
+  isAdmin: boolean;
   
   onClose: () => void;
   onSaveName: (newName: string) => void;
@@ -27,6 +19,7 @@ interface Props {
   onInviteUser: (username: string) => void;
   onChangeRole: (memberId: string, newRole: UserRole) => void;
   onRemoveMember: (memberId: string) => void;
+  onDeleteProject: () => void;
 }
 
 export const ProjectSettingsModal: React.FC<Props> = ({ 
@@ -36,22 +29,21 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   isSyncEnabled,
   isPublic,
   members,
+  isAdmin,
   onClose, 
   onSaveName,
   onToggleSync,
   onTogglePublic,
   onInviteUser,
   onChangeRole,
-  onRemoveMember
+  onRemoveMember,
+  onDeleteProject
 }) => {
-  // プロジェクト名用のState
   const [nameValue, setNameValue] = useState(currentName);
   const [nameError, setNameError] = useState('');
   
-  // 招待用のState
   const [inviteUsername, setInviteUsername] = useState('');
 
-  // プロジェクト名の重複チェック
   useEffect(() => {
     const trimmedValue = nameValue.trim();
     if (!trimmedValue) {
@@ -113,56 +105,64 @@ export const ProjectSettingsModal: React.FC<Props> = ({
         {/* 1. プロジェクト名変更セクション */}
         <section>
           <h3 style={{ fontSize: '1em', margin: '0 0 10px 0', color: 'var(--text-secondary)' }}>プロジェクト名</h3>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input 
-              type="text" 
-              value={nameValue}
-              onChange={handleNameChange}
-              placeholder="プロジェクト名"
-              style={{ 
-                flex: 1, padding: '10px', borderRadius: '4px', 
-                border: nameError ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
-                backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', 
-                outline: 'none'
-              }}
-            />
-            <button 
-              onClick={handleSaveName}
-              disabled={!!nameError || !nameValue.trim() || nameValue.trim() === currentName}
-              style={{
-                padding: '0 16px', backgroundColor: 'var(--color-info)', color: '#fff', 
-                border: 'none', borderRadius: '4px', cursor: 'pointer',
-                opacity: (!!nameError || !nameValue.trim() || nameValue.trim() === currentName) ? 0.5 : 1
-              }}
-            >
-              更新
-            </button>
-          </div>
-          {nameError && (
+          {isAdmin ? (
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input 
+                type="text" 
+                value={nameValue}
+                onChange={handleNameChange}
+                placeholder="プロジェクト名"
+                style={{ 
+                  flex: 1, padding: '10px', borderRadius: '4px', 
+                  border: nameError ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
+                  backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', 
+                  outline: 'none'
+                }}
+              />
+              <button 
+                onClick={handleSaveName}
+                disabled={!!nameError || !nameValue.trim() || nameValue.trim() === currentName}
+                style={{
+                  padding: '0 16px', backgroundColor: 'var(--color-info)', color: '#fff', 
+                  border: 'none', borderRadius: '4px', cursor: 'pointer',
+                  opacity: (!!nameError || !nameValue.trim() || nameValue.trim() === currentName) ? 0.5 : 1
+                }}
+              >
+                更新
+              </button>
+            </div>
+          ) : (
+            <div style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+              {currentName}
+            </div>
+          )}
+          {nameError && isAdmin && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-danger-text)', fontSize: '0.9em', marginTop: '6px' }}>
               <IconWarning size={16} /><span>{nameError}</span>
             </div>
           )}
         </section>
 
-        {/* 2. 同期設定セクション */}
-        <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>クラウド同期</h3>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
-              <span style={{ fontSize: '0.9em' }}>{isSyncEnabled ? 'オン' : 'オフ'}</span>
-              <input 
-                type="checkbox" 
-                checked={isSyncEnabled} 
-                onChange={(e) => onToggleSync(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-            </label>
-          </div>
-        </section>
+        {/* 2. 同期設定セクション (管理者のみ) */}
+        {isAdmin && (
+          <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>クラウド同期</h3>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                <span style={{ fontSize: '0.9em' }}>{isSyncEnabled ? 'オン' : 'オフ'}</span>
+                <input 
+                  type="checkbox" 
+                  checked={isSyncEnabled} 
+                  onChange={(e) => onToggleSync(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+              </label>
+            </div>
+          </section>
+        )}
 
-        {/* 同期ONの時のみ表示されるセクション */}
-        {isSyncEnabled && (
+        {/* 同期ONの時のみ表示されるセクション (管理者のみ) */}
+        {isAdmin && isSyncEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: 'var(--bg-panel)', padding: '16px', borderRadius: '6px' }}>
             
             {/* 3. 公開設定 */}
@@ -253,6 +253,25 @@ export const ProjectSettingsModal: React.FC<Props> = ({
 
           </div>
         )}
+
+        {/* 6. プロジェクト削除セクション */}
+        <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: (isAdmin && isSyncEnabled) ? '20px' : '0' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>危険な操作</h4>
+          <button 
+            onClick={() => {
+              if (window.confirm('このプロジェクトを削除しますか？\n(※クラウドデータも削除される場合があります)')) {
+                onDeleteProject();
+              }
+            }}
+            style={{
+              padding: '8px 16px', backgroundColor: 'transparent', color: 'var(--color-danger-text)', 
+              border: '1px solid var(--color-danger-text)', borderRadius: '4px', cursor: 'pointer',
+              fontSize: '0.9em'
+            }}
+          >
+            {isAdmin ? 'プロジェクトを完全に削除' : 'リストからプロジェクトを削除'}
+          </button>
+        </section>
 
       </div>
     </div>
