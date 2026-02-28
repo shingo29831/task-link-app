@@ -159,6 +159,49 @@ app.get('/api/projects', async (c) => {
   return c.json({ projects: userProjects, limit })
 })
 
+// ★ 追加：単一プロジェクト取得エンドポイント
+app.get('/api/projects/:id', async (c) => {
+  const auth = getAuth(c)
+  const id = c.req.param('id')
+  const db = getDb(c.env.DATABASE_URL)
+
+  const proj = await db.select().from(projects).where(eq(projects.id, id))
+  
+  if (proj.length === 0) {
+    return c.json({ error: 'Project not found' }, 404)
+  }
+
+  const project = proj[0]
+  let role = 'none';
+
+  if (auth?.userId) {
+    if (project.ownerId === auth.userId) {
+      role = 'owner';
+    } else {
+      const memberRecord = await db.select()
+        .from(projectMembers)
+        .where(and(
+          eq(projectMembers.projectId, project.id),
+          eq(projectMembers.userId, auth.userId)
+        ))
+
+      if (memberRecord.length > 0) {
+        role = memberRecord[0].role;
+      }
+    }
+  }
+
+  if (role === 'none') {
+    if (project.isPublic) {
+      role = project.publicRole || 'viewer';
+    } else {
+      return c.json({ error: 'Forbidden' }, 403) 
+    }
+  }
+
+  return c.json({ success: true, project: project, role: role })
+})
+
 app.delete('/api/projects/:id', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)

@@ -11,8 +11,8 @@ interface Props {
   isPublic: boolean;
   members: ProjectMember[];
   isAdmin: boolean;
-  currentUserRole: string; // ★ 追加
-  isCloudProject: boolean; // ★ 追加
+  currentUserRole: string; 
+  isCloudProject: boolean; 
   
   onClose: () => void;
   onSaveName: (newName: string) => void;
@@ -21,7 +21,7 @@ interface Props {
   onInviteUser: (username: string) => void;
   onChangeRole: (memberId: string, newRole: UserRole) => void;
   onRemoveMember: (memberId: string) => void;
-  onDeleteProject: (isCloudDelete: boolean) => void; // ★ 引数を追加
+  onDeleteProject: (isCloudDelete: boolean) => void; 
 }
 
 export const ProjectSettingsModal: React.FC<Props> = ({ 
@@ -48,7 +48,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   
   const [inviteUsername, setInviteUsername] = useState('');
 
-  // ★ 削除確認モーダル用のState
   const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
@@ -90,8 +89,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     setInviteUsername('');
   };
 
-  // ★ 削除権限の判定とハンドラー
-  const canDeleteCloud = currentUserRole === 'owner' || currentUserRole === 'admin';
+  // ★ クラウドプロジェクトである場合のみ、クラウドデータ削除ボタンを表示可能にする
+  const canDeleteCloud = isCloudProject && (currentUserRole === 'owner' || currentUserRole === 'admin');
   const showLocalDelete = !(currentUserRole === 'owner' && isCloudProject);
 
   const handleCloudDeleteConfirm = () => {

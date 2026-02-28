@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
-import type { Task, UserRole } from '../types'; 
+import type { Task, UserRole, AppData } from '../types'; 
 import { useAppData } from './useAppData';
 import { getIntermediateJson, from185, decompressData } from '../utils/compression';
 import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
@@ -35,11 +35,18 @@ export const useTaskOperations = () => {
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
+  // ★ インポート時のクラウド判定モーダル用State
+  const [importCloudCheck, setImportCloudCheck] = useState<{
+      isOpen: boolean;
+      incoming: any;
+      projectData: any;
+  } | null>(null);
+
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
 
   const activeTasks = useMemo(() => {
-    return data ? data.tasks.filter(t => !t.isDeleted) : [];
+    return data ? (data.tasks || []).filter(t => !t.isDeleted) : [];
   }, [data]);
 
   const calendarTasks = useMemo(() => {
@@ -53,7 +60,7 @@ export const useTaskOperations = () => {
 
     const allTasks: Task[] = [];
     projects.forEach(proj => {
-      const projTasks = proj.tasks.filter(t => !t.isDeleted);
+      const projTasks = (proj.tasks || []).filter(t => !t.isDeleted);
       const isCurrentProject = proj.id === data.id;
 
       const safeTasks = projTasks.map(t => {
@@ -72,11 +79,6 @@ export const useTaskOperations = () => {
     return allTasks;
   }, [data, projects, activeTasks, showAllProjectsInCalendar]);
 
-  const activeParent = useMemo(() => {
-    if (!data || !activeParentId) return null;
-    return data.tasks.find(t => t.id === activeParentId) || null;
-  }, [data, activeParentId]);
-
   const rootNodes = useMemo(() => {
     if (!data) return [];
     const buildTree = (tasks: Task[]): TaskNode[] => {
@@ -93,7 +95,7 @@ export const useTaskOperations = () => {
       roots.sort(sortFn);
       return roots;
     };
-    return buildTree(data.tasks);
+    return buildTree(data.tasks || []);
   }, [data]);
 
   const targetLocalData = useMemo(() => {
@@ -143,7 +145,7 @@ export const useTaskOperations = () => {
 
   useEffect(() => {
     if (activeParentId && data) {
-      const exists = data.tasks.some(t => t.id === activeParentId && !t.isDeleted);
+      const exists = (data.tasks || []).some(t => t.id === activeParentId && !t.isDeleted);
       if (!exists) setActiveParentId(null);
     }
   }, [data, activeParentId]);
@@ -195,13 +197,12 @@ export const useTaskOperations = () => {
 
   const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
 
-  // ★ 余分な15秒同期処理を完全に削除し、純粋にローカル状態（tasks）を更新するだけの関数に変更しました。
   const applyCloudSyncForStatusChange = useCallback((targetProjId: string, applyChanges: (tasks: Task[]) => Task[]) => {
       const currentProjects = projectsRef.current;
       const targetProject = currentProjects.find(p => p.id === targetProjId);
       if (!targetProject) return;
 
-      const updatedTasks = applyChanges(targetProject.tasks);
+      const updatedTasks = applyChanges(targetProject.tasks || []);
       const calculatedTasks = recalculateStatus(updatedTasks);
       const now = Date.now();
 
@@ -220,7 +221,7 @@ export const useTaskOperations = () => {
 
     if (id.includes('_')) {
         const [projId, parsedTaskId] = id.split('_');
-        const isCurrent = data?.tasks.some(t => t.id === id);
+        const isCurrent = (data?.tasks || []).some(t => t.id === id);
         if (!isCurrent) {
             targetProjId = projId;
             realTaskId = parsedTaskId;
@@ -251,7 +252,7 @@ export const useTaskOperations = () => {
 
     if (id.includes('_')) {
         const [projId, parsedTaskId] = id.split('_');
-        const isCurrent = data?.tasks.some(t => t.id === id);
+        const isCurrent = (data?.tasks || []).some(t => t.id === id);
         if (!isCurrent) {
             targetProjId = projId;
             realTaskId = parsedTaskId;
@@ -265,35 +266,9 @@ export const useTaskOperations = () => {
     });
   }, [data, applyCloudSyncForStatusChange]);
 
-  const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
-    if (!data) return;
-    let targetParentId = parentId;
-    if (targetParentId) {
-        const parentExists = data.tasks.some(t => t.id === targetParentId && !t.isDeleted);
-        if (!parentExists) targetParentId = undefined;
-    }
-    const normalizedName = name;
-    const isDuplicate = data.tasks.some(t => !t.isDeleted && t.parentId === targetParentId && t.name === normalizedName);
-    if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
-    
-    const existingIds = new Set(data.tasks.map(t => t.id));
-    let candidateNum = activeTasks.length === 0 ? 1 : data.tasks.length + 1;
-    let newId = candidateNum.toString(36);
-    while (existingIds.has(newId)) { candidateNum++; newId = candidateNum.toString(36); }
-    
-    const siblings = data.tasks.filter(t => !t.isDeleted && t.parentId === targetParentId);
-    const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
-    const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
-    const newTask: Task = {
-      id: newId, name: normalizedName, status: 0, deadline: deadline, lastUpdated: Date.now(),
-      parentId: activeTasks.length === 0 ? undefined : targetParentId, order: activeTasks.length === 0 ? 1 : nextOrder
-    };
-    save([...data.tasks, newTask]);
-  }, [data, activeTasks, save]);
-
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
-    const targetTask = data.tasks.find(t => t.id === taskId);
+    const targetTask = (data.tasks || []).find(t => t.id === taskId);
     if (!targetTask) return;
     const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
     if (!confirm(message)) return;
@@ -302,10 +277,10 @@ export const useTaskOperations = () => {
     while (stack.length > 0) {
       const currentId = stack.pop()!;
       idsToDelete.add(currentId);
-      const children = data.tasks.filter(t => !t.isDeleted && t.parentId === currentId);
+      const children = (data.tasks || []).filter(t => !t.isDeleted && t.parentId === currentId);
       children.forEach(c => stack.push(c.id));
     }
-    const newTasks = data.tasks.map(t => idsToDelete.has(t.id) ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t);
+    const newTasks = (data.tasks || []).map(t => idsToDelete.has(t.id) ? { ...t, isDeleted: true, lastUpdated: Date.now() } : t);
     save(newTasks);
     if (menuOpenTaskId === taskId) {
       setMenuOpenTaskId(null);
@@ -314,11 +289,11 @@ export const useTaskOperations = () => {
 
   const renameTask = useCallback((id: string, newName: string) => {
     if (!data || !newName.trim()) return;
-    const targetTask = data.tasks.find(t => t.id === id);
+    const targetTask = (data.tasks || []).find(t => t.id === id);
     if (!targetTask) return;
-    const isDuplicate = data.tasks.some(t => !t.isDeleted && t.id !== id && t.parentId === targetTask.parentId && t.name === newName);
+    const isDuplicate = (data.tasks || []).some(t => !t.isDeleted && t.id !== id && t.parentId === targetTask.parentId && t.name === newName);
     if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
-    const newTasks = data.tasks.map(t => t.id === id ? { ...t, name: newName, lastUpdated: Date.now() } : t);
+    const newTasks = (data.tasks || []).map(t => t.id === id ? { ...t, name: newName, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
 
@@ -327,7 +302,7 @@ export const useTaskOperations = () => {
     let newDeadline: number | undefined;
     if (dateStr) { const [y, m, d] = dateStr.split('-').map(Number); newDeadline = new Date(y, m - 1, d).getTime(); } 
     else { newDeadline = undefined; }
-    const newTasks = data.tasks.map(t => t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t);
+    const newTasks = (data.tasks || []).map(t => t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
 
@@ -339,8 +314,145 @@ export const useTaskOperations = () => {
       return next; 
     }); 
   }, []);
+
+  const finalizeImport = useCallback((incoming: any) => {
+    const currentProjects = projectsRef.current;
+    const sameIdProject = currentProjects.find(p => p.id === incoming.id);
+    
+    // 同一IDのプロジェクトが既にある場合はマージ対象
+    if (sameIdProject) {
+       if (JSON.stringify(sameIdProject.tasks || []) === JSON.stringify(incoming.tasks || []) && sameIdProject.projectName === incoming.projectName) {
+           alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
+           if (activeId !== incoming.id) switchProject(incoming.id);
+           return;
+       }
+       setIncomingData(incoming); // マージモーダルへ
+       return;
+    }
+
+    // 同一IDはないが、同一名のプロジェクトがある場合
+    const sameNameProject = currentProjects.find(p => p.projectName === incoming.projectName);
+    if (sameNameProject) {
+       if ((sameNameProject.tasks || []).every(t => t.isDeleted)) {
+           deleteProject(sameNameProject.id, false);
+       } else {
+           setIncomingData(incoming); 
+           return;
+       }
+    }
+
+    addOrUpdateProject({ ...incoming, lastSynced: Date.now() });
+    if (activeId !== incoming.id) {
+        switchProject(incoming.id);
+    }
+    
+    if (data && (data.tasks || []).every(t => t.isDeleted) && data.id !== incoming.id && data.projectName === '名称未設定プロジェクト') {
+        deleteProject(data.id, false);
+    }
+    
+    alert(`プロジェクト名：${incoming.projectName} を読み込みました。`);
+  }, [activeId, data, setIncomingData, addOrUpdateProject, switchProject, deleteProject]);
+
+  const handleCloudImportChoice = useCallback((useCloud: boolean) => {
+      if (!importCloudCheck) return;
+      const { incoming, projectData } = importCloudCheck;
+      
+      if (useCloud) {
+          // DBから取得したデータ(projectData.data)を使用し、権限情報を付与
+          let cloudAppObj: AppData = {
+              ...(typeof projectData.data === 'string' ? JSON.parse(projectData.data) : projectData.data),
+              id: projectData.id,
+              shortId: projectData.shortId,
+              projectName: projectData.projectName,
+              isCloudSync: true,
+              role: projectData.role,
+              isPublic: projectData.isPublic,
+              publicRole: projectData.publicRole,
+              members: projectData.members || []
+          };
+          finalizeImport(cloudAppObj);
+      } else {
+          // キャンセルした場合は読み込んだJSONをベースにするが、クラウドプロジェクトの属性を持たせる
+          incoming.isCloudSync = true;
+          incoming.role = projectData.role;
+          incoming.members = projectData.members;
+          incoming.isPublic = projectData.isPublic;
+          incoming.publicRole = projectData.publicRole;
+          incoming.shortId = projectData.shortId || incoming.shortId;
+          
+          if(!incoming.tasks) incoming.tasks = []; // フォールバック
+          finalizeImport(incoming);
+      }
+      setImportCloudCheck(null);
+  }, [importCloudCheck, finalizeImport]);
+
+  const processImportedData = useCallback(async (incoming: any) => {
+    // tasks配列が欠落している場合の補完
+    if (!incoming.tasks) incoming.tasks = [];
+
+    let isCloudId = incoming.id && !String(incoming.id).startsWith('local_');
+    let treatAsLocal = false;
+
+    if (isCloudId) {
+      try {
+        const token = await getToken();
+        // クラウドプロジェクトの存在と基本権限の確認
+        const res = await fetch(`http://localhost:5174/api/projects/${incoming.id}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        
+        if (res.ok) {
+          const resData = await res.json();
+          const projectData = resData.project || resData;
+          projectData.isCloudSync = true;
+          if (resData.role) projectData.role = resData.role;
+          
+          try {
+              const membersRes = await fetch(`http://localhost:5174/api/projects/${incoming.id}/members`, {
+                  headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+              });
+              if (membersRes.ok) {
+                  const membersData = await membersRes.json();
+                  projectData.members = membersData.members;
+                  projectData.isPublic = membersData.isPublic;
+                  projectData.publicRole = membersData.publicRole;
+              }
+          } catch (e) {
+              console.error("Failed to fetch project permissions/members:", e);
+          }
+          
+          // モーダルを表示するためにStateにセット
+          setImportCloudCheck({
+              isOpen: true,
+              incoming,
+              projectData
+          });
+          return; // モーダルの操作待ちになるためここで一旦終了
+        } else {
+          if (res.status === 401 || res.status === 403) {
+             alert('クラウドプロジェクトのアクセス権限がありません。\nローカルプロジェクトとして読み込みます。');
+          }
+          treatAsLocal = true;
+        }
+      } catch (e) {
+        console.error("Failed to check cloud project existence:", e);
+        treatAsLocal = true;
+      }
+    }
+
+    if (treatAsLocal) {
+      incoming.isCloudSync = false;
+      incoming.shortId = undefined;
+      incoming.role = 'owner';
+      if (!String(incoming.id).startsWith('local_')) {
+          incoming.id = 'local_' + incoming.id;
+      }
+    }
+
+    finalizeImport(incoming);
+  }, [getToken, finalizeImport]);
   
-  const handleImportFromUrl = useCallback((urlStr: string) => {
+  const handleImportFromUrl = useCallback(async (urlStr: string) => {
     try {
       const targetUrl = urlStr.startsWith('http') ? urlStr : `${window.location.origin}${urlStr.startsWith('/') ? '' : '/'}${urlStr}`;
       const url = new URL(targetUrl);
@@ -348,86 +460,30 @@ export const useTaskOperations = () => {
       if (!compressed) { alert('URLに有効なデータ(dパラメータ)が含まれていません。'); return; }
       const incoming = decompressData(compressed);
       if (incoming) {
-        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) { alert('インポートされたデータは現在のプロジェクトと完全に一致しています。'); return; }
-        
-        let targetId = '';
-        const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-        let targetProj = null;
-
-        if (sameNameProject) { 
-          targetProj = sameNameProject;
-          if (sameNameProject.tasks.every(t => t.isDeleted)) targetId = sameNameProject.id; 
-        } 
-        else { 
-          targetProj = data;
-          if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; 
-        }
-
-        if (targetProj && targetProj.isCloudSync) {
-          alert('クラウド上のプロジェクトにマージすることはできません。');
-          return;
-        }
-
-        if (targetId) { 
-          const newData = { ...incoming, id: targetId, lastSynced: Date.now() }; 
-          setData(newData); 
-          if (targetId !== activeId) switchProject(targetId); 
-          alert(`プロジェクト名：${incoming.projectName} を読み込みました。`); 
+        if (!incoming.tasks) incoming.tasks = [];
+        if (data && JSON.stringify(incoming.tasks) === JSON.stringify(data.tasks) && incoming.projectName === data.projectName) { 
+          alert('インポートされたデータは現在のプロジェクトと完全に一致しています。'); 
           return; 
         }
-        setIncomingData(incoming);
+        await processImportedData(incoming);
       } else { alert('データの復元に失敗しました。'); }
     } catch (e) { console.error(e); alert('URLの形式が正しくありません。'); }
-  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
+  }, [data, processImportedData]);
 
   const handleFileImport = useCallback((f: File) => {
       const r = new FileReader();
-      r.onload = (e) => {
+      r.onload = async (e) => {
         try {
           const incoming = JSON.parse(e.target?.result as string);
-          
-          let targetId = '';
-          const sameNameProject = projects.find(p => p.projectName === incoming.projectName);
-          let targetProj = null;
-
-          if (sameNameProject) { 
-            targetProj = sameNameProject;
-            if (sameNameProject.tasks.every(t => t.isDeleted)) targetId = sameNameProject.id; 
-          } 
-          else { 
-            targetProj = data;
-            if (data && data.tasks.every(t => t.isDeleted)) targetId = data.id; 
-          }
-
-          if (targetProj && targetProj.isCloudSync) {
-            alert('クラウド上のプロジェクトにマージすることはできません。');
-            return;
-          }
-
-          if (targetId) { 
-            const newData = { ...incoming, id: targetId, lastSynced: Date.now() }; 
-            setData(newData); 
-            if (targetId !== activeId) switchProject(targetId); 
-            alert(`プロジェクト名：${incoming.projectName} を読み込みました。`); 
-          } 
-          else { setIncomingData(incoming); }
+          await processImportedData(incoming);
         } catch(err) { alert('JSONの読み込みに失敗しました'); }
       };
       r.readAsText(f);
-  }, [data, setIncomingData, setData, projects, activeId, switchProject]);
-
-  const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
-    if (!inputTaskName.trim()) return;
-    let deadline: number | undefined;
-    if (inputDateStr) { const [y, m, d] = inputDateStr.split('-').map(Number); deadline = new Date(y, m - 1, d).getTime(); }
-    addTask(inputTaskName, deadline, targetParentId ?? activeParentId ?? undefined);
-    setInputTaskName(''); setInputDateStr(''); 
-  }, [addTask, inputTaskName, inputDateStr, activeParentId]);
+  }, [processImportedData]);
 
   const handleTaskClick = useCallback((node: TaskNode) => {
-    if (inputTaskName.trim()) { handleAddTaskWrapper(node.id); } 
-    else { setActiveParentId(node.id); }
-  }, [inputTaskName, handleAddTaskWrapper]);
+    setActiveParentId(node.id);
+  }, []);
 
   const handleBoardClick = useCallback(() => { 
     setActiveParentId(null);
@@ -544,12 +600,45 @@ export const useTaskOperations = () => {
       }
   }, [data, getToken, setData]);
 
+  const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
+    if (!inputTaskName.trim()) return;
+    let deadline: number | undefined;
+    if (inputDateStr) { const [y, m, d] = inputDateStr.split('-').map(Number); deadline = new Date(y, m - 1, d).getTime(); }
+    
+    if (data) {
+        let targetId = targetParentId ?? activeParentId ?? undefined;
+        if (targetId) {
+            const parentExists = (data.tasks || []).some(t => t.id === targetId && !t.isDeleted);
+            if (!parentExists) targetId = undefined;
+        }
+        
+        const isDuplicate = (data.tasks || []).some(t => !t.isDeleted && t.parentId === targetId && t.name === inputTaskName);
+        if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
+        
+        const existingIds = new Set((data.tasks || []).map(t => t.id));
+        let candidateNum = activeTasks.length === 0 ? 1 : (data.tasks || []).length + 1;
+        let newId = candidateNum.toString(36);
+        while (existingIds.has(newId)) { candidateNum++; newId = candidateNum.toString(36); }
+        
+        const siblings = (data.tasks || []).filter(t => !t.isDeleted && t.parentId === targetId);
+        const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+        const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
+        const newTask: Task = {
+            id: newId, name: inputTaskName, status: 0, deadline: deadline, lastUpdated: Date.now(),
+            parentId: activeTasks.length === 0 ? undefined : targetId, order: activeTasks.length === 0 ? 1 : nextOrder
+        };
+        save([...(data.tasks || []), newTask]);
+    }
+
+    setInputTaskName(''); setInputDateStr(''); 
+  }, [data, activeTasks, save, inputTaskName, inputDateStr, activeParentId]);
+
   return {
-    data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, activeParent, calendarTasks,
+    data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks, rootNodes, projectProgress, debugInfo, calendarTasks,
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showSettingsModal, setShowSettingsModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
     menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    addTask, deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
+    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     undo, redo,
@@ -557,6 +646,7 @@ export const useTaskOperations = () => {
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
-    addOrUpdateProject
+    addOrUpdateProject,
+    importCloudCheck, handleCloudImportChoice // ★ 追加
   };
 };

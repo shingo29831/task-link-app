@@ -25,7 +25,7 @@ import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconTrash } from './components/Icons';
+import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 
 type TaskNode = Task & { children: TaskNode[] };
@@ -200,10 +200,10 @@ function App() {
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
-    rootNodes, projectProgress, debugInfo, activeParentId, calendarTasks,
+    rootNodes, projectProgress, debugInfo, calendarTasks,
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu,
     showSettingsModal, setShowSettingsModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar,
-    collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr,
+    collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
@@ -213,13 +213,14 @@ function App() {
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
-    addOrUpdateProject
+    addOrUpdateProject,
+    importCloudCheck, handleCloudImportChoice // ★ 追加
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isVerifyingProject, setIsVerifyingProject] = useState(false); // ★ プロジェクト検証中の状態
+  const [isVerifyingProject, setIsVerifyingProject] = useState(false);
 
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
@@ -247,7 +248,6 @@ function App() {
     });
   }, [currentUserRole, isViewer, isAdmin, isCloudProject, sharedProjectState, hasEditPermission, data?.role]);
 
-  // ★ カスタムイベントで検証中のローディングを表示するリスナー
   useEffect(() => {
     const handler = (e: any) => setIsVerifyingProject(e.detail);
     window.addEventListener('project-verifying', handler);
@@ -284,13 +284,12 @@ function App() {
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
-  const activeDragTask = data?.tasks.find(t => t.id === activeDragId);
+  const activeDragTask = data?.tasks?.find(t => t.id === activeDragId);
 
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
   }
 
-  // ★ 検証中もローディングを表示
   if (isCheckingShared || isVerifyingProject) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
@@ -317,7 +316,7 @@ function App() {
     const content = nodes.map(n => (
       <React.Fragment key={n.id}>
         <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            <TaskItem task={n} tasks={data.tasks} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} />
+            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} />
             {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
         </SortableTaskItem>
       </React.Fragment>
@@ -340,13 +339,7 @@ function App() {
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                     {projects.map(p => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
-                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
-                <div onClick={() => { 
-                  if(window.confirm('このプロジェクトをリストから削除しますか？\n(クラウド同期中の場合はクラウドからも削除されます)')) { 
-                    deleteProject(activeId, true); 
-                    setShowProjectMenu(false); 
-                  } 
-                }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-danger-text)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px' }}><IconTrash size={16} /><span>このプロジェクトを削除</span></div>
+                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
             </div>
         )}
     </div>
@@ -358,7 +351,7 @@ function App() {
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
-                <TaskItem task={root} tasks={data.tasks} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} />
+                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} />
             </div>
             <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
         </div>
@@ -368,7 +361,45 @@ function App() {
 
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
-      {incomingData && targetLocalData && <MergeModal localData={targetLocalData} incomingData={incomingData} onConfirm={(merged) => { setData(merged); if (merged.id !== activeId) switchProject(merged.id); setIncomingData(null); alert('マージが完了しました'); }} onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} />}
+      
+      {/* ★ クラウドインポート確認モーダル */}
+      {importCloudCheck?.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>
+             <h3 style={{ marginTop: 0 }}>クラウドプロジェクトの検出</h3>
+             <p style={{ fontSize: '0.95em', lineHeight: 1.5, marginBottom: '20px' }}>
+               このプロジェクトはクラウド上に存在します。<br/>
+               クラウドの最新データを表示しますか？<br/><br/>
+               <span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>（[キャンセル]を選択すると、読み込んだJSONデータを表示・マージします）</span>
+             </p>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => handleCloudImportChoice(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>キャンセル</button>
+               <button onClick={() => handleCloudImportChoice(true)} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>最新データを表示</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {incomingData && targetLocalData && (
+        <MergeModal 
+          localData={targetLocalData} 
+          incomingData={incomingData} 
+          onConfirm={(merged) => { 
+            const finalMerged = { 
+                ...targetLocalData, 
+                ...merged, 
+                isCloudSync: incomingData.isCloudSync ?? targetLocalData.isCloudSync ?? merged.isCloudSync,
+                shortId: targetLocalData.shortId || incomingData.shortId
+            };
+            setData(finalMerged); 
+            if (finalMerged.id !== activeId) switchProject(finalMerged.id); 
+            setIncomingData(null); 
+            alert('マージが完了しました'); 
+          }} 
+          onCancel={() => setIncomingData(null)} 
+          onCreateNew={importNewProject} 
+        />
+      )}
       {showSettingsModal && data && (
         <ProjectSettingsModal 
           currentName={data.projectName} 
@@ -439,7 +470,22 @@ function App() {
           )}
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <ProjectControls onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} onExport={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `${data.projectName}.json`; a.click(); }} onImport={handleFileImport} onImportFromUrl={handleImportFromUrl} />
+            <ProjectControls 
+              onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
+              onExport={() => { 
+                const exportData = { ...data };
+                delete exportData.isCloudSync;
+                delete exportData.isPublic;
+                delete exportData.publicRole;
+                delete exportData.role;
+                const a = document.createElement('a'); 
+                a.href = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })); 
+                a.download = `${data.projectName}.json`; 
+                a.click(); 
+              }} 
+              onImport={handleFileImport} 
+              onImportFromUrl={handleImportFromUrl} 
+            />
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <SignedIn><UserButton /></SignedIn>
               <SignedOut>
@@ -521,7 +567,7 @@ function App() {
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
               <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-                <TaskItem task={activeDragTask} tasks={data.tasks} depth={0} hasChildren={data.tasks.some(t => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some(t => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
               </div>
             ) : null}
           </DragOverlay>
