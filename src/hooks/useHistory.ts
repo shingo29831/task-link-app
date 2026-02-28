@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 // 履歴の最大保持数
 const HISTORY_LIMIT = 50;
 
-export function useHistory<T>(initialState: T) {
+export function useHistory<T>(initialState: T, transformUndoRedo?: (curr: T, next: T) => T) {
   const [history, setHistory] = useState<{
     past: T[];
     present: T;
@@ -54,13 +54,15 @@ export function useHistory<T>(initialState: T) {
       const previous = curr.past[curr.past.length - 1];
       const newPast = curr.past.slice(0, curr.past.length - 1);
 
+      const nextPresent = transformUndoRedo ? transformUndoRedo(curr.present, previous) : previous;
+
       return {
         past: newPast,
-        present: previous,
+        present: nextPresent,
         future: [curr.present, ...curr.future],
       };
     });
-  }, []);
+  }, [transformUndoRedo]);
 
   // やり直す (Redo) - 必要であれば
   const redo = useCallback(() => {
@@ -70,13 +72,15 @@ export function useHistory<T>(initialState: T) {
       const next = curr.future[0];
       const newFuture = curr.future.slice(1);
 
+      const nextPresent = transformUndoRedo ? transformUndoRedo(curr.present, next) : next;
+
       return {
         past: [...curr.past, curr.present],
-        present: next,
+        present: nextPresent,
         future: newFuture,
       };
     });
-  }, []);
+  }, [transformUndoRedo]);
 
   return {
     state: history.present,

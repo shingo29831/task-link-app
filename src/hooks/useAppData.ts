@@ -41,7 +41,40 @@ const calculateHash = (project: AppData): number => {
 export const useAppData = () => {
   const { getToken, isSignedIn } = useAuth();
 
-  const { state: projects, setState: setProjects, resetState: resetProjects, undo, redo, canUndo, canRedo } = useHistory<AppData[]>([]);
+  const handleUndoRedo = useCallback((currState: AppData[], nextState: AppData[]) => {
+    const now = Date.now();
+    return nextState.map(nextProj => {
+      const currProj = currState.find(p => p.id === nextProj.id);
+      if (!currProj) return { ...nextProj, lastSynced: now };
+
+      let isProjectChanged = false;
+      
+      const updatedTasks = nextProj.tasks.map(nextTask => {
+        const currTask = currProj.tasks.find(t => t.id === nextTask.id);
+        if (!currTask) {
+          isProjectChanged = true;
+          return { ...nextTask, lastUpdated: now };
+        }
+
+        const { lastUpdated: l1, ...restNext } = nextTask;
+        const { lastUpdated: l2, ...restCurr } = currTask;
+        
+        // lastUpdated以外のタスク内容に差分があるか比較
+        if (JSON.stringify(restNext) !== JSON.stringify(restCurr)) {
+          isProjectChanged = true;
+          return { ...nextTask, lastUpdated: now };
+        }
+        return nextTask;
+      });
+
+      if (isProjectChanged) {
+        return { ...nextProj, tasks: updatedTasks, lastSynced: now };
+      }
+      return nextProj;
+    });
+  }, []);
+
+  const { state: projects, setState: setProjects, resetState: resetProjects, undo, redo, canUndo, canRedo } = useHistory<AppData[]>([], handleUndoRedo);
 
   const [activeId, setActiveId] = useState<string>('');
   const activeData = projects.find(p => p.id === activeId) || null;

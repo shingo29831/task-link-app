@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
 import type { Task, UserRole } from '../types'; 
@@ -19,7 +19,7 @@ export const useTaskOperations = () => {
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject // ★ 追加
+    addOrUpdateProject
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -34,6 +34,11 @@ export const useTaskOperations = () => {
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
+
+  // タイマーと最新状態保持用のRef
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const projectsRef = useRef(projects);
+  useEffect(() => { projectsRef.current = projects; }, [projects]);
 
   const activeTasks = useMemo(() => {
     return data ? data.tasks.filter(t => !t.isDeleted) : [];
@@ -192,88 +197,142 @@ export const useTaskOperations = () => {
 
   const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
 
-  const updateExternalProjectTask = useCallback((targetProjId: string, taskId: string, newStatus: 0 | 1 | 2 | 3) => {
-      const targetProject = projects.find(p => p.id === targetProjId);
+  // ★ ローカルの即時更新と15秒後のクラウド同期を行う関数
+  const applyCloudSyncForStatusChange = useCallback((targetProjId: string, applyChanges: (tasks: Task[]) => Task[]) => {
+      const currentProjects = projectsRef.current;
+      const targetProject = currentProjects.find(p => p.id === targetProjId);
       if (!targetProject) return;
 
-      const newTasks = targetProject.tasks.map(t => 
-          t.id === taskId ? { ...t, status: newStatus, lastUpdated: Date.now() } : t
-      );
-      
-      const recalculated = recalculateStatus(newTasks);
-      
-      updateProject({
-          ...targetProject,
-          tasks: recalculated,
-          lastSynced: Date.now()
-      });
-  }, [projects, updateProject]);
+      // 1. ローカルデータを即時更新する
+      const updatedTasks = applyChanges(targetProject.tasks);
+      const calculatedTasks = recalculateStatus(updatedTasks);
+      const now = Date.now();
 
-  const updateExternalProjectParentStatus = useCallback((targetProjId: string, parentId: string, newStatus: 0 | 1 | 2 | 3) => {
-      const targetProject = projects.find(p => p.id === targetProjId);
-      if (!targetProject) return;
-
-      let nextTasks = [...targetProject.tasks];
-    
-      if (newStatus === 2) { 
-        nextTasks = nextTasks.map(t => (t.parentId === parentId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: Date.now() } : t);
-      } else if (newStatus === 0) { 
-        nextTasks = nextTasks.map(t => (t.parentId === parentId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: Date.now() } : t);
-      } else if (newStatus === 1) { 
-        nextTasks = nextTasks.map(t => (t.parentId === parentId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: Date.now() } : t);
+      const newProjectData = { ...targetProject, tasks: calculatedTasks, lastSynced: now };
+      
+      if (targetProjId === activeId && data) {
+          setData(newProjectData);
+      } else {
+          updateProject(newProjectData);
       }
 
-      let calculatedTasks = recalculateStatus(nextTasks);
-      calculatedTasks = calculatedTasks.map(t => t.id === parentId ? { ...t, status: newStatus, lastUpdated: Date.now() } : t);
+      const isCloud = !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false && targetProject.role !== 'viewer';
+      if (!isCloud) return;
 
-      updateProject({ ...targetProject, tasks: calculatedTasks, lastSynced: Date.now() });
-  }, [projects, updateProject]);
+      // 2. 15秒間のデバウンス処理を開始
+      if (syncTimerRef.current) {
+          clearTimeout(syncTimerRef.current);
+      }
+
+      syncTimerRef.current = setTimeout(async () => {
+          // 待機完了後の最新のローカル状態を取得
+          const latestProjects = projectsRef.current;
+          const latestProject = latestProjects.find(p => p.id === targetProjId);
+          if (!latestProject) return;
+
+          try {
+              const token = await getToken();
+              let cloudProject = null;
+              let mergedProjectName = latestProject.projectName;
+              
+              if (latestProject.shortId) {
+                  const res = await fetch(`http://localhost:5174/api/projects/shared/${latestProject.shortId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                  if (res.ok) { const result = await res.json(); if (result.success && result.project) cloudProject = result.project; }
+              } else {
+                  const res = await fetch('http://localhost:5174/api/projects', { headers: { 'Authorization': `Bearer ${token}` } });
+                  if (res.ok) { const { projects: dbProjects } = await res.json(); cloudProject = dbProjects.find((p: any) => p.id === latestProject.id); }
+              }
+
+              let mergedTasks = [...latestProject.tasks];
+
+              if (cloudProject) {
+                  const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+                  mergedProjectName = cloudProject.projectName || mergedProjectName;
+                  
+                  // ローカルとクラウドの変更をマージ
+                  const taskMap = new Map<string, Task>();
+                  cloudTasks.forEach((t: Task) => taskMap.set(t.id, t));
+                  latestProject.tasks.forEach((localTask) => {
+                     const cloudTask = taskMap.get(localTask.id);
+                     if (!cloudTask || localTask.lastUpdated > cloudTask.lastUpdated) {
+                        taskMap.set(localTask.id, localTask);
+                     }
+                  });
+                  mergedTasks = Array.from(taskMap.values());
+              }
+
+              const finalCalculatedTasks = recalculateStatus(mergedTasks);
+              const syncNow = Date.now();
+
+              // マージしたデータをクラウドにアップロード
+              await fetch('http://localhost:5174/api/projects', {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      id: latestProject.id, shortId: latestProject.shortId,
+                      projectName: mergedProjectName, data: { tasks: finalCalculatedTasks, lastSynced: syncNow }
+                  })
+              });
+
+              // 最新のマージ結果をローカルにも反映
+              updateProject({ ...latestProject, projectName: mergedProjectName, tasks: finalCalculatedTasks, lastSynced: syncNow });
+
+          } catch(e) {
+              console.error('クラウドへの同期処理に失敗しました', e);
+          }
+      }, 15000);
+  }, [activeId, data, setData, updateProject, getToken]);
 
   const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
+    let targetProjId = data?.id;
+    let realTaskId = id;
+
     if (id.includes('_')) {
-        const [projId, realTaskId] = id.split('_');
+        const [projId, parsedTaskId] = id.split('_');
         const isCurrent = data?.tasks.some(t => t.id === id);
         if (!isCurrent) {
-            const targetProj = projects.find(p => p.id === projId);
-            if (targetProj) {
-                updateExternalProjectParentStatus(projId, realTaskId, newStatus);
-                return;
-            }
+            targetProjId = projId;
+            realTaskId = parsedTaskId;
         }
     }
-    
-    if (!data) return;
-    let nextTasks = [...data.tasks];
-    
-    if (newStatus === 2) { 
-      nextTasks = nextTasks.map(t => (t.parentId === id && !t.isDeleted) ? { ...t, status: 2, lastUpdated: Date.now() } : t);
-    } else if (newStatus === 0) { 
-      nextTasks = nextTasks.map(t => (t.parentId === id && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: Date.now() } : t);
-    } else if (newStatus === 1) { 
-      nextTasks = nextTasks.map(t => (t.parentId === id && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: Date.now() } : t);
-    }
 
-    let calculatedTasks = recalculateStatus(nextTasks);
-    calculatedTasks = calculatedTasks.map(t => t.id === id ? { ...t, status: newStatus, lastUpdated: Date.now() } : t);
-    setData({ ...data, tasks: calculatedTasks, lastSynced: Date.now() });
-  }, [data, setData, projects, updateExternalProjectParentStatus]);
+    if (!targetProjId) return;
+
+    applyCloudSyncForStatusChange(targetProjId, (tasks) => {
+        let nextTasks = [...tasks];
+        const now = Date.now();
+        
+        if (newStatus === 2) { 
+          nextTasks = nextTasks.map(t => (t.parentId === realTaskId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: now } : t);
+        } else if (newStatus === 0) { 
+          nextTasks = nextTasks.map(t => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: now } : t);
+        } else if (newStatus === 1) { 
+          nextTasks = nextTasks.map(t => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: now } : t);
+        }
+
+        return nextTasks.map(t => t.id === realTaskId ? { ...t, status: newStatus, lastUpdated: now } : t);
+    });
+  }, [data, applyCloudSyncForStatusChange]);
 
   const updateTaskStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
+    let targetProjId = data?.id;
+    let realTaskId = id;
+
     if (id.includes('_')) {
-        const [projId, realTaskId] = id.split('_');
+        const [projId, parsedTaskId] = id.split('_');
         const isCurrent = data?.tasks.some(t => t.id === id);
         if (!isCurrent) {
-            const targetProj = projects.find(p => p.id === projId);
-            if (targetProj) {
-                updateExternalProjectTask(projId, realTaskId, newStatus);
-                return;
-            }
+            targetProjId = projId;
+            realTaskId = parsedTaskId;
         }
     }
-    if (!data) return;
-    const newTasks = data.tasks.map(t => t.id === id ? { ...t, status: newStatus, lastUpdated: Date.now() } : t);
-    save(newTasks);
-  }, [data, save, projects, updateExternalProjectTask]);
+
+    if (!targetProjId) return;
+
+    applyCloudSyncForStatusChange(targetProjId, (tasks) => {
+        return tasks.map(t => t.id === realTaskId ? { ...t, status: newStatus, lastUpdated: Date.now() } : t);
+    });
+  }, [data, applyCloudSyncForStatusChange]);
 
   const addTask = useCallback((name: string, deadline?: number, parentId?: string) => {
     if (!data) return;
@@ -567,6 +626,6 @@ export const useTaskOperations = () => {
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
-    addOrUpdateProject // ★ エクスポートを追加
+    addOrUpdateProject
   };
 };
