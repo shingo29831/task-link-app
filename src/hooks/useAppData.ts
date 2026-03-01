@@ -334,7 +334,8 @@ export const useAppData = () => {
           const loadedCloud = applyCloudProjects(dbProjects);
           setSyncState('synced');
           
-          if (loadedCloud.length > 0 && !loadedCloud.find(p => p.id === activeId)) {
+          // ★ 修正：何も開いていない（activeIdが空の）初期ロード時のみ自動で切り替える
+          if (loadedCloud.length > 0 && activeId === '') {
             setActiveId(loadedCloud[0].id);
           }
         }
@@ -510,7 +511,12 @@ export const useAppData = () => {
 
         if (cloudProject) {
             const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
-            mergedProjectName = cloudProject.projectName || activeData.projectName;
+            
+            // ★ 修正：プロジェクト名のコンフリクト解決（新しい更新日時の方を優先）
+            const cloudLastSynced = cloudProject.data?.lastSynced || cloudProject.lastSynced || 0;
+            mergedProjectName = activeData.lastSynced >= cloudLastSynced 
+                ? activeData.projectName 
+                : (cloudProject.projectName || activeData.projectName);
             
             const diffs = extractTrueCloudDiffs(activeData.id, activeData.tasks, cloudTasks);
             diffs.forEach((v, k) => trueCloudDiffsMap.set(k, v));
