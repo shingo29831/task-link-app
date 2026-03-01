@@ -96,10 +96,38 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     onSaveName(normalizedName);
   };
 
+  // 更新ボタンが押せるかどうかの判定
+  const isSaveDisabled = !!nameError || normalizedName === currentName;
+
+  // プロジェクト名入力欄でのEnterキーハンドラ
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // IME入力中（変換確定のEnterなど）は無視する
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // ボタンが押せる状態であれば保存処理を実行
+      if (!isSaveDisabled) {
+        handleSaveName();
+      }
+    }
+  };
+
   const handleInvite = () => {
     if (!inviteUsername.trim()) return;
     onInviteUser(inviteUsername.trim());
     setInviteUsername('');
+  };
+
+  // 招待ユーザー入力欄でのEnterキーハンドラ
+  const handleInviteKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // IME入力中は無視する
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (inviteUsername.trim()) {
+        handleInvite();
+      }
+    }
   };
 
   const canDeleteCloud = isCloudProject && (currentUserRole === 'owner' || currentUserRole === 'admin');
@@ -116,9 +144,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({
       onDeleteProject(false);
     }
   };
-
-  // 更新ボタンが押せるかどうかの判定（エラーがあるか、名前が変更されていない場合は押せない）
-  const isSaveDisabled = !!nameError || normalizedName === currentName;
 
   return (
     <div style={{
@@ -149,6 +174,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 type="text" 
                 value={nameValue}
                 onChange={handleNameChange}
+                onKeyDown={handleNameKeyDown}
                 placeholder="プロジェクト名"
                 style={{ 
                   flex: 1, padding: '10px', borderRadius: '4px', 
@@ -235,6 +261,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   type="text" 
                   value={inviteUsername}
                   onChange={(e) => setInviteUsername(e.target.value)}
+                  onKeyDown={handleInviteKeyDown}
                   placeholder="ユーザー名を入力"
                   style={{ 
                     flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
