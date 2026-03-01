@@ -20,7 +20,7 @@ const createDefaultProject = (): AppData => ({
 });
 
 const calculateHash = (project: AppData): number => {
-  const essentialTasks = project.tasks.map(t => ({
+  const essentialTasks = project.tasks.map((t: Task) => ({
     id: t.id,
     name: t.name,
     status: t.status,
@@ -50,7 +50,7 @@ export const useAppData = () => {
   const { state: projects, setState: setProjects, resetState: resetProjects, undo: baseUndo, redo: baseRedo, canUndo, canRedo, modifyHistory } = useHistory<AppData[]>([]);
 
   const [activeId, setActiveId] = useState<string>('');
-  const activeData = projects.find(p => p.id === activeId) || null;
+  const activeData = projects.find((p: AppData) => p.id === activeId) || null;
   const [incomingData, setIncomingData] = useState<AppData | null>(null);
   const isLoaded = useRef(false);
   
@@ -59,9 +59,9 @@ export const useAppData = () => {
   const lastSyncedProjectsRef = useRef<AppData[]>([]);
 
   const updateLastSynced = useCallback((projectsToSync: AppData[]) => {
-      lastSyncedProjectsRef.current = projectsToSync.map(p => ({
+      lastSyncedProjectsRef.current = projectsToSync.map((p: AppData) => ({
           ...p,
-          tasks: p.tasks.map(t => ({...t}))
+          tasks: p.tasks.map((t: Task) => ({...t}))
       }));
   }, []);
 
@@ -72,14 +72,14 @@ export const useAppData = () => {
   const initialUrlGuardRef = useRef(true);
 
   const extractTrueCloudDiffs = useCallback((projectId: string, currentTasks: Task[], cloudTasks: Task[]) => {
-      const lastSyncedProject = lastSyncedProjectsRef.current.find(p => p.id === projectId);
+      const lastSyncedProject = lastSyncedProjectsRef.current.find((p: AppData) => p.id === projectId);
       const lastSyncedTasks = lastSyncedProject?.tasks || [];
 
       const diffs = new Map<string, CloudDiffInfo>();
       
-      cloudTasks.forEach((cTask) => {
-          const syncedTask = lastSyncedTasks.find(t => t.id === cTask.id);
-          const localTask = currentTasks.find(t => t.id === cTask.id);
+      cloudTasks.forEach((cTask: Task) => {
+          const syncedTask = lastSyncedTasks.find((t: Task) => t.id === cTask.id);
+          const localTask = currentTasks.find((t: Task) => t.id === cTask.id);
 
           if (!syncedTask || !localTask) {
               diffs.set(cTask.id, {
@@ -155,7 +155,7 @@ export const useAppData = () => {
         if (diffsMap.size === 0) return localProject;
         
         let isChanged = false;
-        const merged = localProject.tasks.map(t => {
+        const merged = localProject.tasks.map((t: Task) => {
            const diff = diffsMap.get(t.id);
            if (diff) {
                isChanged = true;
@@ -181,7 +181,7 @@ export const useAppData = () => {
         });
 
         diffsMap.forEach(diff => {
-            if (!localProject.tasks.some(t => t.id === diff.cloudTask.id)) {
+            if (!localProject.tasks.some((t: Task) => t.id === diff.cloudTask.id)) {
                 merged.push(diff.cloudTask);
                 isChanged = true;
             }
@@ -236,7 +236,7 @@ export const useAppData = () => {
         try {
           const parsed = JSON.parse(localJson);
           if (Array.isArray(parsed)) {
-            loadedProjects = parsed.map(p => ({
+            loadedProjects = parsed.map((p: any) => ({
               ...p,
               id: (isUUID(p.id) || String(p.id).startsWith('local_')) ? p.id : generateProjectId()
             }));
@@ -286,10 +286,10 @@ export const useAppData = () => {
 
   const applyCloudProjects = useCallback((dbProjects: any[]) => {
     const loadedCloud = dbProjects.map((row: any) => {
-      const p = {
+      const p: AppData = {
         id: row.id,
         shortId: row.shortId,
-        projectName: row.projectName,
+        projectName: row.projectName, // クラウドから読み込んだ初期データ
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now(),
         isCloudSync: true,
@@ -301,7 +301,7 @@ export const useAppData = () => {
 
     setProjects(prev => {
       const newProjects = [...prev];
-      loadedCloud.forEach(cp => {
+      loadedCloud.forEach((cp: AppData) => {
         const existingIdx = newProjects.findIndex(p => p.id === cp.id);
         if (existingIdx >= 0) newProjects[existingIdx] = cp;
         else newProjects.push(cp);
@@ -334,7 +334,6 @@ export const useAppData = () => {
           const loadedCloud = applyCloudProjects(dbProjects);
           setSyncState('synced');
           
-          // ★ 修正：何も開いていない（activeIdが空の）初期ロード時のみ自動で切り替える
           if (loadedCloud.length > 0 && activeId === '') {
             setActiveId(loadedCloud[0].id);
           }
@@ -360,7 +359,7 @@ export const useAppData = () => {
 
     applyCloudProjects(syncLimitState.cloudProjects.filter(p => selectedCloudIds.includes(p.id)));
     
-    const downgradedLocal = unselected.map((row: any) => ({
+    const downgradedLocal: AppData[] = unselected.map((row: any) => ({
       id: generateProjectId(),
       projectName: row.projectName + ' (オフライン)',
       tasks: row.data.tasks || [],
@@ -377,10 +376,10 @@ export const useAppData = () => {
   };
 
   const uploadProject = async (localId: string) => {
-    const target = projects.find(p => p.id === localId);
+    const target = projects.find((p: AppData) => p.id === localId);
     if (!target) return;
     
-    const cloudCount = projects.filter(p => !String(p.id).startsWith('local_') && p.isCloudSync !== false).length;
+    const cloudCount = projects.filter((p: AppData) => !String(p.id).startsWith('local_') && p.isCloudSync !== false).length;
     if (cloudCount >= currentLimit) {
       alert(`プランのアップロード上限（${currentLimit}件）に達しています。\n不要なクラウドプロジェクトを削除するか、プランをアップグレードしてください。`);
       return;
@@ -402,7 +401,7 @@ export const useAppData = () => {
         lastSyncedHashMap.current[finalId] = calculateHash(target);
         
         setProjects(prev => {
-            const next = prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true, role: 'owner' } : p);
+            const next = prev.map(p => p.id === localId ? { ...p, id: finalId, shortId: finalShortId, isCloudSync: true, role: 'owner' as const } : p);
             updateLastSynced(next); 
             return next;
         });
@@ -456,10 +455,10 @@ export const useAppData = () => {
                    cloudProject = sharedResult.project;
                    fetchedRole = sharedResult.role;
                } else if (sharedRes.status === 403 || sharedRes.status === 404) {
-                   fetchedRole = 'none';
+                   fetchedRole = 'none' as any;
                }
             } else {
-               fetchedRole = 'none';
+               fetchedRole = 'none' as any;
             }
         } else {
             const getRes = await fetch('http://localhost:5174/api/projects', {
@@ -472,17 +471,18 @@ export const useAppData = () => {
                   cloudProject = found;
                   fetchedRole = found.role || 'owner';
               } else {
-                  fetchedRole = 'none';
+                  fetchedRole = 'none' as any;
               }
             }
         }
 
-        if (fetchedRole === 'viewer' || fetchedRole === 'none') {
+        if (fetchedRole === 'viewer' || fetchedRole === ('none' as any)) {
             let rollbackTasks = activeData.tasks;
             let rollbackName = activeData.projectName;
             
             if (cloudProject) {
                 rollbackTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
+                // 権限がない場合はクラウドのプロジェクト名に戻す
                 rollbackName = cloudProject.projectName || activeData.projectName;
             }
 
@@ -504,6 +504,7 @@ export const useAppData = () => {
         }
 
         let mergedTasks = [...activeData.tasks];
+        // 同期時は常にローカルのプロジェクト名を使用する（不意な巻き戻りを防ぐ）
         let mergedProjectName = activeData.projectName;
         let requiresLocalUpdate = false;
         let isSameAsCloud = false;
@@ -512,17 +513,11 @@ export const useAppData = () => {
         if (cloudProject) {
             const cloudTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
             
-            // ★ 修正：プロジェクト名のコンフリクト解決（新しい更新日時の方を優先）
-            const cloudLastSynced = cloudProject.data?.lastSynced || cloudProject.lastSynced || 0;
-            mergedProjectName = activeData.lastSynced >= cloudLastSynced 
-                ? activeData.projectName 
-                : (cloudProject.projectName || activeData.projectName);
-            
             const diffs = extractTrueCloudDiffs(activeData.id, activeData.tasks, cloudTasks);
             diffs.forEach((v, k) => trueCloudDiffsMap.set(k, v));
             
             const taskMap = new Map<string, Task>();
-            activeData.tasks.forEach(t => taskMap.set(t.id, t));
+            activeData.tasks.forEach((t: Task) => taskMap.set(t.id, t));
 
             trueCloudDiffsMap.forEach((diff, id) => {
                 const t = taskMap.get(id);
@@ -655,7 +650,7 @@ export const useAppData = () => {
   const addProject = () => {
     const newProject = createDefaultProject();
     let nameCandidate = 'マイプロジェクト', counter = 1;
-    while (projects.some(p => p.projectName === nameCandidate)) nameCandidate = `マイプロジェクト ${++counter}`;
+    while (projects.some((p: AppData) => p.projectName === nameCandidate)) nameCandidate = `マイプロジェクト ${++counter}`;
     newProject.projectName = nameCandidate;
     setProjects(prev => [...prev, newProject]);
     setActiveId(newProject.id);
@@ -663,7 +658,7 @@ export const useAppData = () => {
 
   const importNewProject = (data: AppData) => {
     let name = data.projectName, suffix = 1;
-    while(projects.some(p => p.projectName === name)) name = `${data.projectName} (${suffix++})`;
+    while(projects.some((p: AppData) => p.projectName === name)) name = `${data.projectName} (${suffix++})`;
     const newProject = { ...data, id: generateProjectId(), projectName: name };
     setProjects(prev => [...prev, newProject]);
     setActiveId(newProject.id);
@@ -671,7 +666,7 @@ export const useAppData = () => {
   };
 
   const switchProject = async (id: string) => { 
-    const targetProject = projects.find(p => p.id === id);
+    const targetProject = projects.find((p: AppData) => p.id === id);
     if (!targetProject) return;
 
     if (String(id).startsWith('local_') || targetProject.isCloudSync === false) {
@@ -757,7 +752,7 @@ export const useAppData = () => {
   const deleteProject = async (id: string, deleteFromCloud: boolean = true) => {
     if (projects.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
     
-    const targetProject = projects.find(p => p.id === id);
+    const targetProject = projects.find((p: AppData) => p.id === id);
     if (deleteFromCloud && targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
        try {
           const token = await getToken();
@@ -770,7 +765,7 @@ export const useAppData = () => {
        }
     }
 
-    const newProjects = projects.filter(p => p.id !== id);
+    const newProjects = projects.filter((p: AppData) => p.id !== id);
     setProjects(newProjects);
     if (id === activeId) setActiveId(newProjects[0].id);
   };

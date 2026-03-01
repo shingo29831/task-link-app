@@ -20,7 +20,7 @@ import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
-import type { Task } from './types';
+import type { Task, AppData } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
@@ -214,7 +214,7 @@ function App() {
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice // ★ 追加
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName // ★ 追加
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -284,7 +284,7 @@ function App() {
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
-  const activeDragTask = data?.tasks?.find(t => t.id === activeDragId);
+  const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
@@ -337,7 +337,7 @@ function App() {
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {projects.map(p => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
+                    {projects.map((p: AppData) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
             </div>
@@ -412,7 +412,8 @@ function App() {
           currentUserRole={currentUserRole}
           isCloudProject={isCloudProject}
           onClose={() => setShowSettingsModal(false)} 
-          onSaveName={(newName) => { setData({ ...data, projectName: newName, lastSynced: Date.now() }); setShowSettingsModal(false); }} 
+          // ★ handleUpdateProjectNameを利用してDBにも変更を反映させる
+          onSaveName={(newName) => { handleUpdateProjectName(newName); setShowSettingsModal(false); }} 
           onToggleSync={handleToggleSync}
           onTogglePublic={handleTogglePublic}
           onInviteUser={handleInviteUser}
@@ -567,7 +568,7 @@ function App() {
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
               <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some(t => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
               </div>
             ) : null}
           </DragOverlay>

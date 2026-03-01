@@ -43,7 +43,10 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   onRemoveMember,
   onDeleteProject
 }) => {
+  // 入力欄にそのまま表示・保持する値（IME変換を阻害しないため）
   const [nameValue, setNameValue] = useState(currentName);
+  // 実際に保存・比較される、変換＆トリム済みの値
+  const [normalizedName, setNormalizedName] = useState(currentName);
   const [nameError, setNameError] = useState('');
   
   const [inviteUsername, setInviteUsername] = useState('');
@@ -51,16 +54,29 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
+  // 入力中（値が変わるたび）にバリデーションチェックを実行
   useEffect(() => {
-    const trimmedValue = nameValue.trim();
+    // 1. バリデーション・保存用の変数に対してのみ全角英数字→半角変換を行う
+    const convertedValue = nameValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+    // 2. 前後の空白をトリム
+    const trimmedValue = convertedValue.trim();
+    
+    setNormalizedName(trimmedValue);
+
+    // 空チェック
     if (!trimmedValue) {
       setNameError('プロジェクト名を入力してください');
       return;
     }
+    
+    // 重複チェック
     const isDuplicate = projects.some(p => 
       p.id !== currentId && 
       p.projectName.trim().toLowerCase() === trimmedValue.toLowerCase()
     );
+    
     if (isDuplicate) {
       setNameError('他のプロジェクト名で使用しています。');
     } else {
@@ -69,18 +85,15 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   }, [nameValue, currentId, projects]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const normalizedValue = rawValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
-      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    setNameValue(normalizedValue);
+    // 入力欄の値は変換せずにそのままセットする
+    setNameValue(e.target.value);
   };
 
   const handleSaveName = () => {
-    if (nameError || !nameValue.trim()) return;
-    if (nameValue.trim() !== currentName) {
-      onSaveName(nameValue.trim());
-    }
+    // エラーがある場合、または変更がない場合は処理しない
+    if (nameError || normalizedName === currentName) return;
+    
+    onSaveName(normalizedName);
   };
 
   const handleInvite = () => {
@@ -89,7 +102,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     setInviteUsername('');
   };
 
-  // ★ クラウドプロジェクトである場合のみ、クラウドデータ削除ボタンを表示可能にする
   const canDeleteCloud = isCloudProject && (currentUserRole === 'owner' || currentUserRole === 'admin');
   const showLocalDelete = !(currentUserRole === 'owner' && isCloudProject);
 
@@ -104,6 +116,9 @@ export const ProjectSettingsModal: React.FC<Props> = ({
       onDeleteProject(false);
     }
   };
+
+  // 更新ボタンが押せるかどうかの判定（エラーがあるか、名前が変更されていない場合は押せない）
+  const isSaveDisabled = !!nameError || normalizedName === currentName;
 
   return (
     <div style={{
@@ -144,11 +159,14 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               />
               <button 
                 onClick={handleSaveName}
-                disabled={!!nameError || !nameValue.trim() || nameValue.trim() === currentName}
+                disabled={isSaveDisabled}
                 style={{
-                  padding: '0 16px', backgroundColor: 'var(--color-info)', color: '#fff', 
-                  border: 'none', borderRadius: '4px', cursor: 'pointer',
-                  opacity: (!!nameError || !nameValue.trim() || nameValue.trim() === currentName) ? 0.5 : 1
+                  padding: '0 16px', 
+                  backgroundColor: isSaveDisabled ? 'var(--border-light)' : 'var(--color-info)', 
+                  color: '#fff', 
+                  border: 'none', borderRadius: '4px', 
+                  cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isSaveDisabled ? 0.6 : 1
                 }}
               >
                 更新

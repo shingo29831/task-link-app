@@ -159,7 +159,7 @@ app.get('/api/projects', async (c) => {
   return c.json({ projects: userProjects, limit })
 })
 
-// ★ 追加：単一プロジェクト取得エンドポイント
+// 単一プロジェクト取得エンドポイント
 app.get('/api/projects/:id', async (c) => {
   const auth = getAuth(c)
   const id = c.req.param('id')
@@ -214,6 +214,47 @@ app.delete('/api/projects/:id', async (c) => {
 
   await db.delete(projectMembers).where(eq(projectMembers.projectId, id))
   await db.delete(projects).where(eq(projects.id, id))
+  
+  return c.json({ success: true })
+})
+
+// ★ 追加：プロジェクト名変更エンドポイント
+app.put('/api/projects/:id/name', async (c) => {
+  const auth = getAuth(c)
+  if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
+  
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const db = getDb(c.env.DATABASE_URL)
+  
+  const proj = await db.select().from(projects).where(eq(projects.id, id))
+  if (proj.length === 0) return c.json({ error: 'Project not found' }, 404)
+  
+  const project = proj[0]
+  let role = 'none'
+  
+  if (project.ownerId === auth.userId) {
+    role = 'owner'
+  } else {
+    const memberRecord = await db.select()
+      .from(projectMembers)
+      .where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, auth.userId)))
+    
+    if (memberRecord.length > 0) {
+      role = memberRecord[0].role
+    }
+  }
+
+  // オーナーか管理者のみが名前を変更可能
+  if (role !== 'owner' && role !== 'admin') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!body.projectName) {
+     return c.json({ error: 'Project name is required' }, 400)
+  }
+
+  await db.update(projects).set({ projectName: body.projectName }).where(eq(projects.id, id))
   
   return c.json({ success: true })
 })
