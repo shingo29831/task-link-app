@@ -214,7 +214,7 @@ function App() {
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName // ★ 追加
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
   } = useTaskOperations();
 
   const { windowWidth, isMobile } = useResponsive();
@@ -259,7 +259,7 @@ function App() {
       if (!isSignedIn || !user) return; 
       try {
         const token = await getToken();
-        await fetch('http://localhost:5174/api/user/sync', {
+        await fetch('/api/user/sync', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: user.username }) 

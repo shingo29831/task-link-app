@@ -52,7 +52,7 @@ export const useSharedProject = () => {
             headers['Authorization'] = `Bearer ${token}`;
           }
 
-          const response = await fetch(`http://localhost:5174/api/projects/shared/${shortId}`, {
+          const response = await fetch(`/api/projects/shared/${shortId}`, {
             method: 'GET',
             headers
           });

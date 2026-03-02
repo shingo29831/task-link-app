@@ -172,14 +172,12 @@ export const useTaskOperations = () => {
         const fetchMembers = async () => {
             try {
                 const token = await getToken();
-                const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members`, {
+                const res = await fetch(`/api/projects/${data.id}/members`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
                     const resData = await res.json();
                     
-                    // fetchMembersで非同期通信している間にプロジェクト名などが変更されていた場合の巻き戻りを防ぐため、
-                    // 最新のprojectsRefから対象プロジェクトの情報を引っ張ってくる
                     const currentData = projectsRef.current.find(p => p.id === data.id);
                     if (currentData) {
                         setData({ 
@@ -403,7 +401,7 @@ export const useTaskOperations = () => {
     if (isCloudId) {
       try {
         const token = await getToken();
-        const res = await fetch(`http://localhost:5174/api/projects/${incoming.id}`, {
+        const res = await fetch(`/api/projects/${incoming.id}`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
         
@@ -414,7 +412,7 @@ export const useTaskOperations = () => {
           if (resData.role) projectData.role = resData.role;
           
           try {
-              const membersRes = await fetch(`http://localhost:5174/api/projects/${incoming.id}/members`, {
+              const membersRes = await fetch(`/api/projects/${incoming.id}/members`, {
                   headers: token ? { 'Authorization': `Bearer ${token}` } : {}
               });
               if (membersRes.ok) {
@@ -506,7 +504,7 @@ export const useTaskOperations = () => {
     if (!String(data.id).startsWith('local_') && data.isCloudSync !== false) {
         try {
             const token = await getToken();
-            const res = await fetch(`http://localhost:5174/api/projects/${data.id}/name`, {
+            const res = await fetch(`/api/projects/${data.id}/name`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectName: newName })
@@ -530,7 +528,7 @@ export const useTaskOperations = () => {
            if (!confirm("クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？")) return;
            try {
                const token = await getToken();
-               await fetch(`http://localhost:5174/api/projects/${data.id}`, {
+               await fetch(`/api/projects/${data.id}`, {
                    method: 'DELETE',
                    headers: { 'Authorization': `Bearer ${token}` }
                });
@@ -546,7 +544,7 @@ export const useTaskOperations = () => {
       if (!data || String(data.id).startsWith('local_')) return;
       try {
           const token = await getToken();
-          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/public`, {
+          const res = await fetch(`/api/projects/${data.id}/public`, {
               method: 'PUT',
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ isPublic })
@@ -566,7 +564,7 @@ export const useTaskOperations = () => {
       if (!data || String(data.id).startsWith('local_')) return;
       try {
           const token = await getToken();
-          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members`, {
+          const res = await fetch(`/api/projects/${data.id}/members`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ username, role: 'viewer' })
@@ -592,7 +590,7 @@ export const useTaskOperations = () => {
       if (!data || String(data.id).startsWith('local_')) return;
       try {
           const token = await getToken();
-          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members/${memberId}`, {
+          const res = await fetch(`/api/projects/${data.id}/members/${memberId}`, {
               method: 'PUT',
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ role: newRole })
@@ -614,7 +612,7 @@ export const useTaskOperations = () => {
       if (!confirm("このメンバーを削除しますか？")) return;
       try {
           const token = await getToken();
-          const res = await fetch(`http://localhost:5174/api/projects/${data.id}/members/${memberId}`, {
+          const res = await fetch(`/api/projects/${data.id}/members/${memberId}`, {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}` }
           });
