@@ -1,11 +1,11 @@
-import { onRequest as ____path___ts_onRequest } from "C:\\Users\\Shingo\\Projects\\task-link-app\\functions\\[[path]].ts"
+import { onRequest as __api___path___ts_onRequest } from "C:\\Users\\Shingo\\Projects\\task-link-app\\functions\\api\\[[path]].ts"
 
 export const routes = [
     {
-      routePath: "/:path*",
-      mountPath: "/",
+      routePath: "/api/:path*",
+      mountPath: "/api",
       method: "",
       middlewares: [],
-      modules: [____path___ts_onRequest],
+      modules: [__api___path___ts_onRequest],
     },
   ]
