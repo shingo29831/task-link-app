@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
 import { useHistory } from './useHistory';
+import tutorialData from '../data/tutorial.json';
 
 const STORAGE_KEY = 'progress_app_v2';
 
@@ -249,9 +250,34 @@ export const useAppData = () => {
         }
       }
 
-      if (loadedProjects.length === 0) {
-        const def = createDefaultProject();
-        loadedProjects = [def];
+      // ★ チュートリアルプロジェクトの組み込み
+      const now = Date.now();
+      const tutorialProject: AppData = {
+        id: tutorialData.id,
+        projectName: tutorialData.projectName,
+        tasks: tutorialData.tasks.map((t: any) => ({
+          ...t,
+          lastUpdated: now
+        })) as Task[],
+        lastSynced: now,
+        isCloudSync: false,
+        role: 'owner'
+      };
+
+      const existingTutorialIdx = loadedProjects.findIndex(p => p.id === tutorialProject.id);
+      
+      if (existingTutorialIdx >= 0) {
+        // すでに存在する場合（またはユーザーが変更した場合）は強制的に初期化（上書き）
+        loadedProjects[existingTutorialIdx] = tutorialProject;
+      } else {
+        // 存在しない場合は一番最初に追加
+        loadedProjects.unshift(tutorialProject);
+      }
+
+      // チュートリアルプロジェクトのみしかない場合は、もう一つ「マイプロジェクト」を自動で作っておく
+      if (loadedProjects.length === 1 && loadedProjects[0].id === tutorialProject.id) {
+         const def = createDefaultProject();
+         loadedProjects.push(def);
       }
 
       initialActiveId = loadedProjects[0].id;
