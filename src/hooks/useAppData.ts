@@ -319,7 +319,7 @@ export const useAppData = () => {
     const loadFromCloud = async () => {
       try {
         const token = await getToken();
-        const res = await fetch('http://localhost:5174/api/projects', {
+        const res = await fetch('/api/projects', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -353,7 +353,7 @@ export const useAppData = () => {
     
     for (const p of unselected) {
        try {
-         await fetch(`http://localhost:5174/api/projects/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+         await fetch(`/api/projects/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
        } catch (e) { console.error(e) }
     }
 
@@ -388,7 +388,7 @@ export const useAppData = () => {
     try {
       setSyncState('syncing');
       const token = await getToken();
-      const res = await fetch('http://localhost:5174/api/projects', {
+      const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: target.id, shortId: target.shortId, projectName: target.projectName, data: { tasks: target.tasks, lastSynced: target.lastSynced } })
@@ -446,7 +446,7 @@ export const useAppData = () => {
         let fetchedRole = activeData.role;
 
         if (activeData.shortId) {
-            const sharedRes = await fetch(`http://localhost:5174/api/projects/shared/${activeData.shortId}`, {
+            const sharedRes = await fetch(`/api/projects/shared/${activeData.shortId}`, {
                headers: { 'Authorization': `Bearer ${token}` }
             });
             if (sharedRes.ok) {
@@ -461,7 +461,7 @@ export const useAppData = () => {
                fetchedRole = 'none' as any;
             }
         } else {
-            const getRes = await fetch('http://localhost:5174/api/projects', {
+            const getRes = await fetch('/api/projects', {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             if (getRes.ok) {
@@ -575,7 +575,7 @@ export const useAppData = () => {
           data: { tasks: mergedTasks, lastSynced: syncNow } 
         };
 
-        const res = await fetch('http://localhost:5174/api/projects', {
+        const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(dataToUpload)
@@ -691,7 +691,7 @@ export const useAppData = () => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`http://localhost:5174/api/projects/shared/${targetProject.shortId}`, { headers });
+        const response = await fetch(`/api/projects/shared/${targetProject.shortId}`, { headers });
         const result = await response.json();
         
         if (response.ok && result.success) {
@@ -707,7 +707,7 @@ export const useAppData = () => {
           }
         }
       } else if (token) {
-        const response = await fetch(`http://localhost:5174/api/projects`, {
+        const response = await fetch(`/api/projects`, {
            headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
@@ -756,7 +756,7 @@ export const useAppData = () => {
     if (deleteFromCloud && targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
        try {
           const token = await getToken();
-          await fetch(`http://localhost:5174/api/projects/${id}`, {
+          await fetch(`/api/projects/${id}`, {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}` }
           });

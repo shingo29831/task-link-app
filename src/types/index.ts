@@ -7,6 +7,10 @@ export interface Task {
   parentId?: string;
   order?: number;
   isDeleted?: boolean;
+  
+  hasChildren?: boolean;
+  sourceProjectName?: string;
+  sourceProjectId?: string;
 }
 
 export type UserRole = 'viewer' | 'editor' | 'admin' | 'owner';
@@ -27,5 +31,5 @@ export interface AppData {
   publicRole?: UserRole;
   members?: ProjectMember[];
   isCloudSync?: boolean; 
-  role?: UserRole | string; // ★ 追加: 現在のユーザーのこのプロジェクトに対する権限
+  role?: UserRole | string; // 現在のユーザーのこのプロジェクトに対する権限
 }
