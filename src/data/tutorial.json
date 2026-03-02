@@ -1,0 +1,60 @@
+{
+  "id": "local_tutorial_project_id",
+  "projectName": "ようこそMeldTaskへ！！",
+  "tasks": [
+    {
+      "id": "tut_1",
+      "name": "🎉 MeldTaskの特徴",
+      "status": 0,
+      "order": 1
+    },
+    {
+      "id": "tut_1_1",
+      "name": "階層構造でタスクを管理できます。大きなタスクを細かく分解しましょう！",
+      "status": 0,
+      "parentId": "tut_1",
+      "order": 1
+    },
+    {
+      "id": "tut_1_2",
+      "name": "クラウド同期や共有機能（URL共有）で、チームや友達とタスクを共有できます。",
+      "status": 0,
+      "parentId": "tut_1",
+      "order": 2
+    },
+    {
+      "id": "tut_2",
+      "name": "📖 チュートリアル：基本操作",
+      "status": 0,
+      "order": 2
+    },
+    {
+      "id": "tut_2_1",
+      "name": "タスクの左側のボタン（「未着手」など）をクリックして、状態を変更してみましょう。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 1
+    },
+    {
+      "id": "tut_2_2",
+      "name": "タスクをドラッグして並べ替えたり、別のタスクの下に移動して子タスクにしてみましょう。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 2
+    },
+    {
+      "id": "tut_2_3",
+      "name": "右下の「＋」ボタンや画面上部の入力欄から新しいタスクを追加できます。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 3
+    },
+    {
+      "id": "tut_2_4",
+      "name": "タスク名をクリックすると名前を編集できます。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 4
+    }
+  ]
+}
