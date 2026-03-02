@@ -24221,7 +24221,7 @@ var sequences = pgTable("sequences", {
   name: varchar("name", { length: 50 }).primaryKey(),
   value: integer("value").notNull().default(0)
 });
-var app = new Hono2();
+var app = new Hono2().basePath("/api");
 app.use("*", cors());
 app.use("*", clerkMiddleware());
 var getDb = /* @__PURE__ */ __name2((databaseUrl) => {
@@ -24239,7 +24239,7 @@ var toBase64Url = /* @__PURE__ */ __name2((num) => {
   }
   return str;
 }, "toBase64Url");
-app.post("/api/user/sync", async (c) => {
+app.post("/user/sync", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const body = await c.req.json().catch(() => ({}));
@@ -24261,7 +24261,7 @@ app.post("/api/user/sync", async (c) => {
     return c.json({ error: "Database error" }, 500);
   }
 });
-app.post("/api/projects", async (c) => {
+app.post("/projects", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const body = await c.req.json();
@@ -24325,7 +24325,7 @@ app.post("/api/projects", async (c) => {
     }
   }
 });
-app.get("/api/projects", async (c) => {
+app.get("/projects", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const db = getDb(c.env.DATABASE_URL);
@@ -24334,7 +24334,7 @@ app.get("/api/projects", async (c) => {
   const userProjects = await db.select().from(projects).where(eq(projects.ownerId, auth.userId));
   return c.json({ projects: userProjects, limit });
 });
-app.get("/api/projects/:id", async (c) => {
+app.get("/projects/:id", async (c) => {
   const auth = getAuth(c);
   const id = c.req.param("id");
   const db = getDb(c.env.DATABASE_URL);
@@ -24366,7 +24366,7 @@ app.get("/api/projects/:id", async (c) => {
   }
   return c.json({ success: true, project, role });
 });
-app.delete("/api/projects/:id", async (c) => {
+app.delete("/projects/:id", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24377,7 +24377,7 @@ app.delete("/api/projects/:id", async (c) => {
   await db.delete(projects).where(eq(projects.id, id));
   return c.json({ success: true });
 });
-app.put("/api/projects/:id/name", async (c) => {
+app.put("/projects/:id/name", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24404,7 +24404,7 @@ app.put("/api/projects/:id/name", async (c) => {
   await db.update(projects).set({ projectName: body.projectName }).where(eq(projects.id, id));
   return c.json({ success: true });
 });
-app.put("/api/projects/:id/public", async (c) => {
+app.put("/projects/:id/public", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24413,7 +24413,7 @@ app.put("/api/projects/:id/public", async (c) => {
   await db.update(projects).set({ isPublic: body.isPublic }).where(and(eq(projects.id, id), eq(projects.ownerId, auth.userId)));
   return c.json({ success: true });
 });
-app.get("/api/projects/:id/members", async (c) => {
+app.get("/projects/:id/members", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24423,7 +24423,7 @@ app.get("/api/projects/:id/members", async (c) => {
   const members = await db.select({ id: users.id, username: users.username, role: projectMembers.role }).from(projectMembers).innerJoin(users, eq(projectMembers.userId, users.id)).where(eq(projectMembers.projectId, id));
   return c.json({ members, isPublic: proj[0].isPublic, publicRole: proj[0].publicRole });
 });
-app.post("/api/projects/:id/members", async (c) => {
+app.post("/projects/:id/members", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24441,7 +24441,7 @@ app.post("/api/projects/:id/members", async (c) => {
     return c.json({ error: "User may already be a member" }, 400);
   }
 });
-app.put("/api/projects/:id/members/:memberId", async (c) => {
+app.put("/projects/:id/members/:memberId", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24453,7 +24453,7 @@ app.put("/api/projects/:id/members/:memberId", async (c) => {
   await db.update(projectMembers).set({ role: body.role }).where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, memberId)));
   return c.json({ success: true });
 });
-app.delete("/api/projects/:id/members/:memberId", async (c) => {
+app.delete("/projects/:id/members/:memberId", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
   const id = c.req.param("id");
@@ -24464,7 +24464,7 @@ app.delete("/api/projects/:id/members/:memberId", async (c) => {
   await db.delete(projectMembers).where(and(eq(projectMembers.projectId, id), eq(projectMembers.userId, memberId)));
   return c.json({ success: true });
 });
-app.get("/api/projects/shared/:shortId", async (c) => {
+app.get("/projects/shared/:shortId", async (c) => {
   const auth = getAuth(c);
   const shortId = c.req.param("shortId");
   const db = getDb(c.env.DATABASE_URL);
@@ -24509,8 +24509,8 @@ var src_default = app;
 var onRequest = handle(src_default);
 var routes = [
   {
-    routePath: "/:path*",
-    mountPath: "/",
+    routePath: "/api/:path*",
+    mountPath: "/api",
     method: "",
     middlewares: [],
     modules: [onRequest]
