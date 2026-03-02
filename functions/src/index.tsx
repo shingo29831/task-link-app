@@ -12,7 +12,8 @@ type Bindings = {
   CLERK_SECRET_KEY: string
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+// basePath('/api') を追加
+const app = new Hono<{ Bindings: Bindings }>().basePath('/api')
 
 app.use('*', cors())
 app.use('*', clerkMiddleware())
@@ -34,7 +35,8 @@ const toBase64Url = (num: number): string => {
   return str;
 };
 
-app.post('/api/user/sync', async (c) => {
+// basePath で /api がつくので、 /api/user/sync ではなく /user/sync に変更
+app.post('/user/sync', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
 
@@ -60,7 +62,8 @@ app.post('/api/user/sync', async (c) => {
   }
 })
 
-app.post('/api/projects', async (c) => {
+// /api/projects -> /projects
+app.post('/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
 
@@ -147,7 +150,8 @@ app.post('/api/projects', async (c) => {
   }
 })
 
-app.get('/api/projects', async (c) => {
+// /api/projects -> /projects
+app.get('/projects', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
 
@@ -159,8 +163,8 @@ app.get('/api/projects', async (c) => {
   return c.json({ projects: userProjects, limit })
 })
 
-// 単一プロジェクト取得エンドポイント
-app.get('/api/projects/:id', async (c) => {
+// /api/projects/:id -> /projects/:id
+app.get('/projects/:id', async (c) => {
   const auth = getAuth(c)
   const id = c.req.param('id')
   const db = getDb(c.env.DATABASE_URL)
@@ -202,7 +206,8 @@ app.get('/api/projects/:id', async (c) => {
   return c.json({ success: true, project: project, role: role })
 })
 
-app.delete('/api/projects/:id', async (c) => {
+// /api/projects/:id -> /projects/:id
+app.delete('/projects/:id', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
   
@@ -218,8 +223,8 @@ app.delete('/api/projects/:id', async (c) => {
   return c.json({ success: true })
 })
 
-// ★ 追加：プロジェクト名変更エンドポイント
-app.put('/api/projects/:id/name', async (c) => {
+// /api/projects/:id/name -> /projects/:id/name
+app.put('/projects/:id/name', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
   
@@ -259,7 +264,8 @@ app.put('/api/projects/:id/name', async (c) => {
   return c.json({ success: true })
 })
 
-app.put('/api/projects/:id/public', async (c) => {
+// /api/projects/:id/public -> /projects/:id/public
+app.put('/projects/:id/public', async (c) => {
   const auth = getAuth(c)
   if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
   const id = c.req.param('id')
@@ -269,7 +275,8 @@ app.put('/api/projects/:id/public', async (c) => {
   return c.json({ success: true })
 })
 
-app.get('/api/projects/:id/members', async (c) => {
+// /api/projects/:id/members -> /projects/:id/members
+app.get('/projects/:id/members', async (c) => {
     const auth = getAuth(c)
     if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
     const id = c.req.param('id')
@@ -281,7 +288,8 @@ app.get('/api/projects/:id/members', async (c) => {
     return c.json({ members, isPublic: proj[0].isPublic, publicRole: proj[0].publicRole })
 })
 
-app.post('/api/projects/:id/members', async (c) => {
+// /api/projects/:id/members -> /projects/:id/members
+app.post('/projects/:id/members', async (c) => {
     const auth = getAuth(c)
     if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
     const id = c.req.param('id')
@@ -301,7 +309,8 @@ app.post('/api/projects/:id/members', async (c) => {
     }
 })
 
-app.put('/api/projects/:id/members/:memberId', async (c) => {
+// /api/projects/:id/members/:memberId -> /projects/:id/members/:memberId
+app.put('/projects/:id/members/:memberId', async (c) => {
     const auth = getAuth(c)
     if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
     const id = c.req.param('id')
@@ -314,7 +323,8 @@ app.put('/api/projects/:id/members/:memberId', async (c) => {
     return c.json({ success: true })
 })
 
-app.delete('/api/projects/:id/members/:memberId', async (c) => {
+// /api/projects/:id/members/:memberId -> /projects/:id/members/:memberId
+app.delete('/projects/:id/members/:memberId', async (c) => {
     const auth = getAuth(c)
     if (!auth?.userId) return c.json({ error: 'Unauthorized' }, 401)
     const id = c.req.param('id')
@@ -326,7 +336,8 @@ app.delete('/api/projects/:id/members/:memberId', async (c) => {
     return c.json({ success: true })
 })
 
-app.get('/api/projects/shared/:shortId', async (c) => {
+// /api/projects/shared/:shortId -> /projects/shared/:shortId
+app.get('/projects/shared/:shortId', async (c) => {
   const auth = getAuth(c)
   const shortId = c.req.param('shortId')
   const db = getDb(c.env.DATABASE_URL)
