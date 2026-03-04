@@ -31,6 +31,7 @@ import { TaskAddModal } from './components/TaskAddModal';
 import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
+import { TaskEditModal } from './components/TaskEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -368,6 +369,8 @@ function App() {
   const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
@@ -431,6 +434,38 @@ function App() {
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
+  const moveTaskOrder = (taskId: string, direction: 'up' | 'down') => {
+    if (!data || !data.tasks) return;
+    const taskIndex = data.tasks.findIndex((t: Task) => t.id === taskId);
+    if (taskIndex === -1) return;
+    
+    const taskToMove = data.tasks[taskIndex];
+    const siblings = data.tasks
+      .filter((t: Task) => t.parentId === taskToMove.parentId && !t.isDeleted)
+      .sort((a: Task, b: Task) => (a.order ?? 0) - (b.order ?? 0));
+      
+    const siblingIndex = siblings.findIndex((t: Task) => t.id === taskId);
+    if (direction === 'up' && siblingIndex > 0) {
+      const target = siblings[siblingIndex - 1];
+      const newTasks = [...data.tasks];
+      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
+      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
+      const temp = newTasks[tIndex].order;
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      setData({ ...data, tasks: newTasks });
+    } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
+      const target = siblings[siblingIndex + 1];
+      const newTasks = [...data.tasks];
+      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
+      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
+      const temp = newTasks[tIndex].order;
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      setData({ ...data, tasks: newTasks });
+    }
+  };
+
   const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
   if (syncLimitState) {
@@ -463,7 +498,7 @@ function App() {
     const content = nodes.map(n => (
       <React.Fragment key={n.id}>
         <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onRename={(newName) => renameTask(n.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} />
+            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
             {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
         </SortableTaskItem>
       </React.Fragment>
@@ -498,7 +533,7 @@ function App() {
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
-                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onRename={(newName) => renameTask(root.id, newName)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} />
+                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
             </div>
             <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
         </div>
@@ -578,6 +613,24 @@ function App() {
       )}
 
       {showHelpModal && <HelpModal isOpen={showHelpModal} onClose={() => setShowHelpModal(false)} />}
+
+      {editingTask && (
+        <TaskEditModal 
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={(newName, newDateStr) => {
+            if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
+            updateTaskDeadline(editingTask.id, newDateStr);
+            setEditingTask(null);
+          }}
+          onDelete={() => {
+            deleteTask(editingTask.id);
+            setEditingTask(null);
+          }}
+          onMoveUp={() => moveTaskOrder(editingTask.id, 'up')}
+          onMoveDown={() => moveTaskOrder(editingTask.id, 'down')}
+        />
+      )}
 
       {incomingData && targetLocalData && (
         <MergeModal 
@@ -767,7 +820,7 @@ function App() {
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
               <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onRename={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
               </div>
             ) : null}
           </DragOverlay>
