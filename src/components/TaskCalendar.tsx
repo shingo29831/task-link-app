@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -16,9 +16,10 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  // 日曜日始まり(weekStartsOn: 0)として月初めの週の最初の日を取得
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+  // 6週間（42日）固定にするため、開始日から41日後を終了日とする
+  const endDate = addDays(startDate, 41);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
