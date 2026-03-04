@@ -1,3 +1,6 @@
+// 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
+// なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   DndContext, 
@@ -25,7 +28,7 @@ import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus } from './components/Icons';
+import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 
@@ -140,7 +143,7 @@ function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => 
   return { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick };
 }
 
-const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
+const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
   const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
   const [isDragging, setIsDragging] = useState(false);
   const pointerRef = useRef({ x: 0, y: 0 });
@@ -182,14 +185,21 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, o
             <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          {isNarrowLayout ? (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '88px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
+            </>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          )}
         </>
       )}
     </div>
   );
 };
 
-const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onUndo, onRedo, canUndo, canRedo }: any) => { 
+const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
   const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, false, onBoardClick);
 
   return (
@@ -198,10 +208,15 @@ const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onUndo
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
       </div>
       {isMobile && (
-        <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
-          <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
-          <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
-        </div>
+        <>
+          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
+            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
+          </div>
+          {isNarrowLayout && (
+            <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
+          )}
+        </>
       )}
     </div>
   );
@@ -230,9 +245,10 @@ function App() {
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
   } = useTaskOperations();
 
-  const { windowWidth, isMobile } = useResponsive();
+  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
@@ -501,6 +517,8 @@ function App() {
               }} 
               onImport={handleFileImport} 
               onImportFromUrl={handleImportFromUrl} 
+              showModal={showIOModal}
+              setShowModal={setShowIOModal}
             />
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <SignedIn>
@@ -544,11 +562,11 @@ function App() {
           {!isMobile && !isViewer && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
           
           {isViewer ? (
-            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
               <>{rootNodesContent}</>
             </StaticBoardArea>
           ) : (
-            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onShowAddModal={() => setShowAddModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodesContent}
               </SortableContext>
