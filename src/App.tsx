@@ -1,7 +1,7 @@
 // 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   DndContext, 
   useDroppable,
@@ -303,14 +303,12 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
             <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
-          {isNarrowLayout ? (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '88px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
-            </>
-          ) : (
-            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
-          )}
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
+            {isNarrowLayout && (
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          </div>
         </>
       )}
     </div>
@@ -332,7 +330,9 @@ const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarr
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
           {isNarrowLayout && (
-            <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
+            <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+            </div>
           )}
         </>
       )}
@@ -468,6 +468,39 @@ function App() {
 
   const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
+  const overallProgressData = useMemo(() => {
+    if (!data?.tasks || data.tasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
+    const leafTasks = data.tasks.filter((t: Task) => !t.isDeleted && !data.tasks.some((child: Task) => child.parentId === t.id && !child.isDeleted));
+    if (leafTasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
+    
+    const counts = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    let total = 0;
+    leafTasks.forEach((t: Task) => {
+      counts[t.status as 0|1|2|3]++;
+      total++;
+    });
+    if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
+
+    return {
+      p2: (counts[2] / total) * 100, // 完了
+      p1: (counts[1] / total) * 100, // 進行中
+      p0: (counts[0] / total) * 100, // 未着手
+      p3: (counts[3] / total) * 100  // 休止
+    };
+  }, [data?.tasks]);
+
+  const renderProgressBar = () => {
+    const { p0, p1, p2, p3 } = overallProgressData;
+    return (
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+      </div>
+    );
+  };
+
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
   }
@@ -498,7 +531,7 @@ function App() {
     const content = nodes.map(n => (
       <React.Fragment key={n.id}>
         <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
+            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
             {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
         </SortableTaskItem>
       </React.Fragment>
@@ -533,7 +566,7 @@ function App() {
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
-                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
+                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
             </div>
             <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
         </div>
@@ -617,10 +650,21 @@ function App() {
       {editingTask && (
         <TaskEditModal 
           task={editingTask}
+          hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
-          onSave={(newName, newDateStr) => {
+          onSave={(newName, newDateStr, newStatus) => {
             if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
             updateTaskDeadline(editingTask.id, newDateStr);
+            
+            if (newStatus !== editingTask.status) {
+              const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
+              if (hasChild) {
+                updateParentStatus(editingTask.id, newStatus);
+              } else {
+                updateTaskStatus(editingTask.id, newStatus);
+              }
+            }
+            
             setEditingTask(null);
           }}
           onDelete={() => {
@@ -703,9 +747,12 @@ function App() {
                       {rightControls}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingLeft: '44px', boxSizing: 'border-box' }}>
-                      <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginRight: '10px' }}>
+                          <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                          {renderProgressBar()}
+                      </div>
                       {isNarrowLayout && showSidebar && (
-                        <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           <span>全プロジェクト表示</span>
                           <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
                         </label>
@@ -734,7 +781,10 @@ function App() {
                             </div>
                           ) : null}
 
-                          <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '150px' }}>
+                              <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                              {renderProgressBar()}
+                          </div>
 
                           {isNarrowLayout && showSidebar && (
                             <label style={{ marginLeft: 'auto', fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -820,7 +870,7 @@ function App() {
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
               <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
               </div>
             ) : null}
           </DragOverlay>
