@@ -1,3 +1,6 @@
+// 役割: プロジェクト名変更、同期設定、共有設定、メンバー管理などを行うモーダルUI
+// なぜ: プロジェクト単位の設定を一元管理し、権限に応じた操作を提供するため
+
 import React, { useState, useEffect } from 'react';
 import type { AppData, UserRole, ProjectMember } from '../types';
 import { IconWarning } from './Icons';
@@ -149,13 +152,13 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     <div style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
       backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center',
-      alignItems: 'center', zIndex: 2000, overflowY: 'auto', padding: '20px'
+      alignItems: 'center', zIndex: 2000, padding: '20px', boxSizing: 'border-box'
     }} onClick={onClose}>
       <div style={{
         backgroundColor: 'var(--bg-surface)', padding: '24px', borderRadius: '8px',
         width: '500px', maxWidth: '100%', color: 'var(--text-primary)', 
-        boxShadow: '0 4px 10px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '20px'
+        boxShadow: '0 4px 10px rgba(0,0,0,0.5)', maxHeight: '100%', overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box'
       }} onClick={e => e.stopPropagation()}>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
