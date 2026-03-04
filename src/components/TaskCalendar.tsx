@@ -36,8 +36,8 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
   today.setHours(0, 0, 0, 0);
 
   return (
-    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', paddingTop: '17px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)' }}>
+    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', paddingTop: '17px', fontSize: '0.8rem', minHeight: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)', flexShrink: 0 }}>
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
                 <IconChevronLeft size={16} />
             </button>
@@ -47,11 +47,11 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
             </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '5px', textAlign: 'center', color: 'var(--text-placeholder)', fontWeight: 'bold' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '5px', textAlign: 'center', color: 'var(--text-placeholder)', fontWeight: 'bold', flexShrink: 0 }}>
             {weekDays.map(d => <div key={d}>{d}</div>)}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', flex: 1 }}>
             {calendarDays.map((day, kq) => {
                 const dayTasks = getDayTasks(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);
