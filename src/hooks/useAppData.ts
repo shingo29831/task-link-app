@@ -1,3 +1,4 @@
+// 役割: アプリケーションの全体的なデータ状態（プロジェクト、タスク履歴、クラウド同期状態など）を管理するカスタムフック
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { AppData, Task } from '../types';
@@ -37,6 +38,32 @@ const calculateHash = (project: AppData): number => {
     hash = ((hash << 5) + hash) + str.charCodeAt(i);
   }
   return hash >>> 0;
+};
+
+// ★ 修正: IDや親子の階層関係を完全に無視し、タスクの実質的な内容(名前, ステータス, 日単位の期限)の集合として比較する
+const isEffectivelyIdentical = (local: AppData, incoming: AppData) => {
+  const localActive = local.tasks.filter((t: Task) => !t.isDeleted);
+  const incomingActive = incoming.tasks.filter((t: Task) => !t.isDeleted);
+
+  if (localActive.length !== incomingActive.length) return false;
+
+  const normalizeTask = (t: Task) => {
+      const name = String(t.name || '').trim();
+      const status = Number(t.status || 0);
+      let d = 0;
+      if (t.deadline) {
+          // 圧縮の過程で日単位に丸められるため、ローカルデータも日単位にリセットして比較する
+          const date = new Date(t.deadline);
+          date.setHours(0, 0, 0, 0);
+          d = date.getTime();
+      }
+      return `${name}|${status}|${d}`;
+  };
+
+  const localSigs = localActive.map(normalizeTask).sort();
+  const incomingSigs = incomingActive.map(normalizeTask).sort();
+
+  return localSigs.join('::') === incomingSigs.join('::');
 };
 
 type CloudDiffInfo = {
@@ -223,7 +250,6 @@ export const useAppData = () => {
     baseRedo();
   }, [baseRedo]);
 
-
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
@@ -250,7 +276,6 @@ export const useAppData = () => {
         }
       }
 
-      // ★ チュートリアルプロジェクトの組み込み
       const now = Date.now();
       const tutorialProject: AppData = {
         id: tutorialData.id,
@@ -267,14 +292,11 @@ export const useAppData = () => {
       const existingTutorialIdx = loadedProjects.findIndex(p => p.id === tutorialProject.id);
       
       if (existingTutorialIdx >= 0) {
-        // すでに存在する場合（またはユーザーが変更した場合）は強制的に初期化（上書き）
         loadedProjects[existingTutorialIdx] = tutorialProject;
       } else {
-        // 存在しない場合は一番最初に追加
         loadedProjects.unshift(tutorialProject);
       }
 
-      // チュートリアルプロジェクトのみしかない場合は、もう一つ「マイプロジェクト」を自動で作っておく
       if (loadedProjects.length === 1 && loadedProjects[0].id === tutorialProject.id) {
          const def = createDefaultProject();
          loadedProjects.push(def);
@@ -292,8 +314,12 @@ export const useAppData = () => {
         if (compressed) {
           const incoming = decompressData(compressed);
           if (incoming) {
-            incoming.id = generateProjectId();
-            setIncomingData(incoming);
+            const isIdentical = loadedProjects.some(p => isEffectivelyIdentical(p, incoming));
+            
+            if (!isIdentical) {
+              incoming.id = generateProjectId();
+              setIncomingData(incoming);
+            }
             window.history.replaceState(null, '', window.location.pathname);
           }
         }
@@ -315,7 +341,7 @@ export const useAppData = () => {
       const p: AppData = {
         id: row.id,
         shortId: row.shortId,
-        projectName: row.projectName, // クラウドから読み込んだ初期データ
+        projectName: row.projectName,
         tasks: row.data.tasks || [],
         lastSynced: row.data.lastSynced || Date.now(),
         isCloudSync: true,
@@ -508,7 +534,6 @@ export const useAppData = () => {
             
             if (cloudProject) {
                 rollbackTasks = cloudProject.data?.tasks || cloudProject.tasks || [];
-                // 権限がない場合はクラウドのプロジェクト名に戻す
                 rollbackName = cloudProject.projectName || activeData.projectName;
             }
 
@@ -530,7 +555,6 @@ export const useAppData = () => {
         }
 
         let mergedTasks = [...activeData.tasks];
-        // 同期時は常にローカルのプロジェクト名を使用する（不意な巻き戻りを防ぐ）
         let mergedProjectName = activeData.projectName;
         let requiresLocalUpdate = false;
         let isSameAsCloud = false;

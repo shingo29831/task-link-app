@@ -1,8 +1,10 @@
+// 役割: ローカルデータとインポート（またはクラウド）データを比較・マージするためのモーダルUIコンポーネント
 import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { AppData, Task } from '../types';
 import { to185 } from '../utils/compression'; 
 import { IconEdit, IconX, IconWarning } from './Icons';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   localData: AppData;
@@ -31,6 +33,8 @@ interface HierarchicalRow extends ComparisonRow {
 }
 
 export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm, onCancel, onCreateNew }) => {
+  const { isMobile } = useResponsive();
+
   const [step, setStep] = useState<MergeStep>(
     localData.projectName !== incomingData.projectName ? 'ACTION_CHOICE' : 'TASKS'
   );
@@ -345,7 +349,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   if (step === 'ACTION_CHOICE') {
     return (
         <div style={overlayStyle}>
-            <div style={modalStyle}>
+            <div style={{ ...modalStyle, width: isMobile ? '90vw' : '400px', padding: isMobile ? '16px' : '20px' }}>
                 <h3>プロジェクト名の競合</h3>
                 <p>このプロジェクト名はローカルデータにありません。</p>
                 <p>閲覧中: <strong>{localData.projectName}</strong></p>
@@ -363,12 +367,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
   if (step === 'NAME_CHOICE') {
     return (
         <div style={overlayStyle}>
-            <div style={modalStyle}>
+            <div style={{ ...modalStyle, width: isMobile ? '90vw' : '400px', padding: isMobile ? '16px' : '20px' }}>
                 <h3>プロジェクト名の選択</h3>
                 <p>どちらのプロジェクト名を使用しますか？</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>ローカルを使用: <strong>{localData.projectName}</strong></button>
-                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>リモートを使用: <strong>{incomingData.projectName}</strong></button>
+                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>ローカルを使用:<br/><strong>{localData.projectName}</strong></button>
+                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>リモートを使用:<br/><strong>{incomingData.projectName}</strong></button>
                     <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>戻る</button>
                 </div>
             </div>
@@ -380,28 +384,29 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     const conflictRows = rows.filter(r => ignoredIds.has(r.key));
     return (
         <div style={overlayStyle}>
-            <div style={{ ...modalStyle, width: '600px', maxWidth: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ marginTop: 0 }}>競合タスクの追加確認</h3>
+            <div style={{ ...modalStyle, width: '600px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: isMobile ? '16px' : '20px' }}>
+                <h3 style={{ marginTop: 0, fontSize: isMobile ? '1.2em' : '1.5em' }}>競合タスクの追加確認</h3>
                 <div style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
                     以下のリモートタスクはローカル優先でマージされましたが、別タスクとして追加することも可能です。<br/>
                     追加する場合、ローカルタスクのIDが変更され、リモートタスクが元のIDで追加されます。<br/>
-                    <div style={{color: 'var(--color-danger-text)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px'}}>
+                    <div style={{color: 'var(--color-danger-text)', display: 'flex', alignItems: 'flex-start', gap: '4px', marginTop: '8px'}}>
                        <IconWarning size={14} />
-                       <span>注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
+                       <span style={{ lineHeight: '1.4' }}>注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
                     </div>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', margin: '10px 0' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.85em' : '0.9em' }}>
                         <thead>
                             <tr style={{ background: 'var(--bg-input)', textAlign: 'left' }}>
-                                <th style={{ padding: '8px', width: '30px' }}>
+                                <th style={{ padding: '8px', width: '30px', textAlign: 'center' }}>
                                     <input 
                                         type="checkbox" 
                                         checked={selectedIgnoredIds.size === ignoredIds.size && ignoredIds.size > 0}
                                         onChange={(e) => setSelectedIgnoredIds(e.target.checked ? new Set(ignoredIds) : new Set())}
+                                        style={{ transform: isMobile ? 'scale(1.2)' : 'scale(1)' }}
                                     />
                                 </th>
-                                <th style={{ padding: '8px' }}>リモートタスク名 (追加対象)</th>
+                                <th style={{ padding: '8px' }}>リモート (追加対象)</th>
                                 <th style={{ padding: '8px', color: 'var(--text-secondary)' }}>ローカル (ID変更)</th>
                             </tr>
                         </thead>
@@ -413,18 +418,19 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                             type="checkbox" 
                                             checked={selectedIgnoredIds.has(row.key)}
                                             onChange={() => toggleIgnoredSelection(row.key)}
+                                            style={{ transform: isMobile ? 'scale(1.2)' : 'scale(1)' }}
                                         />
                                     </td>
-                                    <td style={{ padding: '8px' }}>{row.remote?.name}</td>
-                                    <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{row.local?.name}</td>
+                                    <td style={{ padding: '8px', wordBreak: 'break-all' }}>{row.remote?.name}</td>
+                                    <td style={{ padding: '8px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{row.local?.name}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>戻る</button>
-                    <button onClick={() => finalizeMerge(selectedIgnoredIds)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', flexDirection: isMobile ? 'column' : 'row' }}>
+                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)', width: isMobile ? '100%' : 'auto' }}>戻る</button>
+                    <button onClick={() => finalizeMerge(selectedIgnoredIds)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff', width: isMobile ? '100%' : 'auto' }}>
                         決定してマージ
                     </button>
                 </div>
@@ -437,24 +443,112 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   return (
     <div style={overlayStyle}>
-        <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', padding: isMobile ? '12px' : '20px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '10px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '10px' : '0' }}>
                 <div>
-                    <h3 style={{ margin: '0 0 4px 0' }}>タスクのマージ (IDベース)</h3>
-                    <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>Remote: <strong style={{ color: 'var(--text-primary)' }}>{incomingData.projectName}</strong> ➔ Local: <strong style={{ color: 'var(--text-primary)' }}>{localData.projectName}</strong></div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: isMobile ? '1.2em' : '1.17em' }}>タスクのマージ (IDベース)</h3>
+                    <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>Remote: <strong style={{ color: 'var(--text-primary)' }}>{incomingData.projectName}</strong> {isMobile && <br/>}➔ Local: <strong style={{ color: 'var(--text-primary)' }}>{localData.projectName}</strong></div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ padding: '5px', borderRadius: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
+                    <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ padding: '5px', borderRadius: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', flex: isMobile ? '1 1 100%' : 'none', marginBottom: isMobile ? '4px' : '0' }}>
                         <option value="LOCAL">Local優先</option><option value="REMOTE">Remote優先</option>
                     </select>
-                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--color-danger)', border: 'none', color: '#fff' }}>キャンセル</button>
-                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: 'var(--color-success)', border: 'none', color: '#fff' }}>実行</button>
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--color-danger)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>キャンセル</button>
+                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: 'var(--color-success)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>実行</button>
                 </div>
             </div>
+            
             <div style={{ flex: 1, overflowY: 'auto' }}>
                 {displayedRows.length === 0 ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-placeholder)' }}>差分はありません。すべてのタスクが一致しています。</div>
+                ) : isMobile ? (
+                    // ==========================================
+                    // モバイル向けカード型レイアウト
+                    // ==========================================
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '20px' }}>
+                        {displayedRows.map((row) => {
+                            const isContextRow = row.isIdentical;
+                            const isDuplicated = duplicateKeys.has(row.key);
+                            const currentName = renames.get(row.key) || (row.local ? row.local.name : row.remote ? row.remote.name : '');
+                            const isRenamed = renames.has(row.key);
+
+                            const renderCardTask = (task: Task | undefined, isLocal: boolean) => {
+                                if (!task) return <div style={{ color: 'var(--text-placeholder)', fontSize: '0.9em' }}>(なし)</div>;
+                                const dateStr = getDeadlineDisplay(task);
+                                const isEditingThis = editingId === row.key && ((isLocal && row.local) || (!isLocal && !row.local));
+                                
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                        {isDuplicated && ((isLocal && row.local) || (!isLocal && !row.local)) && (
+                                            <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <IconWarning size={12} /><span>名前重複</span>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                                            <StatusBadge status={task.status} />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                {isEditingThis ? (
+                                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                        <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', flex: 1, minWidth: '0' }} />
+                                                        <button onClick={handleSaveRename} style={{ padding: '4px 8px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none', borderRadius: '4px' }}>OK</button>
+                                                        <button onClick={handleCancelRename} style={{ padding: '4px 8px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconX size={12} /></button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit', wordBreak: 'break-all', fontSize: '0.95em' }}>{isRenamed ? currentName : task.name}</span>
+                                                        {((isLocal && row.local) || (!isLocal && !row.local)) && (
+                                                            <button onClick={() => handleStartRename(row.key, task.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: '4px', display: 'flex', alignItems: 'center' }}><IconEdit size={16} /></button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {dateStr && <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginTop: '4px' }}>期限: {dateStr}</div>}
+                                    </div>
+                                );
+                            };
+
+                            return (
+                                <div key={row.key} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px', background: 'var(--bg-surface)', marginLeft: `${Math.min(row.depth * 15, 45)}px`, opacity: isContextRow ? 0.6 : 1 }}>
+                                    
+                                    {row.depth > 0 && (
+                                        <div style={{ fontSize: '0.8em', color: 'var(--text-placeholder)', marginBottom: '4px' }}>
+                                            階層: {row.depth}
+                                        </div>
+                                    )}
+
+                                    {/* Local info */}
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <div style={{ fontSize: '0.8em', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 'bold' }}>Local:</div>
+                                        {renderCardTask(row.local, true)}
+                                    </div>
+                                    
+                                    {/* Remote info */}
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <div style={{ fontSize: '0.8em', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 'bold' }}>Remote:</div>
+                                        {renderCardTask(row.remote, false)}
+                                    </div>
+
+                                    {/* Action */}
+                                    <div style={{ paddingTop: '10px', borderTop: '1px dashed var(--border-light)' }}>
+                                        {isContextRow ? (
+                                            <div style={{ color: 'var(--text-placeholder)', fontSize: '0.85em', textAlign: 'center' }}>（一致）</div>
+                                        ) : (
+                                            <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '10px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.95em' }}>
+                                                {row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}
+                                                {row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}
+                                                {!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}
+                                            </select>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 ) : (
+                    // ==========================================
+                    // PC向けテーブルレイアウト
+                    // ==========================================
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
                         <thead><tr style={{ borderBottom: '2px solid var(--border-light)', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>アクション</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
                         <tbody>
@@ -562,5 +656,5 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 };
 
 const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 };
-const modalStyle: React.CSSProperties = { backgroundColor: 'var(--bg-modal)', padding: '20px', borderRadius: '8px', color: 'var(--text-primary)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' };
-const btnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', cursor: 'pointer' };
+const modalStyle: React.CSSProperties = { backgroundColor: 'var(--bg-modal)', borderRadius: '8px', color: 'var(--text-primary)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' };
+const btnStyle: React.CSSProperties = { borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', cursor: 'pointer' };
