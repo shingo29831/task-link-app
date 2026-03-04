@@ -63,6 +63,114 @@ const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   </svg>
 );
 
+// --- 自動で改行位置を判別するプロジェクト名表示コンポーネント ---
+const getCharWidth = (str: string) => {
+  let width = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) width += 1;
+    else width += 2;
+  }
+  return width;
+};
+
+// 文字種を判定するヘルパー
+const getCharClass = (c: string) => {
+  if (/[ \-_/.=　]/.test(c)) return 'symbol';
+  if (/[a-zａ-ｚ]/.test(c)) return 'lower';
+  if (/[A-ZＡ-Ｚ]/.test(c)) return 'upper';
+  if (/[0-9０-９]/.test(c)) return 'num';
+  if (/[\u3040-\u309F]/.test(c)) return 'hiragana';
+  if (/[\u30A0-\u30FF\uFF65-\uFF9F]/.test(c)) return 'katakana';
+  if (/[\u4E00-\u9FFF]/.test(c)) return 'kanji';
+  return 'other';
+};
+
+const FormattedProjectName = ({ name }: { name: string }) => {
+  const totalWidth = getCharWidth(name);
+  // 半角20文字（全角10文字）相当以下の場合は改行しない
+  if (totalWidth <= 20) return <>{name}</>;
+
+  const breakpoints: number[] = [];
+  const widthAt: number[] = [];
+  let currentWidth = 0;
+  
+  for (let i = 0; i < name.length; i++) {
+    const c = name.charCodeAt(i);
+    currentWidth += ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) ? 1 : 2;
+    widthAt[i] = currentWidth;
+    
+    if (i > 0) {
+      const prev = name[i - 1];
+      const curr = name[i];
+      
+      const prevClass = getCharClass(prev);
+      const currClass = getCharClass(curr);
+
+      // 記号や空白の直後
+      if (prevClass === 'symbol' && currClass !== 'symbol') {
+        breakpoints.push(i);
+      }
+      // キャメルケース (小文字 -> 大文字)
+      else if (prevClass === 'lower' && currClass === 'upper') {
+        breakpoints.push(i);
+      }
+      // 文字種が異なる場合 (記号以外で)
+      // upper -> lower は同一単語とみなすので除外 (例: "Task" -> 'upper' then 'lower')
+      else if (prevClass !== 'symbol' && currClass !== 'symbol' && prevClass !== currClass) {
+        if (!(prevClass === 'upper' && currClass === 'lower')) {
+          breakpoints.push(i);
+        }
+      }
+    }
+  }
+
+  let bestPoint = -1;
+  const targetWidth = totalWidth / 2;
+  
+  // 1行目の幅 <= 20 かつ 2行目の幅 <= 20 を満たすブレークポイントを探す
+  const validBreakpoints = breakpoints.filter(bp => {
+    const w1 = widthAt[bp - 1];
+    const w2 = totalWidth - w1;
+    return w1 <= 20 && w2 <= 20;
+  });
+
+  if (validBreakpoints.length > 0) {
+    let minDiff = Infinity;
+    // 条件を満たす中で、最も全体の中央幅に近い区切り位置を選択
+    for (const bp of validBreakpoints) {
+      const diff = Math.abs(targetWidth - widthAt[bp - 1]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestPoint = bp;
+      }
+    }
+  } else {
+    // 適切な区切り位置がない場合は、1行目が20幅を超えない最大の位置で強制的に分割
+    // (全体の最大幅が40に制限されていれば、これで2行目も20幅以下になる)
+    for (let i = 0; i < name.length; i++) {
+      if (widthAt[i] > 20) {
+        bestPoint = i;
+        break;
+      }
+    }
+    // 安全対策
+    if (bestPoint === -1) {
+      bestPoint = Math.floor(name.length / 2);
+    }
+  }
+
+  const line1 = name.substring(0, bestPoint);
+  const line2 = name.substring(bestPoint);
+
+  return (
+    <span style={{ display: 'inline-block', lineHeight: '1.3', textAlign: 'left', verticalAlign: 'middle' }}>
+      {line1}<br/>{line2}
+    </span>
+  );
+};
+// -------------------------------------------------------------
+
 const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve: (ids: string[]) => void }) => {
   const [selected, setSelected] = useState<string[]>([]);
   
@@ -462,7 +570,9 @@ function App() {
                       <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
+                              <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>
+                                <FormattedProjectName name={data.projectName} />
+                              </span>
                               {renderProjectMenu()}
                               
                               {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
@@ -483,7 +593,11 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                   <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
+                      <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>
+                        <span style={{ textDecoration: 'underline dotted' }}>
+                          <FormattedProjectName name={data.projectName} />
+                        </span>
+                      </h1>
                       {renderProjectMenu()}
                       
                       {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
