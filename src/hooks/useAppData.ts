@@ -314,7 +314,6 @@ export const useAppData = () => {
         if (compressed) {
           const incoming = decompressData(compressed);
           if (incoming) {
-            // ★ ここで IDを無視した、より緩やかな同一性判定を実施
             const isIdentical = loadedProjects.some(p => isEffectivelyIdentical(p, incoming));
             
             if (!isIdentical) {
