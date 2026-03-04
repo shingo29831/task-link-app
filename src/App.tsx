@@ -63,7 +63,6 @@ const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   </svg>
 );
 
-// --- 自動で改行位置を判別するプロジェクト名表示コンポーネント ---
 const getCharWidth = (str: string) => {
   let width = 0;
   for (let i = 0; i < str.length; i++) {
@@ -74,7 +73,6 @@ const getCharWidth = (str: string) => {
   return width;
 };
 
-// 文字種を判定するヘルパー
 const getCharClass = (c: string) => {
   if (/[ \-_/.=　]/.test(c)) return 'symbol';
   if (/[a-zａ-ｚ]/.test(c)) return 'lower';
@@ -86,12 +84,20 @@ const getCharClass = (c: string) => {
   return 'other';
 };
 
+// なぜ: 英語と日本語などの大きな文字種の壁を優先的に分割するため
+const getCharGroup = (charClass: string) => {
+  if (['lower', 'upper'].includes(charClass)) return 'alpha';
+  if (charClass === 'num') return 'num';
+  if (['hiragana', 'katakana', 'kanji'].includes(charClass)) return 'japanese';
+  if (charClass === 'symbol') return 'symbol';
+  return 'other';
+};
+
 const FormattedProjectName = ({ name }: { name: string }) => {
   const totalWidth = getCharWidth(name);
-  // 半角20文字（全角10文字）相当以下の場合は改行しない
   if (totalWidth <= 20) return <>{name}</>;
 
-  const breakpoints: number[] = [];
+  const breakpoints: { index: number, score: number, width: number }[] = [];
   const widthAt: number[] = [];
   let currentWidth = 0;
   
@@ -106,21 +112,27 @@ const FormattedProjectName = ({ name }: { name: string }) => {
       
       const prevClass = getCharClass(prev);
       const currClass = getCharClass(curr);
+      const prevGroup = getCharGroup(prevClass);
+      const currGroup = getCharGroup(currClass);
 
-      // 記号や空白の直後
-      if (prevClass === 'symbol' && currClass !== 'symbol') {
-        breakpoints.push(i);
-      }
-      // キャメルケース (小文字 -> 大文字)
-      else if (prevClass === 'lower' && currClass === 'upper') {
-        breakpoints.push(i);
-      }
-      // 文字種が異なる場合 (記号以外で)
-      // upper -> lower は同一単語とみなすので除外 (例: "Task" -> 'upper' then 'lower')
-      else if (prevClass !== 'symbol' && currClass !== 'symbol' && prevClass !== currClass) {
-        if (!(prevClass === 'upper' && currClass === 'lower')) {
-          breakpoints.push(i);
+      let baseScore = 0;
+
+      if (prevGroup === 'symbol' && currGroup !== 'symbol') {
+        baseScore = 120;
+      } else if (prevGroup !== currGroup && prevGroup !== 'symbol' && currGroup !== 'symbol') {
+        baseScore = 100;
+      } else if (prevGroup !== 'symbol' && currGroup === 'symbol') {
+        baseScore = 90;
+      } else if (prevGroup === currGroup && prevClass !== currClass) {
+        if (prevClass === 'lower' && currClass === 'upper') {
+          baseScore = 60;
+        } else if (prevGroup === 'japanese') {
+          baseScore = 40;
         }
+      }
+
+      if (baseScore > 0) {
+        breakpoints.push({ index: i, score: baseScore, width: widthAt[i - 1] });
       }
     }
   }
@@ -128,33 +140,32 @@ const FormattedProjectName = ({ name }: { name: string }) => {
   let bestPoint = -1;
   const targetWidth = totalWidth / 2;
   
-  // 1行目の幅 <= 20 かつ 2行目の幅 <= 20 を満たすブレークポイントを探す
   const validBreakpoints = breakpoints.filter(bp => {
-    const w1 = widthAt[bp - 1];
+    const w1 = bp.width;
     const w2 = totalWidth - w1;
     return w1 <= 20 && w2 <= 20;
   });
 
   if (validBreakpoints.length > 0) {
-    let minDiff = Infinity;
-    // 条件を満たす中で、最も全体の中央幅に近い区切り位置を選択
+    let maxFinalScore = -Infinity;
+    
     for (const bp of validBreakpoints) {
-      const diff = Math.abs(targetWidth - widthAt[bp - 1]);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestPoint = bp;
+      const distanceRatio = Math.abs(targetWidth - bp.width) / targetWidth;
+      const penalty = distanceRatio * 40;
+      const finalScore = bp.score - penalty;
+      
+      if (finalScore > maxFinalScore) {
+        maxFinalScore = finalScore;
+        bestPoint = bp.index;
       }
     }
   } else {
-    // 適切な区切り位置がない場合は、1行目が20幅を超えない最大の位置で強制的に分割
-    // (全体の最大幅が40に制限されていれば、これで2行目も20幅以下になる)
     for (let i = 0; i < name.length; i++) {
       if (widthAt[i] > 20) {
         bestPoint = i;
         break;
       }
     }
-    // 安全対策
     if (bestPoint === -1) {
       bestPoint = Math.floor(name.length / 2);
     }
@@ -169,7 +180,6 @@ const FormattedProjectName = ({ name }: { name: string }) => {
     </span>
   );
 };
-// -------------------------------------------------------------
 
 const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve: (ids: string[]) => void }) => {
   const [selected, setSelected] = useState<string[]>([]);
