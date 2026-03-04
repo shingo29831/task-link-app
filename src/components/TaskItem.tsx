@@ -2,7 +2,7 @@
 // なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
 
 import React, { useState, useMemo } from 'react';
-import { differenceInCalendarDays } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext } from '@dnd-kit/core'; 
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
@@ -18,6 +18,7 @@ interface Props {
   onStatusChange: (s: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, s: 0 | 1 | 2 | 3) => void;
   onDelete: () => void;
+  onDeadlineChange: (dateStr: string) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onClick: () => void;
@@ -63,7 +64,7 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
-  onStatusChange, onParentStatusChange, onDelete,
+  onStatusChange, onParentStatusChange, onDelete, onDeadlineChange,
   isExpanded, onToggleExpand, onClick,
   isMenuOpen, onToggleMenu,
   isActiveParent = false,
@@ -72,6 +73,7 @@ export const TaskItem: React.FC<Props> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
 
   const { windowWidth, isMobile } = useResponsive();
 
@@ -93,6 +95,7 @@ export const TaskItem: React.FC<Props> = ({
     3: { l: '休止', c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
+  const currentDeadlineStr = task.deadline !== undefined ? format(task.deadline, 'yyyy-MM-dd') : '';
   const daysRemaining = task.deadline !== undefined ? differenceInCalendarDays(task.deadline, new Date()) : null;
     
   const isUrgent = useMemo(() => {
@@ -134,9 +137,12 @@ export const TaskItem: React.FC<Props> = ({
   const progress = hasChildren ? calculateProgress() : null;
 
   const handleItemClick = () => {
+      if (isEditingDeadline) return;
       onClick();
       if (!isMenuOpen) { onToggleMenu(); }
   };
+
+  const stopPropagation = (e: React.PointerEvent | React.MouseEvent) => { e.stopPropagation(); };
 
   return (
     <>
@@ -154,7 +160,7 @@ export const TaskItem: React.FC<Props> = ({
           display: 'flex', alignItems: 'center', padding: itemPadding,
           borderBottom: '1px solid var(--border-color)', marginLeft: `${depth * indentWidth}px`,
           position: 'relative', cursor: 'pointer',
-          backgroundColor: (isMenuOpen || isHovered || isActiveParent) ? 'var(--bg-item-hover)' : 'transparent',
+          backgroundColor: (isMenuOpen || isHovered || isActiveParent || isEditingDeadline) ? 'var(--bg-item-hover)' : 'transparent',
           borderRadius: '4px', transition: 'background-color 0.2s, box-shadow 0.2s',
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none',
         }}
@@ -190,14 +196,16 @@ export const TaskItem: React.FC<Props> = ({
           <>
             <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
             {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
-            {getDeadline()}
+            {isEditingDeadline && !isViewer && !isMobile ? (
+                <input type="date" defaultValue={currentDeadlineStr} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', colorScheme: 'dark', fontSize: 'inherit' }} />
+            ) : ( getDeadline() )}
           </>
         </div>
         
         {/* モバイル時はインラインのボタンを非表示にする */}
         {!isViewer && !isMobile && (
-          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
-            <button onClick={(e) => { e.stopPropagation(); onEditModalOpen?.(); }} title="詳細編集" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
+          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
+            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
         )}

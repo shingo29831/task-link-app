@@ -2,6 +2,7 @@
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { format } from 'date-fns';
 import { 
   DndContext, 
   useDroppable,
@@ -498,7 +499,7 @@ function App() {
     const content = nodes.map(n => (
       <React.Fragment key={n.id}>
         <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
+            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
             {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
         </SortableTaskItem>
       </React.Fragment>
@@ -533,7 +534,7 @@ function App() {
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
-                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
+                <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
             </div>
             <div style={{ paddingLeft: '4px', cursor: 'auto' }}>{!collapsedNodeIds.has(root.id) && renderColumnChildren(root.children, 0)}</div>
         </div>
@@ -820,7 +821,7 @@ function App() {
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
               <div style={{ backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--color-primary)', padding: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', opacity: 0.9, cursor: 'grabbing', minWidth: '220px', width: 'max-content', maxWidth: '90vw' }}>
-                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
+                <TaskItem task={activeDragTask} tasks={data.tasks || []} depth={0} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === activeDragTask.id && !t.isDeleted)} onStatusChange={() => {}} onParentStatusChange={() => {}} onDelete={() => {}} onDeadlineChange={() => {}} isExpanded={false} onToggleExpand={() => {}} onClick={() => {}} isMenuOpen={false} onToggleMenu={() => {}} />
               </div>
             ) : null}
           </DragOverlay>
