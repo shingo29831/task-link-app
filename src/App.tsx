@@ -374,7 +374,7 @@ function App() {
   });
 
   const mainAppContent = (
-    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
       {/* ★ クラウドインポート確認モーダル */}
       {importCloudCheck?.isOpen && (
@@ -439,7 +439,7 @@ function App() {
       )}
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
 
-      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' }}>
+      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px' }}>
           {isMobile ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
