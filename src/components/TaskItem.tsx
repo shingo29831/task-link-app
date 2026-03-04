@@ -1,5 +1,8 @@
+// 役割: 個別のタスクを表示し、ステータス変更やドラッグ＆ドロップのターゲットとなるUIコンポーネント
+// なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
+
 import React, { useState, useMemo } from 'react';
-import { format, differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext } from '@dnd-kit/core'; 
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
@@ -15,8 +18,6 @@ interface Props {
   onStatusChange: (s: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, s: 0 | 1 | 2 | 3) => void;
   onDelete: () => void;
-  onRename: (newName: string) => void;
-  onDeadlineChange: (dateStr: string) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onClick: () => void;
@@ -24,6 +25,7 @@ interface Props {
   onToggleMenu: () => void;
   isActiveParent?: boolean;
   isViewer?: boolean;
+  onEditModalOpen?: () => void;
 }
 
 // DnDが有効な場合のみマウントされるネスト用ドロップエリア
@@ -61,19 +63,17 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
-  onStatusChange, onParentStatusChange, onDelete, onRename, onDeadlineChange, 
+  onStatusChange, onParentStatusChange, onDelete,
   isExpanded, onToggleExpand, onClick,
   isMenuOpen, onToggleMenu,
   isActiveParent = false,
-  isViewer = false
+  isViewer = false,
+  onEditModalOpen
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
-  const [editName, setEditName] = useState(task.name);
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
 
-  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
+  const { windowWidth, isMobile } = useResponsive();
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
@@ -93,7 +93,6 @@ export const TaskItem: React.FC<Props> = ({
     3: { l: '休止', c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
-  const currentDeadlineStr = task.deadline !== undefined ? format(task.deadline, 'yyyy-MM-dd') : '';
   const daysRemaining = task.deadline !== undefined ? differenceInCalendarDays(task.deadline, new Date()) : null;
     
   const isUrgent = useMemo(() => {
@@ -134,24 +133,10 @@ export const TaskItem: React.FC<Props> = ({
 
   const progress = hasChildren ? calculateProgress() : null;
 
-  const handleSave = () => {
-    if (editName.trim() && editName !== task.name) { onRename(editName); }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    e.stopPropagation();
-    if (e.key === 'Enter') { handleSave(); }
-    if (e.key === 'Escape') { setEditName(task.name); setIsEditing(false); }
-  };
-
   const handleItemClick = () => {
-      if (isEditing || isEditingDeadline) return;
       onClick();
       if (!isMenuOpen) { onToggleMenu(); }
   };
-
-  const stopPropagation = (e: React.PointerEvent) => { e.stopPropagation(); };
 
   return (
     <>
@@ -159,6 +144,12 @@ export const TaskItem: React.FC<Props> = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={(e) => { e.stopPropagation(); handleItemClick(); }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (!isViewer && onEditModalOpen) {
+            onEditModalOpen();
+          }
+        }}
         style={{ 
           display: 'flex', alignItems: 'center', padding: itemPadding,
           borderBottom: '1px solid var(--border-color)', marginLeft: `${depth * indentWidth}px`,
@@ -196,30 +187,17 @@ export const TaskItem: React.FC<Props> = ({
           {/* 閲覧者でない場合のみドロップエリアをマウント */}
           {!isViewer && <NestDroppableInner task={task} tasks={tasks} depth={depth} />}
 
-          {isEditing ? (
-            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: isMobile ? '4px' : '2px 4px', borderRadius: '4px', width: 'calc(100% - 20px)', fontSize: isMobile ? '16px' : 'inherit' }} />
-          ) : (
-            <>
-              <span onDoubleClick={(e) => { e.stopPropagation(); if (isViewer) return; setEditName(task.name); setIsEditing(true); }} title={isViewer ? "" : "ダブルクリックで編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
-              {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
-              {isEditingDeadline && !isViewer ? (
-                  <input type="date" defaultValue={currentDeadlineStr} className={isNarrowLayout ? "date-input-mobile" : ""} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: isNarrowLayout ? 'transparent' : 'var(--text-primary)', colorScheme: 'dark', fontSize: isMobile ? '16px' : 'inherit', width: isNarrowLayout ? '36px' : 'auto' }} />
-              ) : ( getDeadline() )}
-            </>
-          )}
+          <>
+            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
+            {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
+            {getDeadline()}
+          </>
         </div>
         
-        {!isViewer && (
-          <div style={{ display: 'flex', gap: isMobile ? '6px' : '4px', opacity: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditing || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
-            {isNarrowLayout ? (
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <button title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-                <input type="date" onChange={(e) => onDeadlineChange(e.target.value)} onPointerDown={stopPropagation} value={currentDeadlineStr} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
-              </div>
-            ) : (
-              <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-            )}
-            
+        {/* モバイル時はインラインのボタンを非表示にする */}
+        {!isViewer && !isMobile && (
+          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px' }}>
+            <button onClick={(e) => { e.stopPropagation(); onEditModalOpen?.(); }} title="詳細編集" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
         )}
