@@ -191,14 +191,15 @@ export const TaskItem: React.FC<Props> = ({
       >
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
+          onDoubleClick={stopPropagation}
           style={{
               background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0', marginRight: '2px', color: 'var(--text-placeholder)', visibility: hasChildren ? 'visible' : 'hidden', 
-              width: '1.2em'
+              padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', visibility: hasChildren ? 'visible' : 'hidden', 
+              width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto'
           }}
           title={isExpanded ? "折りたたむ" : "展開する"}
         >
-          {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          {isExpanded ? <IconChevronDown size={isMobile ? 20 : 14} /> : <IconChevronRight size={isMobile ? 20 : 14} />}
         </button>
 
         {/* 子を持たないタスクのみ状態変更ボタンを表示 */}
@@ -209,6 +210,7 @@ export const TaskItem: React.FC<Props> = ({
               if (isViewer) return;
               onStatusChange(((task.status + 1) % 4) as 0|1|2|3); 
             }}
+            onDoubleClick={stopPropagation}
             style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? '68px' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', border: 'none', borderRadius: '4px', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap', textAlign: 'center' }}
           >
             {config.l}
@@ -232,8 +234,8 @@ export const TaskItem: React.FC<Props> = ({
         {/* モバイル時はインラインのボタンを非表示にする */}
         {!isViewer && !isMobile && (
           <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 11 }}>
-            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
         )}
 
