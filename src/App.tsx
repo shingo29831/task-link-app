@@ -2,7 +2,6 @@
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { format } from 'date-fns';
 import { 
   DndContext, 
   useDroppable,
@@ -618,10 +617,21 @@ function App() {
       {editingTask && (
         <TaskEditModal 
           task={editingTask}
+          hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
-          onSave={(newName, newDateStr) => {
+          onSave={(newName, newDateStr, newStatus) => {
             if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
             updateTaskDeadline(editingTask.id, newDateStr);
+            
+            if (newStatus !== editingTask.status) {
+              const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
+              if (hasChild) {
+                updateParentStatus(editingTask.id, newStatus);
+              } else {
+                updateTaskStatus(editingTask.id, newStatus);
+              }
+            }
+            
             setEditingTask(null);
           }}
           onDelete={() => {
