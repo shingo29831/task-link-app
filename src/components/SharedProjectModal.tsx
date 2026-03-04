@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { AppData } from '../types';
 import { decompressData } from '../utils/compression';
 
@@ -21,6 +21,9 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
   // step 2: 開き方の選択 (閲覧 or マージ)
   const [step, setStep] = useState<1 | 2>(compressedData ? 1 : 2);
   const [selectedDataMode, setSelectedDataMode] = useState<'latest' | 'link'>('latest');
+  
+  // ★ 自動オープンの実行を管理するための Ref を追加
+  const autoOpenedRef = useRef(false);
 
   // フロー3: 権限エラーや非公開プロジェクトだった場合、元のプロジェクト（トップ）に即座に遷移
   useEffect(() => {
@@ -33,17 +36,8 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
     }
   }, [projectData, role, step, onClose]);
 
-  if (!projectData || role === 'none' || role === 'error') {
-    return null; // 遷移処理中は何のモーダルも出さない
-  }
-
-  const handleDataSelect = (mode: 'latest' | 'link') => {
-    console.log(`[SharedProjectModal] Selected data mode: ${mode}`);
-    setSelectedDataMode(mode);
-    setStep(2);
-  };
-
-  const handleActionSelect = (action: 'open' | 'merge') => {
+  // ★ 処理を useCallback でメモ化して useEffect 内で安全に呼べるようにする
+  const handleActionSelect = useCallback((action: 'open' | 'merge') => {
     console.log(`[SharedProjectModal] Action selected: ${action} with mode: ${selectedDataMode}`);
     let targetTasks = projectData.data?.tasks || projectData.tasks || [];
     
@@ -69,7 +63,7 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       isCloudSync: true,
       isPublic: projectData.isPublic,
       publicRole: projectData.publicRole || role,
-      role: role, // ★ DBから取得した権限(role)をAppDataに保存する
+      role: role, 
     };
 
     window.history.replaceState(null, '', `/${shortId}`);
@@ -81,6 +75,25 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       onOpenAsProject(sharedData);
     }
     onClose();
+  }, [projectData, selectedDataMode, compressedData, shortId, role, onMergeProject, onOpenAsProject, onClose]);
+
+  // ★ 閲覧権限（viewer）のみの場合は「プロジェクトの開き方」モーダルをスキップして即座に開く
+  useEffect(() => {
+    if (step === 2 && role === 'viewer' && projectData && !autoOpenedRef.current) {
+      autoOpenedRef.current = true;
+      handleActionSelect('open');
+    }
+  }, [step, role, projectData, handleActionSelect]);
+
+  // ★ viewer権限で自動で開く最中はモーダルの画面を非表示にする条件を追加
+  if (!projectData || role === 'none' || role === 'error' || (step === 2 && role === 'viewer')) {
+    return null; 
+  }
+
+  const handleDataSelect = (mode: 'latest' | 'link') => {
+    console.log(`[SharedProjectModal] Selected data mode: ${mode}`);
+    setSelectedDataMode(mode);
+    setStep(2);
   };
 
   // フロー4: 「?d=」がある場合のデータ選択モーダル

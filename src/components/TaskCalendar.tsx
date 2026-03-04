@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { IconChevronLeft, IconChevronRight } from './Icons';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   tasks: Task[];
@@ -12,13 +13,15 @@ interface Props {
 }
 
 export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentStatusChange }) => {
+  const { isMobile } = useResponsive();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  // 日曜日始まり(weekStartsOn: 0)として月初めの週の最初の日を取得
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+  // 6週間（42日）固定にするため、開始日から41日後を終了日とする
+  const endDate = addDays(startDate, 41);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -35,8 +38,8 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
   today.setHours(0, 0, 0, 0);
 
   return (
-    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: '15px', paddingTop: '17px', fontSize: '0.8rem', height: '100%', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)' }}>
+    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: isMobile ? '8px' : '15px', paddingTop: isMobile ? '8px' : '17px', fontSize: '0.8rem', minHeight: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'var(--text-primary)', flexShrink: 0 }}>
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
                 <IconChevronLeft size={16} />
             </button>
@@ -46,11 +49,11 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
             </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '5px', textAlign: 'center', color: 'var(--text-placeholder)', fontWeight: 'bold' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '5px', textAlign: 'center', color: 'var(--text-placeholder)', fontWeight: 'bold', flexShrink: 0 }}>
             {weekDays.map(d => <div key={d}>{d}</div>)}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px':'4px', flex: 1 }}>
             {calendarDays.map((day, kq) => {
                 const dayTasks = getDayTasks(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);

@@ -1,3 +1,6 @@
+// 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
+// なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   DndContext, 
@@ -25,10 +28,19 @@ import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus } from './components/Icons';
+import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
+import { HelpModal } from './components/HelpModal';
 
 type TaskNode = Task & { children: TaskNode[] };
+
+const IconHelp = ({ size = 20, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+  </svg>
+);
 
 const IconCloudUpload = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -131,7 +143,7 @@ function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => 
   return { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick };
 }
 
-const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onShowAddModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
+const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
   const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
   const [isDragging, setIsDragging] = useState(false);
   const pointerRef = useRef({ x: 0, y: 0 });
@@ -163,32 +175,48 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, o
   }, [isDragging, isMobile]);
 
   return (
-    <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', padding: isMobile ? '8px' : '16px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', minHeight: '200px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto', position: 'relative' }}>
-      {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
+    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
+      </div>
       {isMobile && !isDragging && (
         <>
-          <div style={{ position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', left: 'max(20px, env(safe-area-inset-left))', display: 'flex', gap: '10px', zIndex: 100 }}>
+          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
             <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'fixed', bottom: 'max(20px, env(safe-area-bottom))', right: 'max(20px, env(safe-area-inset-right))', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          {isNarrowLayout ? (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '88px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
+            </>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          )}
         </>
       )}
     </div>
   );
 };
 
-const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, onUndo, onRedo, canUndo, canRedo }: any) => { 
+const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
   const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, false, onBoardClick);
 
   return (
-    <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', border: '1px solid var(--border-color)', borderRadius: '8px', padding: isMobile ? '8px' : '16px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', minHeight: '200px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto', position: 'relative' }}>
-      {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
+    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
+      </div>
       {isMobile && (
-        <div style={{ position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', left: 'max(20px, env(safe-area-inset-left))', display: 'flex', gap: '10px', zIndex: 100 }}>
-          <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
-          <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
-        </div>
+        <>
+          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
+            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
+          </div>
+          {isNarrowLayout && (
+            <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ position: 'absolute', bottom: '16px', right: '16px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
+          )}
+        </>
       )}
     </div>
   );
@@ -217,10 +245,12 @@ function App() {
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
   } = useTaskOperations();
 
-  const { windowWidth, isMobile } = useResponsive();
+  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   const isDev = import.meta.env.DEV;
   const isCompactSpacing = windowWidth < 1280;
@@ -360,7 +390,7 @@ function App() {
   });
 
   const mainAppContent = (
-    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '10px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
       {/* ★ クラウドインポート確認モーダル */}
       {importCloudCheck?.isOpen && (
@@ -379,6 +409,8 @@ function App() {
           </div>
         </div>
       )}
+
+      {showHelpModal && <HelpModal isOpen={showHelpModal} onClose={() => setShowHelpModal(false)} />}
 
       {incomingData && targetLocalData && (
         <MergeModal 
@@ -412,7 +444,6 @@ function App() {
           currentUserRole={currentUserRole}
           isCloudProject={isCloudProject}
           onClose={() => setShowSettingsModal(false)} 
-          // ★ handleUpdateProjectNameを利用してDBにも変更を反映させる
           onSaveName={(newName) => { handleUpdateProjectName(newName); setShowSettingsModal(false); }} 
           onToggleSync={handleToggleSync}
           onTogglePublic={handleTogglePublic}
@@ -424,7 +455,7 @@ function App() {
       )}
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
 
-      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' }}>
+      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px' }}>
           {isMobile ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
@@ -486,14 +517,29 @@ function App() {
               }} 
               onImport={handleFileImport} 
               onImportFromUrl={handleImportFromUrl} 
+              showModal={showIOModal}
+              setShowModal={setShowIOModal}
             />
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <SignedIn><UserButton /></SignedIn>
+              <SignedIn>
+                <UserButton>
+                  <UserButton.MenuItems>
+                    <UserButton.Action 
+                      label="ヘルプ" 
+                      labelIcon={<IconHelp size={16} />} 
+                      onClick={() => setShowHelpModal(true)} 
+                    />
+                  </UserButton.MenuItems>
+                </UserButton>
+              </SignedIn>
               <SignedOut>
                 <div ref={authMenuRef} style={{ position: 'relative' }}>
                   <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
                   {isAuthMenuOpen && (
                     <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
+                      <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IconHelp size={16} /> ヘルプ
+                      </button>
                       <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
                       <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>新規登録</button></SignUpButton>
                     </div>
@@ -516,11 +562,11 @@ function App() {
           {!isMobile && !isViewer && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
           
           {isViewer ? (
-            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
               <>{rootNodesContent}</>
             </StaticBoardArea>
           ) : (
-            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} onShowAddModal={() => setShowAddModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
                   {rootNodesContent}
               </SortableContext>
