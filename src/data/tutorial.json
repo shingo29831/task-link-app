@@ -5,20 +5,20 @@
     {
       "id": "tut_1",
       "name": "🎉 MeldTaskの特徴",
-      "status": 0,
+      "status": 1,
       "order": 1
     },
     {
       "id": "tut_1_1",
       "name": "階層構造でタスクを管理できます。大きなタスクを細かく分解しましょう！",
-      "status": 0,
+      "status": 1,
       "parentId": "tut_1",
       "order": 1
     },
     {
       "id": "tut_1_2",
       "name": "クラウド同期や共有機能（URL共有）で、チームや友達とタスクを共有できます。",
-      "status": 0,
+      "status": 1,
       "parentId": "tut_1",
       "order": 2
     },
