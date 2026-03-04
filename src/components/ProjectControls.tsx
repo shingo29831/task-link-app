@@ -1,3 +1,6 @@
+// 役割: プロジェクト単位の操作（リンク共有、データ出力・読み込み）を提供するコントロールUI
+// なぜ: ヘッダー部分から共通操作へアクセスできるようにするため
+
 import React, { useRef, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { IconLink, IconArrowUp, IconArrowDown, IconInputOutput} from './Icons';
@@ -7,11 +10,12 @@ interface Props {
   onExport: () => void;
   onImport: (file: File) => void;
   onImportFromUrl: (url: string) => void;
+  showModal: boolean;
+  setShowModal: (show: boolean) => void;
 }
 
-export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl }) => {
+export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl, showModal, setShowModal }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showModal, setShowModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   
   const { windowWidth, isNarrowLayout } = useResponsive();
@@ -43,8 +47,6 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         justifyContent: 'flex-end'
       }}>
         
-        
-
         {/* リンクコピーボタン */}
         {!isNarrowLayout && (
           <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }} title="リンクをコピー">
@@ -54,12 +56,14 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         )}
         
         {/* 入出力ボタン */}
-        <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <IconInputOutput size={14} />
-          </div>
-          <span>{isNarrowLayout ? "" : (windowWidth < 1280 ? "入出力" : "出力 / 読み込み")}</span>
-        </button>
+        {!isNarrowLayout && (
+          <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <IconInputOutput size={14} />
+            </div>
+            <span>{windowWidth < 1280 ? "入出力" : "出力 / 読み込み"}</span>
+          </button>
+        )}
 
         <input 
           type="file" 
