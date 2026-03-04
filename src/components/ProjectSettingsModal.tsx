@@ -27,6 +27,21 @@ interface Props {
   onDeleteProject: (isCloudDelete: boolean) => void; 
 }
 
+// 全角文字を2、半角文字を1として文字幅を計算する関数
+const getCharWidth = (str: string) => {
+  let width = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    // ASCII文字（半角英数字・記号）および半角カタカナ領域は1としてカウント
+    if ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) {
+      width += 1;
+    } else {
+      width += 2;
+    }
+  }
+  return width;
+};
+
 export const ProjectSettingsModal: React.FC<Props> = ({ 
   currentName, 
   currentId, 
@@ -46,9 +61,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   onRemoveMember,
   onDeleteProject
 }) => {
-  // 入力欄にそのまま表示・保持する値（IME変換を阻害しないため）
   const [nameValue, setNameValue] = useState(currentName);
-  // 実際に保存・比較される、変換＆トリム済みの値
   const [normalizedName, setNormalizedName] = useState(currentName);
   const [nameError, setNameError] = useState('');
   
@@ -57,24 +70,25 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
-  // 入力中（値が変わるたび）にバリデーションチェックを実行
   useEffect(() => {
-    // 1. バリデーション・保存用の変数に対してのみ全角英数字→半角変換を行う
     const convertedValue = nameValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
     });
-    // 2. 前後の空白をトリム
     const trimmedValue = convertedValue.trim();
     
     setNormalizedName(trimmedValue);
 
-    // 空チェック
     if (!trimmedValue) {
       setNameError('プロジェクト名を入力してください');
       return;
     }
+
+    // 文字幅の制限チェック (半角40文字 / 全角20文字)
+    if (getCharWidth(trimmedValue) > 40) {
+      setNameError('プロジェクト名は全角20文字（半角40文字）以内で入力してください');
+      return;
+    }
     
-    // 重複チェック
     const isDuplicate = projects.some(p => 
       p.id !== currentId && 
       p.projectName.trim().toLowerCase() === trimmedValue.toLowerCase()
@@ -88,27 +102,21 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   }, [nameValue, currentId, projects]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 入力欄の値は変換せずにそのままセットする
     setNameValue(e.target.value);
   };
 
   const handleSaveName = () => {
-    // エラーがある場合、または変更がない場合は処理しない
     if (nameError || normalizedName === currentName) return;
     
     onSaveName(normalizedName);
   };
 
-  // 更新ボタンが押せるかどうかの判定
   const isSaveDisabled = !!nameError || normalizedName === currentName;
 
-  // プロジェクト名入力欄でのEnterキーハンドラ
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // IME入力中（変換確定のEnterなど）は無視する
     if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      // ボタンが押せる状態であれば保存処理を実行
       if (!isSaveDisabled) {
         handleSaveName();
       }
@@ -121,9 +129,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     setInviteUsername('');
   };
 
-  // 招待ユーザー入力欄でのEnterキーハンドラ
   const handleInviteKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // IME入力中は無視する
     if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -179,6 +185,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 onChange={handleNameChange}
                 onKeyDown={handleNameKeyDown}
                 placeholder="プロジェクト名"
+                maxLength={40}
                 style={{ 
                   flex: 1, padding: '10px', borderRadius: '4px', 
                   border: nameError ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 

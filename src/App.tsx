@@ -63,6 +63,123 @@ const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   </svg>
 );
 
+const getCharWidth = (str: string) => {
+  let width = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) width += 1;
+    else width += 2;
+  }
+  return width;
+};
+
+const getCharClass = (c: string) => {
+  if (/[ \-_/.=　]/.test(c)) return 'symbol';
+  if (/[a-zａ-ｚ]/.test(c)) return 'lower';
+  if (/[A-ZＡ-Ｚ]/.test(c)) return 'upper';
+  if (/[0-9０-９]/.test(c)) return 'num';
+  if (/[\u3040-\u309F]/.test(c)) return 'hiragana';
+  if (/[\u30A0-\u30FF\uFF65-\uFF9F]/.test(c)) return 'katakana';
+  if (/[\u4E00-\u9FFF]/.test(c)) return 'kanji';
+  return 'other';
+};
+
+const getCharGroup = (charClass: string) => {
+  if (['lower', 'upper'].includes(charClass)) return 'alpha';
+  if (charClass === 'num') return 'num';
+  if (['hiragana', 'katakana', 'kanji'].includes(charClass)) return 'japanese';
+  if (charClass === 'symbol') return 'symbol';
+  return 'other';
+};
+
+const FormattedProjectName = ({ name }: { name: string }) => {
+  const totalWidth = getCharWidth(name);
+  if (totalWidth <= 20) return <>{name}</>;
+
+  const breakpoints: { index: number, score: number, width: number }[] = [];
+  const widthAt: number[] = [];
+  let currentWidth = 0;
+  
+  for (let i = 0; i < name.length; i++) {
+    const c = name.charCodeAt(i);
+    currentWidth += ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) ? 1 : 2;
+    widthAt[i] = currentWidth;
+    
+    if (i > 0) {
+      const prev = name[i - 1];
+      const curr = name[i];
+      
+      const prevClass = getCharClass(prev);
+      const currClass = getCharClass(curr);
+      const prevGroup = getCharGroup(prevClass);
+      const currGroup = getCharGroup(currClass);
+
+      let baseScore = 0;
+
+      if (prevGroup === 'symbol' && currGroup !== 'symbol') {
+        baseScore = 120;
+      } else if (prevGroup !== currGroup && prevGroup !== 'symbol' && currGroup !== 'symbol') {
+        baseScore = 100;
+      } else if (prevGroup !== 'symbol' && currGroup === 'symbol') {
+        baseScore = 90;
+      } else if (prevGroup === currGroup && prevClass !== currClass) {
+        if (prevClass === 'lower' && currClass === 'upper') {
+          baseScore = 60;
+        } else if (prevGroup === 'japanese') {
+          baseScore = 40;
+        }
+      }
+
+      if (baseScore > 0) {
+        breakpoints.push({ index: i, score: baseScore, width: widthAt[i - 1] });
+      }
+    }
+  }
+
+  let bestPoint = -1;
+  const targetWidth = totalWidth / 2;
+  
+  const validBreakpoints = breakpoints.filter(bp => {
+    const w1 = bp.width;
+    const w2 = totalWidth - w1;
+    return w1 <= 20 && w2 <= 20;
+  });
+
+  if (validBreakpoints.length > 0) {
+    let maxFinalScore = -Infinity;
+    
+    for (const bp of validBreakpoints) {
+      const distanceRatio = Math.abs(targetWidth - bp.width) / targetWidth;
+      const penalty = distanceRatio * 40;
+      const finalScore = bp.score - penalty;
+      
+      if (finalScore > maxFinalScore) {
+        maxFinalScore = finalScore;
+        bestPoint = bp.index;
+      }
+    }
+  } else {
+    for (let i = 0; i < name.length; i++) {
+      if (widthAt[i] > 20) {
+        bestPoint = i;
+        break;
+      }
+    }
+    if (bestPoint === -1) {
+      bestPoint = Math.floor(name.length / 2);
+    }
+  }
+
+  const line1 = name.substring(0, bestPoint);
+  const line2 = name.substring(bestPoint);
+
+  return (
+    <span style={{ display: 'inline-block', lineHeight: '1.3', textAlign: 'left', verticalAlign: 'middle' }}>
+      {line1}<br/>{line2}
+    </span>
+  );
+};
+
 const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve: (ids: string[]) => void }) => {
   const [selected, setSelected] = useState<string[]>([]);
   
@@ -389,6 +506,56 @@ function App() {
     );
   });
 
+  const rightControls = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      <ProjectControls 
+        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
+        onExport={() => { 
+          const exportData = { ...data };
+          delete exportData.isCloudSync;
+          delete exportData.isPublic;
+          delete exportData.publicRole;
+          delete exportData.role;
+          const a = document.createElement('a'); 
+          a.href = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })); 
+          a.download = `${data.projectName}.json`; 
+          a.click(); 
+        }} 
+        onImport={handleFileImport} 
+        onImportFromUrl={handleImportFromUrl} 
+        showModal={showIOModal}
+        setShowModal={setShowIOModal}
+      />
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <SignedIn>
+          <UserButton>
+            <UserButton.MenuItems>
+              <UserButton.Action 
+                label="ヘルプ" 
+                labelIcon={<IconHelp size={16} />} 
+                onClick={() => setShowHelpModal(true)} 
+              />
+            </UserButton.MenuItems>
+          </UserButton>
+        </SignedIn>
+        <SignedOut>
+          <div ref={authMenuRef} style={{ position: 'relative' }}>
+            <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
+            {isAuthMenuOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
+                <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
+                <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>新規登録</button></SignUpButton>
+                <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <IconHelp size={16} /> ヘルプ
+                </button>
+              </div>
+            )}
+          </div>
+        </SignedOut>
+      </div>
+    </div>
+  );
+
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
@@ -455,104 +622,90 @@ function App() {
       )}
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
 
-      <header style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px' }}>
+      <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
           {isMobile ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>{data.projectName}</span>
-                              {renderProjectMenu()}
-                              
-                              {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                                <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
-                                  <IconCloudUpload size={16} />
-                                </button>
-                              ) : isSignedIn ? (
-                                <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
-                                  {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={16} /> : <IconCheckCircle size={16} />}
-                                </div>
-                              ) : null}
+              <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '1.2em', fontWeight: 'bold', textDecoration: 'underline dotted', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>
+                                    <FormattedProjectName name={data.projectName} />
+                                  </span>
+                                  {renderProjectMenu()}
+                                  
+                                  {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
+                                      <IconCloudUpload size={16} />
+                                    </button>
+                                  ) : isSignedIn ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
+                                      {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={16} /> : <IconCheckCircle size={16} />}
+                                    </div>
+                                  ) : null}
+                              </div>
                           </div>
-                          <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold', marginTop: '4px' }}>(全進捗: {projectProgress}%)</span>
+                      </div>
+                      {rightControls}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingLeft: '44px', boxSizing: 'border-box' }}>
+                      <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                      {isNarrowLayout && showSidebar && (
+                        <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>全プロジェクト表示</span>
+                          <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
+                        </label>
+                      )}
+                  </div>
+              </>
+          ) : (
+              <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
+                      <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                          <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>
+                            <span style={{ textDecoration: 'underline dotted' }}>
+                              <FormattedProjectName name={data.projectName} />
+                            </span>
+                          </h1>
+                          {renderProjectMenu()}
+                          
+                          {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
+                              <IconCloudUpload size={16} /> 保存
+                            </button>
+                          ) : isSignedIn ? (
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title={syncState === 'waiting' || syncState === 'syncing' ? '同期待機中...' : 'クラウド同期済み'}>
+                              {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={18} /> : <IconCheckCircle size={18} />}
+                            </div>
+                          ) : null}
+
+                          <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
+
+                          {isNarrowLayout && showSidebar && (
+                            <label style={{ marginLeft: 'auto', fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>全プロジェクト表示</span>
+                              <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
+                            </label>
+                          )}
                       </div>
                   </div>
-              </div>
-          ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}><span style={{ textDecoration: 'underline dotted' }}>{data.projectName}</span></h1>
-                      {renderProjectMenu()}
-                      
-                      {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                        <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
-                          <IconCloudUpload size={16} /> 保存
-                        </button>
-                      ) : isSignedIn ? (
-                        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title={syncState === 'waiting' || syncState === 'syncing' ? '同期待機中...' : 'クラウド同期済み'}>
-                          {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={18} /> : <IconCheckCircle size={18} />}
-                        </div>
-                      ) : null}
-
-                      <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold', marginLeft: '10px' }}>(全進捗: {projectProgress}%)</span>
-                  </div>
-              </div>
+                  {rightControls}
+              </>
           )}
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <ProjectControls 
-              onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
-              onExport={() => { 
-                const exportData = { ...data };
-                delete exportData.isCloudSync;
-                delete exportData.isPublic;
-                delete exportData.publicRole;
-                delete exportData.role;
-                const a = document.createElement('a'); 
-                a.href = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })); 
-                a.download = `${data.projectName}.json`; 
-                a.click(); 
-              }} 
-              onImport={handleFileImport} 
-              onImportFromUrl={handleImportFromUrl} 
-              showModal={showIOModal}
-              setShowModal={setShowIOModal}
-            />
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <SignedIn>
-                <UserButton>
-                  <UserButton.MenuItems>
-                    <UserButton.Action 
-                      label="ヘルプ" 
-                      labelIcon={<IconHelp size={16} />} 
-                      onClick={() => setShowHelpModal(true)} 
-                    />
-                  </UserButton.MenuItems>
-                </UserButton>
-              </SignedIn>
-              <SignedOut>
-                <div ref={authMenuRef} style={{ position: 'relative' }}>
-                  <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
-                  {isAuthMenuOpen && (
-                    <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
-                      <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <IconHelp size={16} /> ヘルプ
-                      </button>
-                      <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
-                      <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>新規登録</button></SignUpButton>
-                    </div>
-                  )}
-                </div>
-              </SignedOut>
-            </div>
-          </div>
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden', gap: (showSidebar && !isMobile) ? '23px' : '0' }}>
         <div style={{ flex: showSidebar ? (isMobile ? '1 0 100%' : '0 0 35%') : '0 0 0px', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'flex 0.3s ease, opacity 0.3s ease', opacity: showSidebar ? 1 : 0, pointerEvents: showSidebar ? 'auto' : 'none', height: '100%', minWidth: showSidebar ? (isMobile ? '100%' : '300px') : '0' }}>
-            <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, marginBottom: isMobile ? '0px' : '21px' }}><label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><span>全プロジェクト表示</span><div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div></label></div>
+            {!isNarrowLayout && (
+              <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, marginBottom: isMobile ? '0px' : '21px' }}>
+                <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>全プロジェクト表示</span>
+                  <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
+                </label>
+              </div>
+            )}
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}>
               <TaskCalendar tasks={calendarTasks} onStatusChange={isViewer ? () => {} : updateTaskStatus} onParentStatusChange={isViewer ? () => {} : updateParentStatus} />
             </div>
