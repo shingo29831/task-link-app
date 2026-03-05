@@ -1,3 +1,6 @@
+// 役割: タスク操作（追加・編集・削除）やプロジェクトのインポート・エクスポートなど、ビジネスロジックの統合と提供
+// なぜ: Appコンポーネントの肥大化を防ぎ、UIとロジックを分離するため
+
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -19,7 +22,7 @@ export const useTaskOperations = () => {
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject
+    addOrUpdateProject, forceSync
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -40,6 +43,11 @@ export const useTaskOperations = () => {
       incoming: any;
       projectData: any;
   } | null>(null);
+
+  const [retryFetchTrigger, setRetryFetchTrigger] = useState(0);
+  const fetchMembersRef = useRef<string | null>(null);
+  // 【修正】NodeJS.Timeout を ReturnType<typeof setTimeout> に変更
+  const fetchMembersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
@@ -169,6 +177,9 @@ export const useTaskOperations = () => {
 
   useEffect(() => {
     if (showSettingsModal && data && !String(data.id).startsWith('local_') && data.isCloudSync !== false) {
+        if (fetchMembersRef.current === data.id) return;
+        fetchMembersRef.current = data.id;
+
         const fetchMembers = async () => {
             try {
                 const token = await getToken();
@@ -187,12 +198,26 @@ export const useTaskOperations = () => {
                            publicRole: resData.publicRole 
                         });
                     }
+                } else {
+                    throw new Error('Failed to fetch members');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error("メンバー情報の取得に失敗しました:", e); 
+                fetchMembersTimeoutRef.current = setTimeout(() => {
+                    fetchMembersRef.current = null;
+                    setRetryFetchTrigger(prev => prev + 1);
+                }, 10000);
+            }
         };
         fetchMembers();
+    } else if (!showSettingsModal) {
+        fetchMembersRef.current = null;
+        if (fetchMembersTimeoutRef.current) {
+            clearTimeout(fetchMembersTimeoutRef.current);
+            fetchMembersTimeoutRef.current = null;
+        }
     }
-  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken, setData]);
+  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken, setData, retryFetchTrigger]);
 
   const save = useCallback((newTasks: Task[]) => {
     if (!data) return;
@@ -327,18 +352,16 @@ export const useTaskOperations = () => {
     const currentProjects = projectsRef.current;
     const sameIdProject = currentProjects.find((p: AppData) => p.id === incoming.id);
     
-    // 同一IDのプロジェクトが既にある場合はマージ対象
     if (sameIdProject) {
        if (JSON.stringify(sameIdProject.tasks || []) === JSON.stringify(incoming.tasks || []) && sameIdProject.projectName === incoming.projectName) {
            alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
            if (activeId !== incoming.id) switchProject(incoming.id);
            return;
        }
-       setIncomingData(incoming); // マージモーダルへ
+       setIncomingData(incoming); 
        return;
     }
 
-    // 同一IDはないが、同一名のプロジェクトがある場合
     const sameNameProject = currentProjects.find((p: AppData) => p.projectName === incoming.projectName);
     if (sameNameProject) {
        if ((sameNameProject.tasks || []).every((t: Task) => t.isDeleted)) {
@@ -498,7 +521,6 @@ export const useTaskOperations = () => {
   const handleUpdateProjectName = useCallback(async (newName: string) => {
     if (!data) return;
     
-    // UIを即座に更新する
     setData({ ...data, projectName: newName, lastSynced: Date.now() });
 
     if (!String(data.id).startsWith('local_') && data.isCloudSync !== false) {
@@ -550,7 +572,7 @@ export const useTaskOperations = () => {
               body: JSON.stringify({ isPublic })
           });
           if (res.ok) {
-              setData({ ...data, isPublic });
+              setData({ ...data, isPublic, lastSynced: Date.now() });
           } else {
                alert("公開設定の変更に失敗しました");
           }
@@ -573,7 +595,7 @@ export const useTaskOperations = () => {
               const resData = await res.json();
               if (resData.member) {
                   const newMembers = [...(data.members || []), resData.member];
-                  setData({ ...data, members: newMembers });
+                  setData({ ...data, members: newMembers, lastSynced: Date.now() });
                   alert(`${username} を招待しました。`);
               }
           } else {
@@ -597,7 +619,7 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).map(m => m.id === memberId ? { ...m, role: newRole } : m);
-              setData({ ...data, members: newMembers });
+              setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
               alert("権限の変更に失敗しました");
           }
@@ -618,7 +640,7 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).filter(m => m.id !== memberId);
-              setData({ ...data, members: newMembers });
+              setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
                alert("メンバーの削除に失敗しました");
           }
@@ -675,6 +697,6 @@ export const useTaskOperations = () => {
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
   };
 };
