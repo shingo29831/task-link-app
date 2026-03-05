@@ -1,19 +1,12 @@
 // 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  DndContext, 
-  useDroppable,
-  DragOverlay,
-  useDndMonitor,
-  type DragStartEvent,
-  type DragEndEvent
+  DndContext, DragOverlay, type DragStartEvent, type DragEndEvent
 } from '@dnd-kit/core';
 import {
-  SortableContext,
-  verticalListSortingStrategy,
-  horizontalListSortingStrategy
+  SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/clerk-react";
 
@@ -23,297 +16,24 @@ import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
-import type { Task, AppData } from './types';
+import type { Task } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
 import { 
-  IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput, 
+  IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, 
   IconHelp, IconCloudUpload, IconLoader, IconCheckCircle, IconError 
 } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
 
+import { FormattedProjectName } from './components/FormattedProjectName';
+import { SyncLimitModal } from './components/SyncLimitModal';
+import { InteractiveBoardArea, StaticBoardArea } from './components/BoardArea';
+
 type TaskNode = Task & { children: TaskNode[] };
-
-const getCharWidth = (str: string) => {
-  let width = 0;
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i);
-    if ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) width += 1;
-    else width += 2;
-  }
-  return width;
-};
-
-const getCharClass = (c: string) => {
-  if (/[ \-_/.=　]/.test(c)) return 'symbol';
-  if (/[a-zａ-ｚ]/.test(c)) return 'lower';
-  if (/[A-ZＡ-Ｚ]/.test(c)) return 'upper';
-  if (/[0-9０-９]/.test(c)) return 'num';
-  if (/[\u3040-\u309F]/.test(c)) return 'hiragana';
-  if (/[\u30A0-\u30FF\uFF65-\uFF9F]/.test(c)) return 'katakana';
-  if (/[\u4E00-\u9FFF]/.test(c)) return 'kanji';
-  return 'other';
-};
-
-const getCharGroup = (charClass: string) => {
-  if (['lower', 'upper'].includes(charClass)) return 'alpha';
-  if (charClass === 'num') return 'num';
-  if (['hiragana', 'katakana', 'kanji'].includes(charClass)) return 'japanese';
-  if (charClass === 'symbol') return 'symbol';
-  return 'other';
-};
-
-const FormattedProjectName = ({ name }: { name: string }) => {
-  const totalWidth = getCharWidth(name);
-  if (totalWidth <= 20) return <>{name}</>;
-
-  const breakpoints: { index: number, score: number, width: number }[] = [];
-  const widthAt: number[] = [];
-  let currentWidth = 0;
-  
-  for (let i = 0; i < name.length; i++) {
-    const c = name.charCodeAt(i);
-    currentWidth += ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) ? 1 : 2;
-    widthAt[i] = currentWidth;
-    
-    if (i > 0) {
-      const prev = name[i - 1];
-      const curr = name[i];
-      
-      const prevClass = getCharClass(prev);
-      const currClass = getCharClass(curr);
-      const prevGroup = getCharGroup(prevClass);
-      const currGroup = getCharGroup(currClass);
-
-      let baseScore = 0;
-
-      if (prevGroup === 'symbol' && currGroup !== 'symbol') {
-        baseScore = 120;
-      } else if (prevGroup !== currGroup && prevGroup !== 'symbol' && currGroup !== 'symbol') {
-        baseScore = 100;
-      } else if (prevGroup !== 'symbol' && currGroup === 'symbol') {
-        baseScore = 90;
-      } else if (prevGroup === currGroup && prevClass !== currClass) {
-        if (prevClass === 'lower' && currClass === 'upper') {
-          baseScore = 60;
-        } else if (prevGroup === 'japanese') {
-          baseScore = 40;
-        }
-      }
-
-      if (baseScore > 0) {
-        breakpoints.push({ index: i, score: baseScore, width: widthAt[i - 1] });
-      }
-    }
-  }
-
-  let bestPoint = -1;
-  const targetWidth = totalWidth / 2;
-  
-  const validBreakpoints = breakpoints.filter(bp => {
-    const w1 = bp.width;
-    const w2 = totalWidth - w1;
-    return w1 <= 20 && w2 <= 20;
-  });
-
-  if (validBreakpoints.length > 0) {
-    let maxFinalScore = -Infinity;
-    
-    for (const bp of validBreakpoints) {
-      const distanceRatio = Math.abs(targetWidth - bp.width) / targetWidth;
-      const penalty = distanceRatio * 40;
-      const finalScore = bp.score - penalty;
-      
-      if (finalScore > maxFinalScore) {
-        maxFinalScore = finalScore;
-        bestPoint = bp.index;
-      }
-    }
-  } else {
-    for (let i = 0; i < name.length; i++) {
-      if (widthAt[i] > 20) {
-        bestPoint = i;
-        break;
-      }
-    }
-    if (bestPoint === -1) {
-      bestPoint = Math.floor(name.length / 2);
-    }
-  }
-
-  const line1 = name.substring(0, bestPoint);
-  const line2 = name.substring(bestPoint);
-
-  return (
-    <span style={{ display: 'inline-block', lineHeight: '1.3', textAlign: 'left', verticalAlign: 'middle' }}>
-      {line1}<br/>{line2}
-    </span>
-  );
-};
-
-const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve: (ids: string[]) => void }) => {
-  const [selected, setSelected] = useState<string[]>([]);
-  
-  const toggle = (id: string) => {
-     if (selected.includes(id)) setSelected(prev => prev.filter(x => x !== id));
-     else if (selected.length < limitState.limit) setSelected(prev => [...prev, id]);
-  };
-
-  return (
-     <div style={{position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-        <div style={{background: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', maxWidth: '500px', width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.5)'}}>
-           <h3 style={{ color: 'var(--color-danger-text)', marginTop: 0 }}>⚠️ クラウド同期の上限を超えています</h3>
-           <p style={{ color: 'var(--text-primary)', fontSize: '0.95em', lineHeight: 1.5 }}>現在のプランの同期上限は <strong>{limitState.limit}件</strong> ですが、クラウド上に {limitState.cloudProjects.length}件 のデータが見つかりました。</p>
-           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85em', marginBottom: '20px' }}>同期を継続するプロジェクトを {limitState.limit}件 選んでください。（選ばれなかったものはオフラインのローカルデータに切り替わります）</p>
-           
-           <div style={{maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', marginBottom: '20px'}}>
-              {limitState.cloudProjects.map((p: any) => (
-                 <label key={p.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)', opacity: (!selected.includes(p.id) && selected.length >= limitState.limit) ? 0.5 : 1}}>
-                    <input type="checkbox" checked={selected.includes(p.id)} onChange={() => toggle(p.id)} disabled={!selected.includes(p.id) && selected.length >= limitState.limit} style={{ transform: 'scale(1.2)' }} />
-                    <span style={{ color: 'var(--text-primary)' }}>{p.projectName}</span>
-                 </label>
-              ))}
-           </div>
-           
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <span style={{ fontSize: '0.9em', color: selected.length === limitState.limit ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
-                選択中: {selected.length} / {limitState.limit}件
-             </span>
-             <button onClick={() => onResolve(selected)} disabled={selected.length === 0} style={{ padding: '10px 20px', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.length === 0 ? 'not-allowed' : 'pointer', opacity: selected.length === 0 ? 0.5 : 1 }}>決定する</button>
-           </div>
-        </div>
-     </div>
-  );
-};
-
-// モバイル時もパン操作を有効にするため isMobile の判定を削除
-function usePanning(isDragging: boolean, onBoardClick: () => void) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isPanning, setIsPanning] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [scrollPos, setScrollPos] = useState({ left: 0, top: 0 });
-  const hasMovedRef = useRef(false);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (isDragging || e.button !== 0) return; 
-    if ((e.target as Element).closest('[data-task-id]')) return; 
-    setIsPanning(true); 
-    hasMovedRef.current = false; 
-    setStartPos({ x: e.clientX, y: e.clientY }); 
-    if (scrollRef.current) setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop }); 
-    (e.target as Element).setPointerCapture(e.pointerId); 
-  }, [isDragging]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (!isPanning || !scrollRef.current) return; 
-    const dx = e.clientX - startPos.x; 
-    const dy = e.clientY - startPos.y; 
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true; 
-    scrollRef.current.scrollLeft = scrollPos.left - dx; 
-    scrollRef.current.scrollTop = scrollPos.top - dy; 
-  }, [isPanning, startPos, scrollPos]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (!isPanning) return; 
-    setIsPanning(false); 
-    (e.target as Element).releasePointerCapture(e.pointerId); 
-  }, [isPanning]);
-
-  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (!isPanning) return; 
-    setIsPanning(false); 
-    (e.target as Element).releasePointerCapture(e.pointerId); 
-  }, [isPanning]);
-
-  const handleClick = useCallback(() => {
-    if (!hasMovedRef.current) onBoardClick();
-  }, [onBoardClick]);
-
-  return { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick };
-}
-
-const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
-  const [isDragging, setIsDragging] = useState(false);
-  const pointerRef = useRef({ x: 0, y: 0 });
-  useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
-  
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isDragging, onBoardClick);
-  const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef, scrollRef]);
-
-  useEffect(() => {
-    if (!isDragging || !isMobile) return;
-    const updatePointer = (x: number, y: number) => { pointerRef.current = { x, y }; };
-    const handleTouchMove = (e: TouchEvent) => { if (e.touches.length > 0) updatePointer(e.touches[0].clientX, e.touches[0].clientY); };
-    const handlePointerMoveGlobal = (e: PointerEvent) => { updatePointer(e.clientX, e.clientY); };
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('pointermove', handlePointerMoveGlobal);
-    let animationFrameId: number;
-    const tick = () => {
-      if (scrollRef.current) {
-        const rect = scrollRef.current.getBoundingClientRect();
-        const ratioX = (pointerRef.current.x - (rect.left + rect.width / 2)) / (rect.width / 2);
-        const ratioY = (pointerRef.current.y - (rect.top + rect.height / 2)) / (rect.height / 2);
-        if (Math.abs(ratioX) > 0.4) scrollRef.current.scrollLeft += Math.sign(ratioX) * ((Math.abs(ratioX) - 0.4) / 0.6) * 15;
-        if (Math.abs(ratioY) > 0.4) scrollRef.current.scrollTop += Math.sign(ratioY) * ((Math.abs(ratioY) - 0.4) / 0.6) * 15;
-      }
-      animationFrameId = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => { window.removeEventListener('touchmove', handleTouchMove); window.removeEventListener('pointermove', handlePointerMoveGlobal); cancelAnimationFrame(animationFrameId); };
-  }, [isDragging, isMobile]);
-
-  return (
-    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
-        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
-      </div>
-      {isMobile && !isDragging && (
-        <>
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
-            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
-            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
-          </div>
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
-            {isNarrowLayout && (
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
-            )}
-            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
-
-  return (
-    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
-        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
-      </div>
-      {isMobile && (
-        <>
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
-            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
-            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
-          </div>
-          {isNarrowLayout && (
-            <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
 
 function App() {
   const { getToken, isSignedIn } = useAuth();
@@ -327,12 +47,12 @@ function App() {
     collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
+    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
-    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
@@ -355,23 +75,9 @@ function App() {
   const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
   
   const currentUserRole = sharedProjectState?.role || data?.role || 'owner';
-  
   const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
-  
   const isViewer = isCloudProject ? !hasEditPermission : false;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
-
-  useEffect(() => {
-    console.log('[Permission Check]', {
-      role: currentUserRole,
-      isViewer,
-      isAdmin,
-      isCloudProject,
-      isShared: !!sharedProjectState,
-      hasEditPermission,
-      dataRole: data?.role
-    });
-  }, [currentUserRole, isViewer, isAdmin, isCloudProject, sharedProjectState, hasEditPermission, data?.role]);
 
   useEffect(() => {
     const handler = (e: any) => setIsVerifyingProject(e.detail);
@@ -409,51 +115,32 @@ function App() {
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
-  const moveTaskOrder = (taskId: string, direction: 'up' | 'down') => {
-    if (!data || !data.tasks) return;
-    const taskIndex = data.tasks.findIndex((t: Task) => t.id === taskId);
-    if (taskIndex === -1) return;
-    
-    const taskToMove = data.tasks[taskIndex];
-    const siblings = data.tasks
-      .filter((t: Task) => t.parentId === taskToMove.parentId && !t.isDeleted)
-      .sort((a: Task, b: Task) => (a.order ?? 0) - (b.order ?? 0));
-      
-    const siblingIndex = siblings.findIndex((t: Task) => t.id === taskId);
-    if (direction === 'up' && siblingIndex > 0) {
-      const target = siblings[siblingIndex - 1];
-      const newTasks = [...data.tasks];
-      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
-      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
-      const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
-      setData({ ...data, tasks: newTasks });
-    } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
-      const target = siblings[siblingIndex + 1];
-      const newTasks = [...data.tasks];
-      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
-      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
-      const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
-      setData({ ...data, tasks: newTasks });
-    }
-  };
-
   const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
-  const overallProgressData = useMemo(() => {
+  const renderProgressBar = () => {
+    const { p0, p1, p2, p3 } = projectProgressData;
+    return (
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
+          {p2 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" /></svg>}
+        </div>
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
+          {p1 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" /></svg>}
+        </div>
+        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
+        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
+      </div>
+    );
+  };
+
+  const projectProgressData = useMemo(() => {
     if (!data?.tasks || data.tasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
     const leafTasks = data.tasks.filter((t: Task) => !t.isDeleted && !data.tasks.some((child: Task) => child.parentId === t.id && !child.isDeleted));
     if (leafTasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
     
     const counts = { 0: 0, 1: 0, 2: 0, 3: 0 };
     let total = 0;
-    leafTasks.forEach((t: Task) => {
-      counts[t.status as 0|1|2|3]++;
-      total++;
-    });
+    leafTasks.forEach((t: Task) => { counts[t.status as 0|1|2|3]++; total++; });
     if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
 
     return {
@@ -463,30 +150,6 @@ function App() {
       p3: (counts[3] / total) * 100  // 休止
     };
   }, [data?.tasks]);
-
-  const renderProgressBar = () => {
-    const { p0, p1, p2, p3 } = overallProgressData;
-    return (
-      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
-        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
-          {p2 > 0 && (
-            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
-              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" />
-            </svg>
-          )}
-        </div>
-        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
-          {p1 > 0 && (
-            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
-              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" />
-            </svg>
-          )}
-        </div>
-        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
-        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
-      </div>
-    );
-  };
 
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
@@ -524,13 +187,7 @@ function App() {
       </React.Fragment>
     ));
 
-    return isViewer ? (
-      <>{content}</>
-    ) : (
-      <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
-        {content}
-      </SortableContext>
-    );
+    return isViewer ? <>{content}</> : <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>{content}</SortableContext>;
   };
 
   const renderProjectMenu = () => (
@@ -539,7 +196,7 @@ function App() {
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {projects.map((p: AppData) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
+                    {projects.map((p: any) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
             </div>
@@ -567,31 +224,17 @@ function App() {
         onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
         onExport={() => { 
           const exportData = { ...data };
-          delete exportData.isCloudSync;
-          delete exportData.isPublic;
-          delete exportData.publicRole;
-          delete exportData.role;
+          delete exportData.isCloudSync; delete exportData.isPublic; delete exportData.publicRole; delete exportData.role;
           const a = document.createElement('a'); 
           a.href = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })); 
           a.download = `${data.projectName}.json`; 
           a.click(); 
         }} 
-        onImport={handleFileImport} 
-        onImportFromUrl={handleImportFromUrl} 
-        showModal={showIOModal}
-        setShowModal={setShowIOModal}
+        onImport={handleFileImport} onImportFromUrl={handleImportFromUrl} showModal={showIOModal} setShowModal={setShowIOModal}
       />
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <SignedIn>
-          <UserButton>
-            <UserButton.MenuItems>
-              <UserButton.Action 
-                label="ヘルプ" 
-                labelIcon={<IconHelp size={16} />} 
-                onClick={() => setShowHelpModal(true)} 
-              />
-            </UserButton.MenuItems>
-          </UserButton>
+          <UserButton><UserButton.MenuItems><UserButton.Action label="ヘルプ" labelIcon={<IconHelp size={16} />} onClick={() => setShowHelpModal(true)} /></UserButton.MenuItems></UserButton>
         </SignedIn>
         <SignedOut>
           <div ref={authMenuRef} style={{ position: 'relative' }}>
@@ -600,9 +243,7 @@ function App() {
               <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
                 <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
                 <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>新規登録</button></SignUpButton>
-                <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <IconHelp size={16} /> ヘルプ
-                </button>
+                <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><IconHelp size={16} /> ヘルプ</button>
               </div>
             )}
           </div>
@@ -614,16 +255,11 @@ function App() {
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
-      {/* ★ クラウドインポート確認モーダル */}
       {importCloudCheck?.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>
              <h3 style={{ marginTop: 0 }}>クラウドプロジェクトの検出</h3>
-             <p style={{ fontSize: '0.95em', lineHeight: 1.5, marginBottom: '20px' }}>
-               このプロジェクトはクラウド上に存在します。<br/>
-               クラウドの最新データを表示しますか？<br/><br/>
-               <span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>（[キャンセル]を選択すると、読み込んだJSONデータを表示・マージします）</span>
-             </p>
+             <p style={{ fontSize: '0.95em', lineHeight: 1.5, marginBottom: '20px' }}>このプロジェクトはクラウド上に存在します。<br/>クラウドの最新データを表示しますか？<br/><br/><span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>（[キャンセル]を選択すると、読み込んだJSONデータを表示・マージします）</span></p>
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                <button onClick={() => handleCloudImportChoice(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>キャンセル</button>
                <button onClick={() => handleCloudImportChoice(true)} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>最新データを表示</button>
@@ -636,75 +272,54 @@ function App() {
 
       {editingTask && (
         <TaskEditModal 
-          task={editingTask}
-          hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
+          task={editingTask} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
           onSave={(newName, newDateStr, newStatus) => {
             if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
             updateTaskDeadline(editingTask.id, newDateStr);
-            
             if (newStatus !== editingTask.status) {
               const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
-              if (hasChild) {
-                updateParentStatus(editingTask.id, newStatus);
-              } else {
-                updateTaskStatus(editingTask.id, newStatus);
-              }
+              if (hasChild) updateParentStatus(editingTask.id, newStatus);
+              else updateTaskStatus(editingTask.id, newStatus);
             }
-            
             setEditingTask(null);
           }}
-          onDelete={() => {
-            deleteTask(editingTask.id);
-            setEditingTask(null);
-          }}
-          onMoveUp={() => moveTaskOrder(editingTask.id, 'up')}
-          onMoveDown={() => moveTaskOrder(editingTask.id, 'down')}
+          onDelete={() => { deleteTask(editingTask.id); setEditingTask(null); }}
+          onMoveUp={() => moveTaskOrder(editingTask.id, 'up')} onMoveDown={() => moveTaskOrder(editingTask.id, 'down')}
         />
       )}
 
       {incomingData && targetLocalData && (
         <MergeModal 
-          localData={targetLocalData} 
-          incomingData={incomingData} 
+          localData={targetLocalData} incomingData={incomingData} 
           onConfirm={(merged) => { 
-            const finalMerged = { 
-                ...targetLocalData, 
-                ...merged, 
-                isCloudSync: incomingData.isCloudSync ?? targetLocalData.isCloudSync ?? merged.isCloudSync,
-                shortId: targetLocalData.shortId || incomingData.shortId
-            };
+            const finalMerged = { ...targetLocalData, ...merged, isCloudSync: incomingData.isCloudSync ?? targetLocalData.isCloudSync ?? merged.isCloudSync, shortId: targetLocalData.shortId || incomingData.shortId };
             setData(finalMerged); 
             if (finalMerged.id !== activeId) switchProject(finalMerged.id); 
             setIncomingData(null); 
             alert('マージが完了しました'); 
           }} 
-          onCancel={() => setIncomingData(null)} 
-          onCreateNew={importNewProject} 
+          onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} 
         />
       )}
+      
       {showSettingsModal && data && (
         <ProjectSettingsModal 
-          currentName={data.projectName} 
-          currentId={data.id} 
-          projects={projects} 
+          currentName={data.projectName} currentId={data.id} projects={projects} 
           isSyncEnabled={!String(data.id).startsWith('local_') && data.isCloudSync !== false}
           isPublic={!!data.isPublic}
-          members={data.members || []}
-          isAdmin={isAdmin}
-          currentUserRole={currentUserRole}
-          isCloudProject={isCloudProject}
-          syncState={syncState}
-          onClose={() => setShowSettingsModal(false)} 
-          onSaveName={(newName) => { handleUpdateProjectName(newName); }} 
-          onToggleSync={handleToggleSync}
-          onTogglePublic={handleTogglePublic}
+          includeDataInLink={!!(data as any).includeDataInLink}
+          members={data.members || []} isAdmin={isAdmin} currentUserRole={currentUserRole}
+          isCloudProject={isCloudProject} syncState={syncState}
+          onClose={() => setShowSettingsModal(false)} onSaveName={(newName) => { handleUpdateProjectName(newName); }} 
+          onToggleSync={handleToggleSync} onTogglePublic={handleTogglePublic} 
+          onToggleIncludeDataInLink={handleToggleIncludeDataInLink}
           onInviteUser={handleInviteUser}
-          onChangeRole={handleChangeRole}
-          onRemoveMember={handleRemoveMember}
+          onChangeRole={handleChangeRole} onRemoveMember={handleRemoveMember}
           onDeleteProject={(isCloudDelete) => { deleteProject(data.id, isCloudDelete); setShowSettingsModal(false); }}
         />
       )}
+      
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
 
       <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
@@ -721,21 +336,13 @@ function App() {
                                   {renderProjectMenu()}
                                   
                                   {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
-                                      <IconLoader size={16} />
-                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={16} /></div>
                                   ) : isSignedIn && syncState === 'error' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行">
-                                      <IconError size={16} />
-                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={16} /></button>
                                   ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
-                                      <IconCloudUpload size={16} />
-                                    </button>
+                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存"><IconCloudUpload size={16} /></button>
                                   ) : isSignedIn && syncState === 'synced' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
-                                      <IconCheckCircle size={16} />
-                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={16} /></button>
                                   ) : null}
                               </div>
                           </div>
@@ -761,28 +368,18 @@ function App() {
                       <button onClick={() => setShowSidebar(!showSidebar)} style={{ padding: '8px', backgroundColor: showSidebar ? 'var(--color-primary)' : 'var(--bg-button)', color: showSidebar ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: '4px' }}><IconCalendar size={20} /></button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                           <h1 style={{ margin: 0, fontSize: '1.5em', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={handleProjectNameClick}>
-                            <span style={{ textDecoration: 'underline dotted' }}>
-                              <FormattedProjectName name={data.projectName} />
-                            </span>
+                            <span style={{ textDecoration: 'underline dotted' }}><FormattedProjectName name={data.projectName} /></span>
                           </h1>
                           {renderProjectMenu()}
                           
                           {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
-                              <IconLoader size={18} />
-                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={18} /></div>
                           ) : isSignedIn && syncState === 'error' ? (
-                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行">
-                              <IconError size={18} />
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={18} /></button>
                           ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
-                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
-                              <IconCloudUpload size={16} /> 保存
-                            </button>
+                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存"><IconCloudUpload size={16} /> 保存</button>
                           ) : isSignedIn && syncState === 'synced' ? (
-                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
-                              <IconCheckCircle size={18} />
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={18} /></button>
                           ) : null}
 
                           <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '150px' }}>
@@ -859,8 +456,7 @@ function App() {
 
       {sharedProjectState && (
         <SharedProjectModal 
-          sharedState={sharedProjectState} 
-          onClose={() => setSharedProjectState(null)}
+          sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
           onOpenAsProject={(sharedData) => { addOrUpdateProject(sharedData); }}
           onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
         />

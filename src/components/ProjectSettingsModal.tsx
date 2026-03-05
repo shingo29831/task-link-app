@@ -1,9 +1,9 @@
 // 役割: プロジェクト名変更、同期設定、共有設定、メンバー管理などを行うモーダルUI
 // なぜ: プロジェクト単位の設定を一元管理し、権限に応じた操作を提供するため
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppData, UserRole, ProjectMember } from '../types';
-import { IconWarning } from './Icons';
+import { IconWarning, IconLoader, IconCheckCircle, IconError, IconCloudUpload, IconX } from './Icons';
 
 interface Props {
   currentName: string;
@@ -12,6 +12,7 @@ interface Props {
   
   isSyncEnabled: boolean;
   isPublic: boolean;
+  includeDataInLink: boolean;
   members: ProjectMember[];
   isAdmin: boolean;
   currentUserRole: string; 
@@ -22,32 +23,12 @@ interface Props {
   onSaveName: (newName: string) => void;
   onToggleSync: (enabled: boolean) => void;
   onTogglePublic: (isPublic: boolean) => void;
+  onToggleIncludeDataInLink: (enabled: boolean) => void;
   onInviteUser: (username: string) => void;
   onChangeRole: (memberId: string, newRole: UserRole) => void;
   onRemoveMember: (memberId: string) => void;
   onDeleteProject: (isCloudDelete: boolean) => void; 
 }
-
-const IconLoader = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-
-const IconError = ({ size = 20, color = "var(--color-danger)" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
 
 // 全角文字を2、半角文字を1として文字幅を計算する関数
 const getCharWidth = (str: string) => {
@@ -70,6 +51,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   projects, 
   isSyncEnabled,
   isPublic,
+  includeDataInLink,
   members,
   isAdmin,
   currentUserRole,
@@ -79,6 +61,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   onSaveName,
   onToggleSync,
   onTogglePublic,
+  onToggleIncludeDataInLink,
   onInviteUser,
   onChangeRole,
   onRemoveMember,
@@ -91,6 +74,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [inviteUsername, setInviteUsername] = useState('');
 
   const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
+  const [showSyncDisableModal, setShowSyncDisableModal] = useState(false);
+  const [showIncludeDataModal, setShowIncludeDataModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
   useEffect(() => {
@@ -227,7 +212,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 placeholder="プロジェクト名"
                 maxLength={40}
                 style={{ 
-                  flex: 1, padding: '10px', borderRadius: '4px', 
+                  flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', 
                   border: nameError ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
                   backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', 
                   outline: 'none'
@@ -242,7 +227,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   color: '#fff', 
                   border: 'none', borderRadius: '4px', 
                   cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
-                  opacity: isSaveDisabled ? 0.6 : 1
+                  opacity: isSaveDisabled ? 0.6 : 1,
+                  whiteSpace: 'nowrap', flexShrink: 0
                 }}
               >
                 更新
@@ -265,15 +251,21 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>クラウド同期</h3>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
-                <span style={{ fontSize: '0.9em' }}>{isSyncEnabled ? 'オン' : 'オフ'}</span>
-                <input 
-                  type="checkbox" 
-                  checked={isSyncEnabled} 
-                  onChange={(e) => onToggleSync(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-              </label>
+              {isSyncEnabled ? (
+                <button 
+                  onClick={() => setShowSyncDisableModal(true)}
+                  style={{ backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
+                >
+                  <IconX size={16} /> 同期解除
+                </button>
+              ) : (
+                <button 
+                  onClick={() => onToggleSync(true)}
+                  style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
+                >
+                  <IconCloudUpload size={16} /> 同期する
+                </button>
+              )}
             </div>
           </section>
         )}
@@ -291,7 +283,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                     リンクを知っている全員がプロジェクトにアクセスできるようにします
                   </p>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   <span style={{ fontSize: '0.9em' }}>{isPublic ? '公開' : '非公開'}</span>
                   <input 
                     type="checkbox" 
@@ -303,7 +295,31 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 4. ユーザー招待 */}
+            {/* 4. リンクにデータを保存設定 */}
+            <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>リンクにデータを保存</h4>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.9em' }}>{includeDataInLink ? 'オン' : 'オフ'}</span>
+                  <input 
+                    type="checkbox" 
+                    checked={includeDataInLink} 
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setShowIncludeDataModal(true);
+                      } else {
+                        onToggleIncludeDataInLink(false);
+                      }
+                    }}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                </label>
+              </div>
+            </section>
+
+            {/* 5. ユーザー招待 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>ユーザーを招待</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -314,7 +330,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   onKeyDown={handleInviteKeyDown}
                   placeholder="ユーザー名を入力"
                   style={{ 
-                    flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
+                    flex: 1, minWidth: 0, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
                     backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)'
                   }}
                 />
@@ -324,7 +340,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   style={{
                     padding: '0 16px', backgroundColor: 'var(--color-primary)', color: '#fff', 
                     border: 'none', borderRadius: '4px', cursor: 'pointer',
-                    opacity: !inviteUsername.trim() ? 0.5 : 1
+                    opacity: !inviteUsername.trim() ? 0.5 : 1,
+                    whiteSpace: 'nowrap', flexShrink: 0
                   }}
                 >
                   招待
@@ -332,7 +349,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 5. 招待済みメンバー一覧と権限変更 */}
+            {/* 6. 招待済みメンバー一覧と権限変更 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>メンバー一覧</h4>
               {members.length === 0 ? (
@@ -340,9 +357,9 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {members.map(member => (
-                    <li key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: '4px' }}>
-                      <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{member.username}</span>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <li key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: '4px', gap: '10px' }}>
+                      <span style={{ fontSize: '0.9em', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.username}</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                         <select 
                           value={member.role}
                           onChange={(e) => onChangeRole(member.id, e.target.value as UserRole)}
@@ -357,7 +374,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                         </select>
                         <button 
                           onClick={() => onRemoveMember(member.id)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-danger-text)', cursor: 'pointer', fontSize: '0.85em' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-danger-text)', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
                           title="メンバーから削除"
                         >
                           削除
@@ -372,7 +389,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* 6. プロジェクト削除セクション */}
+        {/* 7. プロジェクト削除セクション */}
         <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: (isAdmin && isSyncEnabled) ? '20px' : '0' }}>
           <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>危険な操作</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -420,11 +437,44 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                value={confirmName} 
                onChange={e => setConfirmName(e.target.value)} 
                placeholder={currentName}
-               style={{ width: '100%', padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
+               style={{ width: '100%', minWidth: 0, padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
              />
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
                <button onClick={handleCloudDeleteConfirm} disabled={confirmName !== currentName} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: confirmName === currentName ? 'pointer' : 'not-allowed', opacity: confirmName === currentName ? 1 : 0.5, fontWeight: 'bold' }}>完全に削除する</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 同期解除の確認モーダル */}
+      {showSyncDisableModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowSyncDisableModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
+             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>クラウド同期を解除しますか？</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
+               クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？
+             </p>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => setShowSyncDisableModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
+               <button onClick={() => { onToggleSync(false); setShowSyncDisableModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>解除する</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* リンクにデータを保存の説明モーダル */}
+      {showIncludeDataModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowIncludeDataModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
+             <h3 style={{ margin: '0 0 10px 0' }}>リンクにデータを保存</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
+               有効にするとリンクURLに現在のタスクデータが含まれます。<br/>
+               このリンクで遷移することで、リンク生成時のタスク状況に復元することができます。
+             </p>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => setShowIncludeDataModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
+               <button onClick={() => { onToggleIncludeDataInLink(true); setShowIncludeDataModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>有効にする</button>
              </div>
           </div>
         </div>
