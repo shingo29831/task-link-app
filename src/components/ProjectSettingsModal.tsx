@@ -16,7 +16,7 @@ interface Props {
   isAdmin: boolean;
   currentUserRole: string; 
   isCloudProject: boolean; 
-  syncState?: string; // 追加
+  syncState?: string; 
   
   onClose: () => void;
   onSaveName: (newName: string) => void;
@@ -38,6 +38,14 @@ const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
     <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+
+const IconError = ({ size = 20, color = "var(--color-danger)" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
 
@@ -66,7 +74,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   isAdmin,
   currentUserRole,
   isCloudProject,
-  syncState, // 追加
+  syncState, 
   onClose, 
   onSaveName,
   onToggleSync,
@@ -186,8 +194,13 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h2 style={{ margin: 0, fontSize: '1.2em' }}>プロジェクト設定</h2>
             {(syncState === 'waiting' || syncState === 'syncing') && (
-              <div style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center' }} title="同期待機中・同期中">
+              <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} title="同期待機中・同期中">
                 <IconLoader size={18} />
+              </div>
+            )}
+            {syncState === 'error' && (
+              <div style={{ display: 'flex', alignItems: 'center' }} title="同期エラー">
+                <IconError size={18} />
               </div>
             )}
             {syncState === 'synced' && (

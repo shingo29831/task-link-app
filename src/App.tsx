@@ -64,6 +64,14 @@ const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
   </svg>
 );
 
+const IconError = ({ size = 20, color = "var(--color-danger)" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+  </svg>
+);
+
 const getCharWidth = (str: string) => {
   let width = 0;
   for (let i = 0; i < str.length; i++) {
@@ -360,7 +368,7 @@ function App() {
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
   } = useTaskOperations();
 
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
@@ -737,14 +745,18 @@ function App() {
                                     <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
                                       <IconLoader size={16} />
                                     </div>
+                                  ) : isSignedIn && syncState === 'error' ? (
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行">
+                                      <IconError size={16} />
+                                    </button>
                                   ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
                                       <IconCloudUpload size={16} />
                                     </button>
-                                  ) : isSignedIn ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
+                                  ) : isSignedIn && syncState === 'synced' ? (
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
                                       <IconCheckCircle size={16} />
-                                    </div>
+                                    </button>
                                   ) : null}
                               </div>
                           </div>
@@ -780,14 +792,18 @@ function App() {
                             <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
                               <IconLoader size={18} />
                             </div>
+                          ) : isSignedIn && syncState === 'error' ? (
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行">
+                              <IconError size={18} />
+                            </button>
                           ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
                               <IconCloudUpload size={16} /> 保存
                             </button>
-                          ) : isSignedIn ? (
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title="クラウド同期済み">
+                          ) : isSignedIn && syncState === 'synced' ? (
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
                               <IconCheckCircle size={18} />
-                            </div>
+                            </button>
                           ) : null}
 
                           <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '150px' }}>

@@ -1,3 +1,6 @@
+// 役割: タスク操作（追加・編集・削除）やプロジェクトのインポート・エクスポートなど、ビジネスロジックの統合と提供
+// なぜ: Appコンポーネントの肥大化を防ぎ、UIとロジックを分離するため
+
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -16,10 +19,10 @@ export const useTaskOperations = () => {
   const { getToken } = useAuth();
   
   const { 
-    data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
+    data, setData, updateProject, replaceProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject
+    addOrUpdateProject, forceSync
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -327,18 +330,16 @@ export const useTaskOperations = () => {
     const currentProjects = projectsRef.current;
     const sameIdProject = currentProjects.find((p: AppData) => p.id === incoming.id);
     
-    // 同一IDのプロジェクトが既にある場合はマージ対象
     if (sameIdProject) {
        if (JSON.stringify(sameIdProject.tasks || []) === JSON.stringify(incoming.tasks || []) && sameIdProject.projectName === incoming.projectName) {
            alert('インポートされたデータは現在のプロジェクトと完全に一致しています。');
            if (activeId !== incoming.id) switchProject(incoming.id);
            return;
        }
-       setIncomingData(incoming); // マージモーダルへ
+       setIncomingData(incoming); 
        return;
     }
 
-    // 同一IDはないが、同一名のプロジェクトがある場合
     const sameNameProject = currentProjects.find((p: AppData) => p.projectName === incoming.projectName);
     if (sameNameProject) {
        if ((sameNameProject.tasks || []).every((t: Task) => t.isDeleted)) {
@@ -498,7 +499,6 @@ export const useTaskOperations = () => {
   const handleUpdateProjectName = useCallback(async (newName: string) => {
     if (!data) return;
     
-    // UIを即座に更新する
     setData({ ...data, projectName: newName, lastSynced: Date.now() });
 
     if (!String(data.id).startsWith('local_') && data.isCloudSync !== false) {
@@ -550,7 +550,6 @@ export const useTaskOperations = () => {
               body: JSON.stringify({ isPublic })
           });
           if (res.ok) {
-              // lastSynced を更新して同期トリガーを発火させる
               setData({ ...data, isPublic, lastSynced: Date.now() });
           } else {
                alert("公開設定の変更に失敗しました");
@@ -574,7 +573,6 @@ export const useTaskOperations = () => {
               const resData = await res.json();
               if (resData.member) {
                   const newMembers = [...(data.members || []), resData.member];
-                  // lastSynced を更新
                   setData({ ...data, members: newMembers, lastSynced: Date.now() });
                   alert(`${username} を招待しました。`);
               }
@@ -599,7 +597,6 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).map(m => m.id === memberId ? { ...m, role: newRole } : m);
-              // lastSynced を更新
               setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
               alert("権限の変更に失敗しました");
@@ -621,7 +618,6 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).filter(m => m.id !== memberId);
-              // lastSynced を更新
               setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
                alert("メンバーの削除に失敗しました");
@@ -679,6 +675,6 @@ export const useTaskOperations = () => {
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
   };
 };

@@ -1,5 +1,5 @@
 // 役割: アプリケーションの全体的なデータ状態（プロジェクト、タスク履歴、クラウド同期状態など）を管理するカスタムフック
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef} from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
@@ -94,7 +94,9 @@ export const useAppData = () => {
   const [currentLimit, setCurrentLimit] = useState<number>(3);
   const [currentPlan, setCurrentPlan] = useState<'free' | 'premium'>('free');
   const [syncLimitState, setSyncLimitState] = useState<{ isOverLimit: boolean, limit: number, cloudProjects: any[] } | null>(null);
-  const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced'>('idle');
+  
+  // 状態に error を追加
+  const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced' | 'error'>('idle');
 
   // 非同期で計算された現在のハッシュ値を保持
   const [currentHash, setCurrentHash] = useState<number>(0);
@@ -231,7 +233,7 @@ export const useAppData = () => {
 
           if (dbProjects.length > limit) {
               setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
-              setSyncState('idle');
+              setSyncState('error'); // エラー扱いに
               initialCloudFetchDone.current = true;
               return;
           }
@@ -294,12 +296,12 @@ export const useAppData = () => {
           setSyncState('synced');
           initialCloudFetchDone.current = true;
         } else {
-          setSyncState('idle');
+          setSyncState('error');
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
         console.error('クラウドからのデータ読み込みに失敗しました', e);
-        setSyncState('idle');
+        setSyncState('error');
       }
     };
 
@@ -355,7 +357,7 @@ export const useAppData = () => {
 
               if (dbProjects.length > limit) {
                   setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
-                  setSyncState('idle');
+                  setSyncState('error');
                   return;
               }
 
@@ -424,7 +426,7 @@ export const useAppData = () => {
               setProjects(prev => prev.map(p => p.id === projectId ? {
                   ...p, role: fetchedRole, tasks: rollbackTasks, projectName: rollbackName, lastSynced: Date.now()
               } : p));
-              setSyncState('idle');
+              setSyncState('error');
               if (fetchedRole !== 'viewer') alert('アクセス権限がありません。クラウドの最新状態にリセットされました。');
               return;
           }
@@ -517,10 +519,10 @@ export const useAppData = () => {
               } else if (uploadRes.status === 403) {
                   const errData = await uploadRes.json().catch(() => ({}));
                   setProjects(prev => prev.map(p => p.id === targetProject.id ? { ...p, role: errData.role || 'viewer' } : p));
-                  setSyncState('idle');
+                  setSyncState('error');
                   alert('権限が変更されたため、変更を保存できません。');
               } else {
-                  setSyncState('idle');
+                  setSyncState('error');
               }
           } else {
               // 差分がないのでアップロードをスキップ
@@ -540,7 +542,7 @@ export const useAppData = () => {
       } catch (e) {
           if (e instanceof DOMException && e.name === 'AbortError') return;
           console.error('クラウド同期エラー', e);
-          setSyncState('idle');
+          setSyncState('error');
       }
   }, [getToken, getWaitTime, setProjects]);
 
@@ -631,14 +633,28 @@ export const useAppData = () => {
         setSyncState('synced');
         alert('クラウドにアップロードしました！');
       } else {
-        setSyncState('idle');
+        setSyncState('error');
         alert('アップロードに失敗しました');
       }
     } catch (e) {
       console.error(e);
-      setSyncState('idle');
+      setSyncState('error');
     }
   };
+
+  // 手動で同期処理を開始する関数
+  const forceSync = useCallback(() => {
+    if (!activeData || !isSignedIn || String(activeData.id).startsWith('local_') || activeData.isCloudSync === false) return;
+    
+    if (syncAbortControllerRef.current) {
+        syncAbortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    syncAbortControllerRef.current = abortController;
+
+    // forceFetchをtrueにして同期フローを実行
+    triggerSyncFlow(activeData.id, true, abortController.signal);
+  }, [activeData, isSignedIn, triggerSyncFlow]);
 
   useEffect(() => {
     if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -724,6 +740,6 @@ export const useAppData = () => {
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
-    syncState, addOrUpdateProject
+    syncState, addOrUpdateProject, forceSync
   };
 };
