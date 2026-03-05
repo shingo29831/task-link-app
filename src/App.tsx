@@ -335,13 +335,13 @@ function App() {
                                   </span>
                                   {renderProjectMenu()}
                                   
-                                  {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
+                                  {isSignedIn && isCloudProject && (syncState === 'waiting' || syncState === 'syncing') ? (
                                     <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={16} /></div>
-                                  ) : isSignedIn && syncState === 'error' ? (
+                                  ) : isSignedIn && isCloudProject && syncState === 'error' ? (
                                     <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={16} /></button>
-                                  ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                                  ) : isSignedIn && !isCloudProject ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存"><IconCloudUpload size={16} /></button>
-                                  ) : isSignedIn && syncState === 'synced' ? (
+                                  ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
                                     <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={16} /></button>
                                   ) : null}
                               </div>
@@ -372,13 +372,13 @@ function App() {
                           </h1>
                           {renderProjectMenu()}
                           
-                          {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
+                          {isSignedIn && isCloudProject && (syncState === 'waiting' || syncState === 'syncing') ? (
                             <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={18} /></div>
-                          ) : isSignedIn && syncState === 'error' ? (
+                          ) : isSignedIn && isCloudProject && syncState === 'error' ? (
                             <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={18} /></button>
-                          ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                          ) : isSignedIn && !isCloudProject ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存"><IconCloudUpload size={16} /> 保存</button>
-                          ) : isSignedIn && syncState === 'synced' ? (
+                          ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
                             <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={18} /></button>
                           ) : null}
 

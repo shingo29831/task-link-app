@@ -1,3 +1,6 @@
+// 役割: アプリケーション全体で利用する共通の型定義
+// なぜ: 各コンポーネント間でデータの整合性を保つため
+
 export interface Task {
   id: string;
   name: string;
@@ -8,6 +11,8 @@ export interface Task {
   order?: number;
   isDeleted?: boolean;
   
+  isExpanded?: boolean;
+
   hasChildren?: boolean;
   sourceProjectName?: string;
   sourceProjectId?: string;
@@ -16,7 +21,7 @@ export interface Task {
 export type UserRole = 'viewer' | 'editor' | 'admin' | 'owner';
 
 export interface ProjectMember {
-  id: string; // userId
+  id: string;
   username: string;
   role: UserRole;
 }
@@ -31,5 +36,5 @@ export interface AppData {
   publicRole?: UserRole;
   members?: ProjectMember[];
   isCloudSync?: boolean; 
-  role?: UserRole | string; // 現在のユーザーのこのプロジェクトに対する権限
+  role?: UserRole | string;
 }
