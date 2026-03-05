@@ -28,41 +28,15 @@ import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput } from './components/Icons';
+import { 
+  IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput, 
+  IconHelp, IconCloudUpload, IconLoader, IconCheckCircle, IconError 
+} from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
-
-const IconHelp = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-  </svg>
-);
-
-const IconCloudUpload = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.5 19C19.985 19 22 16.985 22 14.5C22 12.164 20.228 10.235 17.957 10.024C17.447 6.6 14.526 4 11 4C7.134 4 4 7.134 4 11C4 11.233 4.011 11.462 4.032 11.687C1.782 12.083 0 14.075 0 16.5C0 19.538 2.462 22 5.5 22H17.5Z"/>
-    <path d="M12 17V10"/>
-    <path d="M9 13L12 10L15 13"/>
-  </svg>
-);
-
-const IconLoader = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
 
 const getCharWidth = (str: string) => {
   let width = 0;
@@ -216,7 +190,8 @@ const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve:
   );
 };
 
-function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => void) {
+// モバイル時もパン操作を有効にするため isMobile の判定を削除
+function usePanning(isDragging: boolean, onBoardClick: () => void) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
@@ -224,14 +199,14 @@ function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => 
   const hasMovedRef = useRef(false);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (isMobile || isDragging || e.button !== 0) return; 
+    if (isDragging || e.button !== 0) return; 
     if ((e.target as Element).closest('[data-task-id]')) return; 
     setIsPanning(true); 
     hasMovedRef.current = false; 
     setStartPos({ x: e.clientX, y: e.clientY }); 
     if (scrollRef.current) setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop }); 
     (e.target as Element).setPointerCapture(e.pointerId); 
-  }, [isMobile, isDragging]);
+  }, [isDragging]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
     if (!isPanning || !scrollRef.current) return; 
@@ -267,7 +242,7 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
   const pointerRef = useRef({ x: 0, y: 0 });
   useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
   
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, isDragging, onBoardClick);
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isDragging, onBoardClick);
   const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef, scrollRef]);
 
   useEffect(() => {
@@ -294,7 +269,7 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
       </div>
       {isMobile && !isDragging && (
@@ -316,11 +291,11 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
 };
 
 const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, false, onBoardClick);
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
       </div>
       {isMobile && (
@@ -360,7 +335,7 @@ function App() {
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
   } = useTaskOperations();
 
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
@@ -492,11 +467,23 @@ function App() {
   const renderProgressBar = () => {
     const { p0, p1, p2, p3 } = overallProgressData;
     return (
-      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
-        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
+          {p2 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
+          {p1 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
+        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
       </div>
     );
   };
@@ -707,8 +694,9 @@ function App() {
           isAdmin={isAdmin}
           currentUserRole={currentUserRole}
           isCloudProject={isCloudProject}
+          syncState={syncState}
           onClose={() => setShowSettingsModal(false)} 
-          onSaveName={(newName) => { handleUpdateProjectName(newName); setShowSettingsModal(false); }} 
+          onSaveName={(newName) => { handleUpdateProjectName(newName); }} 
           onToggleSync={handleToggleSync}
           onTogglePublic={handleTogglePublic}
           onInviteUser={handleInviteUser}
@@ -732,14 +720,22 @@ function App() {
                                   </span>
                                   {renderProjectMenu()}
                                   
-                                  {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                                  {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
+                                      <IconLoader size={16} />
+                                    </div>
+                                  ) : isSignedIn && syncState === 'error' ? (
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行">
+                                      <IconError size={16} />
+                                    </button>
+                                  ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存">
                                       <IconCloudUpload size={16} />
                                     </button>
-                                  ) : isSignedIn ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
-                                      {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={16} /> : <IconCheckCircle size={16} />}
-                                    </div>
+                                  ) : isSignedIn && syncState === 'synced' ? (
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
+                                      <IconCheckCircle size={16} />
+                                    </button>
                                   ) : null}
                               </div>
                           </div>
@@ -771,14 +767,22 @@ function App() {
                           </h1>
                           {renderProjectMenu()}
                           
-                          {isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
+                          {isSignedIn && (syncState === 'waiting' || syncState === 'syncing') ? (
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中">
+                              <IconLoader size={18} />
+                            </div>
+                          ) : isSignedIn && syncState === 'error' ? (
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行">
+                              <IconError size={18} />
+                            </button>
+                          ) : isSignedIn && (String(data.id).startsWith('local_') || data.isCloudSync === false) ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存">
                               <IconCloudUpload size={16} /> 保存
                             </button>
-                          ) : isSignedIn ? (
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: (syncState === 'synced' || syncState === 'idle') ? 'var(--color-primary)' : 'var(--text-secondary)' }} title={syncState === 'waiting' || syncState === 'syncing' ? '同期待機中...' : 'クラウド同期済み'}>
-                              {(syncState === 'waiting' || syncState === 'syncing') ? <IconLoader size={18} /> : <IconCheckCircle size={18} />}
-                            </div>
+                          ) : isSignedIn && syncState === 'synced' ? (
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期">
+                              <IconCheckCircle size={18} />
+                            </button>
                           ) : null}
 
                           <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '150px' }}>
