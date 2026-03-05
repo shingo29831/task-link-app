@@ -189,5 +189,22 @@ export const useTaskMutations = (
     }
   }, [data, save]);
 
-  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder };
+  // 開閉状態のトグル（JSONデータに直接書き込む）
+  const toggleTaskExpand = useCallback((taskId: string) => {
+    if (!data) return;
+    const newTasks = (data.tasks || []).map((t: Task) => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          // undefined (デフォルト展開) または true なら false にする
+          isExpanded: t.isExpanded === false ? true : false,
+          lastUpdated: Date.now()
+        };
+      }
+      return t;
+    });
+    save(newTasks);
+  }, [data, save]);
+
+  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand };
 };
