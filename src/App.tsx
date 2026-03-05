@@ -16,7 +16,7 @@ import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
 import { TaskCalendar } from './components/TaskCalendar';
-import type { Task, AppData } from './types';
+import type { Task } from './types';
 import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
@@ -29,7 +29,6 @@ import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
 
-// 切り出したコンポーネントのインポート
 import { FormattedProjectName } from './components/FormattedProjectName';
 import { SyncLimitModal } from './components/SyncLimitModal';
 import { InteractiveBoardArea, StaticBoardArea } from './components/BoardArea';
@@ -48,7 +47,7 @@ function App() {
     collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
+    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
@@ -63,6 +62,7 @@ function App() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIOModal, setShowIOModal] = useState(false);
+  const [showCopyLinkModal, setShowCopyLinkModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   
@@ -76,7 +76,6 @@ function App() {
   const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
   
   const currentUserRole = sharedProjectState?.role || data?.role || 'owner';
-  
   const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
   const isViewer = isCloudProject ? !hasEditPermission : false;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
@@ -117,41 +116,25 @@ function App() {
   const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
   const handleDragCancel = () => { setActiveDragId(null); };
 
-  const moveTaskOrder = (taskId: string, direction: 'up' | 'down') => {
-    if (!data || !data.tasks) return;
-    const taskIndex = data.tasks.findIndex((t: Task) => t.id === taskId);
-    if (taskIndex === -1) return;
-    
-    const taskToMove = data.tasks[taskIndex];
-    const siblings = data.tasks
-      .filter((t: Task) => t.parentId === taskToMove.parentId && !t.isDeleted)
-      .sort((a: Task, b: Task) => (a.order ?? 0) - (b.order ?? 0));
-      
-    const siblingIndex = siblings.findIndex((t: Task) => t.id === taskId);
-    if (direction === 'up' && siblingIndex > 0) {
-      const target = siblings[siblingIndex - 1];
-      const newTasks = [...data.tasks];
-      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
-      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
-      const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
-      setData({ ...data, tasks: newTasks });
-    } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
-      const target = siblings[siblingIndex + 1];
-      const newTasks = [...data.tasks];
-      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
-      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
-      const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
-      setData({ ...data, tasks: newTasks });
-    }
-  };
-
   const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
-  const overallProgressData = useMemo(() => {
+  const renderProgressBar = () => {
+    const { p0, p1, p2, p3 } = projectProgressData;
+    return (
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
+          {p2 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" /></svg>}
+        </div>
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
+          {p1 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" /></svg>}
+        </div>
+        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
+        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
+      </div>
+    );
+  };
+
+  const projectProgressData = useMemo(() => {
     if (!data?.tasks || data.tasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
     const leafTasks = data.tasks.filter((t: Task) => !t.isDeleted && !data.tasks.some((child: Task) => child.parentId === t.id && !child.isDeleted));
     if (leafTasks.length === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
@@ -168,22 +151,6 @@ function App() {
       p3: (counts[3] / total) * 100  // 休止
     };
   }, [data?.tasks]);
-
-  const renderProgressBar = () => {
-    const { p0, p1, p2, p3 } = overallProgressData;
-    return (
-      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
-        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
-          {p2 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" /></svg>}
-        </div>
-        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
-          {p1 > 0 && <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}><path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" /></svg>}
-        </div>
-        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
-        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
-      </div>
-    );
-  };
 
   if (syncLimitState) {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
@@ -230,7 +197,7 @@ function App() {
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {projects.map((p: AppData) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
+                    {projects.map((p: any) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
             </div>
@@ -255,7 +222,7 @@ function App() {
   const rightControls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <ProjectControls 
-        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
+        onCopyLink={() => setShowCopyLinkModal(true)} 
         onExport={() => { 
           const exportData = { ...data };
           delete exportData.isCloudSync; delete exportData.isPublic; delete exportData.publicRole; delete exportData.role;
@@ -289,6 +256,49 @@ function App() {
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
+      {showCopyLinkModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowCopyLinkModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '500px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>リンクをコピー</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {isCloudProject ? (
+                <>
+                  <div>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>1. クラウドの最新データへのリンク（推奨）</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>アクセス時に常にクラウド上の最新データを読み込みます。データ変更があってもURLは変わりません。</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input type="text" readOnly value={getShareUrl(false)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                      <button onClick={() => { navigator.clipboard.writeText(getShareUrl(false)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
+                    </div>
+                  </div>
+                  <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)' }} />
+                  <div>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>2. 現在の編集状態（データ付き）のリンク</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>未保存の変更も含めて共有できます。データ変更ごとにURLが変わります。</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input type="text" readOnly value={getShareUrl(true)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                      <button onClick={() => { navigator.clipboard.writeText(getShareUrl(true)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>現在のデータ付きリンク</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>ローカルプロジェクトのため、URLに全データが含まれます。データ変更ごとにURLが変わります。</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" readOnly value={getShareUrl(true)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                    <button onClick={() => { navigator.clipboard.writeText(getShareUrl(true)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button onClick={() => setShowCopyLinkModal(false)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {importCloudCheck?.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>

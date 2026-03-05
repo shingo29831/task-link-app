@@ -48,7 +48,7 @@ export const useTaskOperations = () => {
   const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar);
 
   // 3. タスクの更新処理 (useTaskMutations)
-  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask } = useTaskMutations(
+  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder } = useTaskMutations(
     data, setData, projectsRef, activeId, updateProject, activeTasks, menuOpenTaskId, setMenuOpenTaskId
   );
 
@@ -114,7 +114,7 @@ export const useTaskOperations = () => {
     showDebug, setShowDebug, showSidebar, setShowSidebar, showProjectMenu, setShowProjectMenu, showSettingsModal, setShowSettingsModal, showAllProjectsInCalendar, setShowAllProjectsInCalendar, collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId, setActiveParentId,
     menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus,
+    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
     undo, redo, canUndo, canRedo,

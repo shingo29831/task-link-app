@@ -16,12 +16,14 @@ export const useAppData = () => {
 
   // 1. ローカル状態の管理
   const projectState = useProjectState();
-  // ★ incomingData を削除
   const { projects, setProjects, resetProjects, projectsRef, activeId, setActiveId, activeData, setIncomingData } = projectState;
 
   const lastSyncedHashMap = useRef<Record<string, number>>({});
   const isLoaded = useRef(false);
   const initialUrlGuardRef = useRef(true);
+  
+  // URL に ?d= パラメータを省略する（クリーンURL）モードかどうかを保持
+  const omitDataParamRef = useRef(!new URLSearchParams(window.location.search).has('d'));
 
   // 2. クラウド同期ロジックの統合
   const cloudSync = useCloudSync(activeData, activeId, projectsRef, setProjects, setActiveId, lastSyncedHashMap);
@@ -107,10 +109,16 @@ export const useAppData = () => {
         }
       }
 
-      const compressed = compressData(activeData);
       const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
-      window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
+      
+      // ?d=なしでアクセスした場合、クラウドプロジェクト表示中はdパラメータを付与しない
+      if (!isLocal && omitDataParamRef.current) {
+        window.history.replaceState(null, '', `${window.location.origin}${basePath}`);
+      } else {
+        const compressed = compressData(activeData);
+        window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
+      }
     }
   }, [activeData]);
 
@@ -130,11 +138,17 @@ export const useAppData = () => {
     if (id === activeId) setActiveId(newProjects[0].id);
   }, [projectsRef, getToken, setProjects, activeId, setActiveId]);
 
-  const getShareUrl = useCallback(() => {
+  // 引数 withData で URL の出力形式を分ける
+  const getShareUrl = useCallback((withData: boolean = true) => {
     if (!activeData) return '';
-    const compressed = compressData(activeData);
     const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
     const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
+    
+    if (!withData && !isLocal && activeData.shortId) {
+      return `${window.location.origin}${basePath}`;
+    }
+    
+    const compressed = compressData(activeData);
     return `${window.location.origin}${basePath}?d=${compressed}`;
   }, [activeData]);
 

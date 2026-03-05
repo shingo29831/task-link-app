@@ -157,5 +157,37 @@ export const useTaskMutations = (
     save([...(data.tasks || []), newTask]);
   }, [data, activeTasks, save]);
 
-  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper };
+  const moveTaskOrder = useCallback((taskId: string, direction: 'up' | 'down') => {
+    if (!data || !data.tasks) return;
+    const taskIndex = data.tasks.findIndex((t: Task) => t.id === taskId);
+    if (taskIndex === -1) return;
+    
+    const taskToMove = data.tasks[taskIndex];
+    const siblings = data.tasks
+      .filter((t: Task) => t.parentId === taskToMove.parentId && !t.isDeleted)
+      .sort((a: Task, b: Task) => (a.order ?? 0) - (b.order ?? 0));
+      
+    const siblingIndex = siblings.findIndex((t: Task) => t.id === taskId);
+    if (direction === 'up' && siblingIndex > 0) {
+      const target = siblings[siblingIndex - 1];
+      const newTasks = [...data.tasks];
+      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
+      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
+      const temp = newTasks[tIndex].order;
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      save(newTasks);
+    } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
+      const target = siblings[siblingIndex + 1];
+      const newTasks = [...data.tasks];
+      const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
+      const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
+      const temp = newTasks[tIndex].order;
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      save(newTasks);
+    }
+  }, [data, save]);
+
+  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder };
 };
