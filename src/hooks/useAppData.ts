@@ -1,5 +1,5 @@
 // 役割: アプリケーションの全体的なデータ状態（プロジェクト、タスク履歴、クラウド同期状態など）を管理するカスタムフック
-import { useState, useEffect, useCallback, useRef} from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { AppData, Task } from '../types';
 import { compressData, decompressData } from '../utils/compression';
@@ -94,8 +94,6 @@ export const useAppData = () => {
   const [currentLimit, setCurrentLimit] = useState<number>(3);
   const [currentPlan, setCurrentPlan] = useState<'free' | 'premium'>('free');
   const [syncLimitState, setSyncLimitState] = useState<{ isOverLimit: boolean, limit: number, cloudProjects: any[] } | null>(null);
-  
-  // 状態に error を追加
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced' | 'error'>('idle');
 
   // 非同期で計算された現在のハッシュ値を保持
@@ -225,79 +223,77 @@ export const useAppData = () => {
 
         // クラウドデータを取得
         const res = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) {
-          const resData = await res.json();
-          const { projects: dbProjects, limit, plan } = resData;
-          setCurrentLimit(limit);
-          setCurrentPlan(plan || (limit > 3 ? 'premium' : 'free'));
+        if (!res.ok) throw new Error("Failed to fetch cloud projects");
 
-          if (dbProjects.length > limit) {
-              setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
-              setSyncState('error'); // エラー扱いに
-              initialCloudFetchDone.current = true;
-              return;
-          }
+        const resData = await res.json();
+        const { projects: dbProjects, limit, plan } = resData;
+        setCurrentLimit(limit);
+        setCurrentPlan(plan || (limit > 3 ? 'premium' : 'free'));
 
-          // クラウドデータをローカルデータにマージ
-          const updatedProjects: AppData[] = [];
-          setProjects(prev => {
-              const next = [...prev];
-              dbProjects.forEach((cp: any) => {
-                  const exIdx = next.findIndex(p => p.id === cp.id);
-                  let mergedProject: AppData;
-                  if (exIdx === -1) {
-                      mergedProject = {
-                          id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
-                          tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
-                          lastSynced: cp.data?.lastSynced || Date.now(),
-                          isCloudSync: true, role: cp.role || 'owner',
-                          isPublic: cp.isPublic, members: cp.members || []
-                      };
-                      next.push(mergedProject);
-                  } else {
-                      const localP = next[exIdx];
-                      const tMap = new Map<string, Task>();
-                      (cp.data?.tasks || cp.tasks || []).forEach((t: Task) => tMap.set(t.id, t));
-                      localP.tasks.forEach((lt: Task) => {
-                          const ct = tMap.get(lt.id);
-                          if (!ct || lt.lastUpdated > ct.lastUpdated) tMap.set(lt.id, lt);
-                      });
-                      mergedProject = {
-                          ...cp,
-                          projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
-                          tasks: recalculateStatus(Array.from(tMap.values())),
-                          isCloudSync: true, role: cp.role || 'owner',
-                          isPublic: cp.isPublic ?? localP.isPublic, 
-                          members: cp.members ?? localP.members
-                      };
-                      next[exIdx] = mergedProject;
-                  }
-                  updatedProjects.push(mergedProject);
-              });
-              return next;
-          });
-
-          // ハッシュ計算
-          for (const p of updatedProjects) {
-              lastSyncedHashMap.current[p.id] = await calculateHashAsync(p);
-          }
-          
-          setActiveId(prevId => {
-              if (dbProjects.length > 0) {
-                  const currentProj = projectsRef.current.find(p => p.id === prevId);
-                  // 未編集の初期プロジェクトならクラウドのものに切り替える
-                  if (!currentProj || (String(prevId).startsWith('local_') && (currentProj.tasks.length === 0 || currentProj.projectName === 'マイプロジェクト'))) {
-                      return dbProjects[0].id;
-                  }
-              }
-              return prevId;
-          });
-
-          setSyncState('synced');
-          initialCloudFetchDone.current = true;
-        } else {
-          setSyncState('error');
+        if (dbProjects.length > limit) {
+            setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
+            setSyncState('error'); // エラー扱いに
+            initialCloudFetchDone.current = true;
+            return;
         }
+
+        // クラウドデータをローカルデータにマージ
+        const updatedProjects: AppData[] = [];
+        setProjects(prev => {
+            const next = [...prev];
+            dbProjects.forEach((cp: any) => {
+                const exIdx = next.findIndex(p => p.id === cp.id);
+                let mergedProject: AppData;
+                if (exIdx === -1) {
+                    mergedProject = {
+                        id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
+                        tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
+                        lastSynced: cp.data?.lastSynced || Date.now(),
+                        isCloudSync: true, role: cp.role || 'owner',
+                        isPublic: cp.isPublic, members: cp.members || []
+                    };
+                    next.push(mergedProject);
+                } else {
+                    const localP = next[exIdx];
+                    const tMap = new Map<string, Task>();
+                    (cp.data?.tasks || cp.tasks || []).forEach((t: Task) => tMap.set(t.id, t));
+                    localP.tasks.forEach((lt: Task) => {
+                        const ct = tMap.get(lt.id);
+                        if (!ct || lt.lastUpdated > ct.lastUpdated) tMap.set(lt.id, lt);
+                    });
+                    mergedProject = {
+                        ...cp,
+                        projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
+                        tasks: recalculateStatus(Array.from(tMap.values())),
+                        isCloudSync: true, role: cp.role || 'owner',
+                        isPublic: cp.isPublic ?? localP.isPublic, 
+                        members: cp.members ?? localP.members
+                    };
+                    next[exIdx] = mergedProject;
+                }
+                updatedProjects.push(mergedProject);
+            });
+            return next;
+        });
+
+        // ハッシュ計算
+        for (const p of updatedProjects) {
+            lastSyncedHashMap.current[p.id] = await calculateHashAsync(p);
+        }
+        
+        setActiveId(prevId => {
+            if (dbProjects.length > 0) {
+                const currentProj = projectsRef.current.find(p => p.id === prevId);
+                // 未編集の初期プロジェクトならクラウドのものに切り替える
+                if (!currentProj || (String(prevId).startsWith('local_') && (currentProj.tasks.length === 0 || currentProj.projectName === 'マイプロジェクト'))) {
+                    return dbProjects[0].id;
+                }
+            }
+            return prevId;
+        });
+
+        setSyncState('synced');
+        initialCloudFetchDone.current = true;
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
         console.error('クラウドからのデータ読み込みに失敗しました', e);
@@ -346,73 +342,69 @@ export const useAppData = () => {
           // 2. クラウドデータを取得
           let cloudProject = null;
           let fetchedRole = targetProject.role;
-          let isPublic = targetProject.isPublic;
 
           const res = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.ok) {
-              const resData = await res.json();
-              const { projects: dbProjects, limit, plan } = resData;
-              setCurrentLimit(limit);
-              setCurrentPlan(plan || (limit > 3 ? 'premium' : 'free'));
+          if (!res.ok) throw new Error("Failed to fetch cloud projects");
 
-              if (dbProjects.length > limit) {
-                  setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
-                  setSyncState('error');
-                  return;
-              }
+          const resData = await res.json();
+          const { projects: dbProjects, limit, plan } = resData;
+          setCurrentLimit(limit);
+          setCurrentPlan(plan || (limit > 3 ? 'premium' : 'free'));
 
-              const found = dbProjects.find((p: any) => p.id === projectId);
-              if (found) {
-                  cloudProject = found;
-                  fetchedRole = found.role || 'owner';
-                  isPublic = found.isPublic;
-              }
-
-              setProjects(prev => {
-                  const next = [...prev];
-                  dbProjects.forEach((cp: any) => {
-                      if (cp.id !== projectId) {
-                          const exIdx = next.findIndex(p => p.id === cp.id);
-                          if (exIdx === -1) {
-                              next.push({
-                                  id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
-                                  tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
-                                  lastSynced: cp.data?.lastSynced || Date.now(),
-                                  isCloudSync: true, role: cp.role || 'owner'
-                              });
-                          } else {
-                              const localP = next[exIdx];
-                              const tMap = new Map<string, Task>();
-                              (cp.data?.tasks || cp.tasks || []).forEach((t: Task) => tMap.set(t.id, t));
-                              localP.tasks.forEach((lt: Task) => {
-                                  const ct = tMap.get(lt.id);
-                                  if (!ct || lt.lastUpdated > ct.lastUpdated) tMap.set(lt.id, lt);
-                              });
-                              next[exIdx] = {
-                                  ...cp,
-                                  projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
-                                  tasks: recalculateStatus(Array.from(tMap.values())),
-                                  isCloudSync: true, role: cp.role || 'owner'
-                              };
-                          }
-                      }
-                  });
-                  return next;
-              });
+          if (dbProjects.length > limit) {
+              setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
+              setSyncState('error');
+              return;
           }
+
+          const found = dbProjects.find((p: any) => p.id === projectId);
+          if (found) {
+              cloudProject = found;
+              fetchedRole = found.role || 'owner';
+          }
+
+          setProjects(prev => {
+              const next = [...prev];
+              dbProjects.forEach((cp: any) => {
+                  if (cp.id !== projectId) {
+                      const exIdx = next.findIndex(p => p.id === cp.id);
+                      if (exIdx === -1) {
+                          next.push({
+                              id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
+                              tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
+                              lastSynced: cp.data?.lastSynced || Date.now(),
+                              isCloudSync: true, role: cp.role || 'owner'
+                          });
+                      } else {
+                          const localP = next[exIdx];
+                          const tMap = new Map<string, Task>();
+                          (cp.data?.tasks || cp.tasks || []).forEach((t: Task) => tMap.set(t.id, t));
+                          localP.tasks.forEach((lt: Task) => {
+                              const ct = tMap.get(lt.id);
+                              if (!ct || lt.lastUpdated > ct.lastUpdated) tMap.set(lt.id, lt);
+                          });
+                          next[exIdx] = {
+                              ...cp,
+                              projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
+                              tasks: recalculateStatus(Array.from(tMap.values())),
+                              isCloudSync: true, role: cp.role || 'owner'
+                          };
+                      }
+                  }
+              });
+              return next;
+          });
 
           if (abortSignal.aborted) return;
 
           if (targetProject.shortId && !cloudProject) {
               const sharedRes = await fetch(`/api/projects/shared/${targetProject.shortId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-              if (sharedRes.ok) {
-                  const sharedResult = await sharedRes.json();
-                  if (sharedResult.success && sharedResult.project) {
-                      cloudProject = sharedResult.project;
-                      fetchedRole = sharedResult.role;
-                  } else {
-                      fetchedRole = 'none' as any;
-                  }
+              if (!sharedRes.ok) throw new Error("Failed to fetch shared project");
+              
+              const sharedResult = await sharedRes.json();
+              if (sharedResult.success && sharedResult.project) {
+                  cloudProject = sharedResult.project;
+                  fetchedRole = sharedResult.role;
               } else {
                   fetchedRole = 'none' as any;
               }
@@ -522,7 +514,7 @@ export const useAppData = () => {
                   setSyncState('error');
                   alert('権限が変更されたため、変更を保存できません。');
               } else {
-                  setSyncState('error');
+                  throw new Error("Failed to upload data");
               }
           } else {
               // 差分がないのでアップロードをスキップ
@@ -549,6 +541,8 @@ export const useAppData = () => {
   const activeProjectId = activeData?.id || '';
   const isCloudProject = activeData?.isCloudSync !== false && activeData?.role !== 'viewer';
 
+  const previousHashRef = useRef<number>(currentHash);
+
   // プロジェクト切り替え・タスク変更を全て一元監視するトリガー
   useEffect(() => {
     if (!isSignedIn || !activeProjectId || activeProjectId.startsWith('local_') || !isCloudProject) {
@@ -556,16 +550,25 @@ export const useAppData = () => {
     }
 
     const isProjectChanged = previousActiveIdRef.current !== activeProjectId;
+    const isHashChanged = previousHashRef.current !== currentHash;
+
+    // プロジェクトもハッシュも変わっていないなら何もしない
+    if (!isProjectChanged && !isHashChanged) {
+        return;
+    }
+
+    previousActiveIdRef.current = activeProjectId;
+    previousHashRef.current = currentHash;
     
+    // プロジェクト変更なしでハッシュが以前の同期済みと同じに戻った場合、待機をキャンセルしてsyncedに戻す
     if (!isProjectChanged && lastSyncedHashMap.current[activeProjectId] === currentHash) {
       if (syncAbortControllerRef.current) {
           syncAbortControllerRef.current.abort();
       }
-      setSyncState('synced');
+      // エラー状態の場合は上書きしないようにする
+      setSyncState(prev => (prev === 'waiting' || prev === 'syncing') ? 'synced' : prev);
       return;
     }
-
-    previousActiveIdRef.current = activeProjectId;
 
     if (syncAbortControllerRef.current) {
         syncAbortControllerRef.current.abort();
@@ -573,6 +576,7 @@ export const useAppData = () => {
     const abortController = new AbortController();
     syncAbortControllerRef.current = abortController;
 
+    // isProjectChangedがtrueなら強制フェッチ(forceFetch = true)
     triggerSyncFlow(activeProjectId, isProjectChanged, abortController.signal);
 
     return () => { abortController.abort(); };
@@ -685,7 +689,6 @@ export const useAppData = () => {
 
   const setActiveData = (newData: AppData) => { setProjects(prev => prev.map(p => p.id === newData.id ? newData : p)); };
   const updateProject = useCallback((updatedProject: AppData) => { setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p)); }, [setProjects]);
-  const replaceProject = useCallback((oldId: string, newData: AppData) => { setProjects(prev => prev.map(p => p.id === oldId ? newData : p)); }, [setProjects]);
 
   const addProject = () => {
     const newProject = createDefaultProject();
@@ -736,7 +739,7 @@ export const useAppData = () => {
   };
 
   return { 
-    data: activeData, setData: setActiveData, updateProject, replaceProject, incomingData, setIncomingData, getShareUrl,
+    data: activeData, setData: setActiveData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit,
