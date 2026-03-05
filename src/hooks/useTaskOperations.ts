@@ -19,7 +19,7 @@ export const useTaskOperations = () => {
   const { getToken } = useAuth();
   
   const { 
-    data, setData, updateProject, replaceProject, incomingData, setIncomingData, getShareUrl,
+    data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     addOrUpdateProject, forceSync
@@ -43,6 +43,11 @@ export const useTaskOperations = () => {
       incoming: any;
       projectData: any;
   } | null>(null);
+
+  const [retryFetchTrigger, setRetryFetchTrigger] = useState(0);
+  const fetchMembersRef = useRef<string | null>(null);
+  // 【修正】NodeJS.Timeout を ReturnType<typeof setTimeout> に変更
+  const fetchMembersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
@@ -172,6 +177,9 @@ export const useTaskOperations = () => {
 
   useEffect(() => {
     if (showSettingsModal && data && !String(data.id).startsWith('local_') && data.isCloudSync !== false) {
+        if (fetchMembersRef.current === data.id) return;
+        fetchMembersRef.current = data.id;
+
         const fetchMembers = async () => {
             try {
                 const token = await getToken();
@@ -190,12 +198,26 @@ export const useTaskOperations = () => {
                            publicRole: resData.publicRole 
                         });
                     }
+                } else {
+                    throw new Error('Failed to fetch members');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error("メンバー情報の取得に失敗しました:", e); 
+                fetchMembersTimeoutRef.current = setTimeout(() => {
+                    fetchMembersRef.current = null;
+                    setRetryFetchTrigger(prev => prev + 1);
+                }, 10000);
+            }
         };
         fetchMembers();
+    } else if (!showSettingsModal) {
+        fetchMembersRef.current = null;
+        if (fetchMembersTimeoutRef.current) {
+            clearTimeout(fetchMembersTimeoutRef.current);
+            fetchMembersTimeoutRef.current = null;
+        }
     }
-  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken, setData]);
+  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken, setData, retryFetchTrigger]);
 
   const save = useCallback((newTasks: Task[]) => {
     if (!data) return;
