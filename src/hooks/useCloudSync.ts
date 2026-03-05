@@ -21,6 +21,9 @@ export const useCloudSync = (
   const [syncLimitState, setSyncLimitState] = useState<{ isOverLimit: boolean, limit: number, cloudProjects: any[] } | null>(null);
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced' | 'error'>('idle');
   const [currentHashInfo, setCurrentHashInfo] = useState<{ id: string, hash: number }>({ id: '', hash: 0 });
+  
+  // 追加: クラウドの初回取得が完了したことをトリガーにするためのState
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
 
   const syncAbortControllerRef = useRef<AbortController | null>(null);
   const initialCloudFetchDone = useRef(false);
@@ -46,15 +49,13 @@ export const useCloudSync = (
     const abortController = new AbortController();
 
     const loadFromCloud = async () => {
-      setSyncState('waiting');
+      // ローカルプロジェクト（またはクラウド非対応）の場合は表示上待ち状態（スピナー）を出さないようにする
+      const isInitialLocal = activeId && (activeId.startsWith('local_') || activeData?.isCloudSync === false);
+      if (!isInitialLocal) {
+        setSyncState('syncing'); // 待機せず即座に取得開始するため syncing を設定
+      }
+      
       try {
-        await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(resolve, getWaitTime());
-            abortController.signal.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); });
-        });
-        if (abortController.signal.aborted) return;
-
-        setSyncState('syncing');
         const token = await getToken();
         if (!token) throw new Error("No token");
 
@@ -68,8 +69,9 @@ export const useCloudSync = (
 
         if (dbProjects.length > limit) {
             setSyncLimitState({ isOverLimit: true, limit, cloudProjects: dbProjects });
-            setSyncState('error');
+            if (!isInitialLocal) setSyncState('error');
             initialCloudFetchDone.current = true;
+            setIsCloudLoaded(true);
             return;
         }
 
@@ -130,18 +132,31 @@ export const useCloudSync = (
             }
             return prevId;
         });
-        setSyncState('synced');
+        
+        if (!isInitialLocal) {
+          setSyncState('synced');
+        } else {
+          setSyncState('idle'); // ローカルの時はidleに戻す
+        }
         initialCloudFetchDone.current = true;
+        setIsCloudLoaded(true); // 初回ロード完了を通知
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
         console.error('クラウドからのデータ読み込みに失敗しました', e);
-        setSyncState('error');
+        const isInitialLocalError = activeId && (activeId.startsWith('local_') || activeData?.isCloudSync === false);
+        if (!isInitialLocalError) {
+          setSyncState('error');
+        } else {
+          setSyncState('idle');
+        }
+        initialCloudFetchDone.current = true;
+        setIsCloudLoaded(true);
       }
     };
 
     loadFromCloud();
     return () => { abortController.abort(); };
-  }, [isSignedIn, getToken, getWaitTime, setProjects, projectsRef, setActiveId, lastSyncedHashMap]);
+  }, [isSignedIn, getToken, setProjects, projectsRef, setActiveId, lastSyncedHashMap]);
 
   const triggerSyncFlow = useCallback(async (projectId: string, forceFetch: boolean, abortSignal: AbortSignal) => {
       setSyncState('waiting');
@@ -302,8 +317,21 @@ export const useCloudSync = (
 
   // タスク変更の監視トリガー（自動同期・プロジェクト切り替え）
   useEffect(() => {
-    // 初回クラウド取得が未完了の場合は何もしない
-    if (!isSignedIn || !activeProjectId || activeProjectId.startsWith('local_') || !isCloudProject || !initialCloudFetchDone.current) return;
+    // 初回クラウド取得が未完了（isCloudLoadedがfalse）の場合は何もしない
+    if (!isSignedIn || !activeProjectId || !isCloudLoaded) return;
+
+    // ローカルプロジェクト（クラウド非対応）の場合は即座に同期状態を解除し処理を終了する
+    if (activeProjectId.startsWith('local_') || !isCloudProject) {
+      if (syncAbortControllerRef.current) syncAbortControllerRef.current.abort();
+      setSyncState('idle');
+      
+      // 履歴を残すことで、次回クラウドプロジェクトに切り替えた際に「初回実行」と誤認されるのを防ぐ
+      previousActiveIdRef.current = activeProjectId;
+      if (currentHashInfo.id === activeProjectId) {
+          previousHashRef.current = currentHashInfo.hash;
+      }
+      return;
+    }
 
     if (currentHashInfo.id !== activeProjectId) return;
 
@@ -318,7 +346,10 @@ export const useCloudSync = (
     previousHashRef.current = currentHashInfo.hash;
     
     // 初回クラウド取得が完了してIDがセットされた直後は、同期トリガーをスキップ
-    if (isFirstRun) return;
+    if (isFirstRun) {
+      setSyncState('synced');
+      return;
+    }
 
     // プロジェクト切り替え時（isProjectChanged = true）以外は、
     // ハッシュが一致していれば事前に即時キャンセル（待機状態やスピナーに入らない）
@@ -335,7 +366,7 @@ export const useCloudSync = (
     triggerSyncFlow(activeProjectId, isProjectChanged, abortController.signal);
     
     return () => { abortController.abort(); };
-  }, [activeProjectId, currentHashInfo, isSignedIn, isCloudProject, triggerSyncFlow, lastSyncedHashMap]);
+  }, [activeProjectId, currentHashInfo, isSignedIn, isCloudProject, isCloudLoaded, triggerSyncFlow, lastSyncedHashMap]);
 
   const resolveSyncLimit = async (selectedCloudIds: string[]) => {
     if (!syncLimitState) return;
