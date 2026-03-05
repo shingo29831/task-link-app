@@ -20,20 +20,23 @@ export const useCloudSync = (
   const [currentPlan, setCurrentPlan] = useState<'free' | 'premium'>('free');
   const [syncLimitState, setSyncLimitState] = useState<{ isOverLimit: boolean, limit: number, cloudProjects: any[] } | null>(null);
   const [syncState, setSyncState] = useState<'idle' | 'waiting' | 'syncing' | 'synced' | 'error'>('idle');
-  const [currentHash, setCurrentHash] = useState<number>(0);
+  const [currentHashInfo, setCurrentHashInfo] = useState<{ id: string, hash: number }>({ id: '', hash: 0 });
 
   const syncAbortControllerRef = useRef<AbortController | null>(null);
   const initialCloudFetchDone = useRef(false);
   const previousActiveIdRef = useRef<string>('');
-  
-  // previousHashRef の宣言をここに統合（再宣言エラーの修正）
   const previousHashRef = useRef<number>(0);
 
   const getWaitTime = useCallback(() => currentPlan === 'premium' ? 10000 : 15000, [currentPlan]);
 
   useEffect(() => {
     let isMounted = true;
-    if (activeData) { calculateHashAsync(activeData).then(hash => { if (isMounted) setCurrentHash(hash); }); }
+    if (activeData) { 
+      const id = activeData.id;
+      calculateHashAsync(activeData).then(hash => { 
+        if (isMounted) setCurrentHashInfo({ id, hash }); 
+      }); 
+    }
     return () => { isMounted = false; };
   }, [activeData]);
 
@@ -70,7 +73,6 @@ export const useCloudSync = (
             return;
         }
 
-        // ?d= なしでアクセスされたプロジェクトは完全上書き（強制同期）する
         const pathParts = window.location.pathname.split('/').filter(Boolean);
         const params = new URLSearchParams(window.location.search);
         const isCleanUrlAccess = pathParts.length === 1 && !params.has('d');
@@ -85,7 +87,6 @@ export const useCloudSync = (
                 
                 const isTargetCleanProject = isCleanUrlAccess && cp.shortId === targetShortId;
 
-                // 存在しないか、CleanURLモードでの対象プロジェクトであれば強制上書き
                 if (exIdx === -1 || isTargetCleanProject) {
                     mergedProject = {
                         id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
@@ -299,19 +300,29 @@ export const useCloudSync = (
   const activeProjectId = activeData?.id || '';
   const isCloudProject = activeData?.isCloudSync !== false && activeData?.role !== 'viewer';
 
-  // タスク変更の監視トリガー
+  // タスク変更の監視トリガー（自動同期・プロジェクト切り替え）
   useEffect(() => {
-    if (!isSignedIn || !activeProjectId || activeProjectId.startsWith('local_') || !isCloudProject) return;
+    // 初回クラウド取得が未完了の場合は何もしない
+    if (!isSignedIn || !activeProjectId || activeProjectId.startsWith('local_') || !isCloudProject || !initialCloudFetchDone.current) return;
 
+    if (currentHashInfo.id !== activeProjectId) return;
+
+    // 初回実行であるかの判定（初回クラウドロード直後の不要な同期発火を防ぐため）
+    const isFirstRun = previousActiveIdRef.current === '';
     const isProjectChanged = previousActiveIdRef.current !== activeProjectId;
-    const isHashChanged = previousHashRef.current !== currentHash;
+    const isHashChanged = previousHashRef.current !== currentHashInfo.hash;
 
     if (!isProjectChanged && !isHashChanged) return;
 
     previousActiveIdRef.current = activeProjectId;
-    previousHashRef.current = currentHash;
+    previousHashRef.current = currentHashInfo.hash;
     
-    if (!isProjectChanged && lastSyncedHashMap.current[activeProjectId] === currentHash) {
+    // 初回クラウド取得が完了してIDがセットされた直後は、同期トリガーをスキップ
+    if (isFirstRun) return;
+
+    // プロジェクト切り替え時（isProjectChanged = true）以外は、
+    // ハッシュが一致していれば事前に即時キャンセル（待機状態やスピナーに入らない）
+    if (!isProjectChanged && lastSyncedHashMap.current[activeProjectId] === currentHashInfo.hash) {
       if (syncAbortControllerRef.current) syncAbortControllerRef.current.abort();
       setSyncState(prev => (prev === 'waiting' || prev === 'syncing') ? 'synced' : prev);
       return;
@@ -322,8 +333,9 @@ export const useCloudSync = (
     syncAbortControllerRef.current = abortController;
 
     triggerSyncFlow(activeProjectId, isProjectChanged, abortController.signal);
+    
     return () => { abortController.abort(); };
-  }, [activeProjectId, currentHash, isSignedIn, isCloudProject, triggerSyncFlow, lastSyncedHashMap]);
+  }, [activeProjectId, currentHashInfo, isSignedIn, isCloudProject, triggerSyncFlow, lastSyncedHashMap]);
 
   const resolveSyncLimit = async (selectedCloudIds: string[]) => {
     if (!syncLimitState) return;
@@ -376,6 +388,8 @@ export const useCloudSync = (
     if (syncAbortControllerRef.current) syncAbortControllerRef.current.abort();
     const abortController = new AbortController();
     syncAbortControllerRef.current = abortController;
+    
+    // 手動同期時も forceFetch: true として待機時間を経てから確実にクラウドのデータを取得する
     triggerSyncFlow(activeData.id, true, abortController.signal);
   }, [activeData, isSignedIn, triggerSyncFlow]);
 
