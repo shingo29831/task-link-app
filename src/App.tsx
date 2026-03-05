@@ -52,7 +52,7 @@ function App() {
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
-    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
@@ -62,7 +62,6 @@ function App() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIOModal, setShowIOModal] = useState(false);
-  const [showCopyLinkModal, setShowCopyLinkModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   
@@ -222,7 +221,7 @@ function App() {
   const rightControls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <ProjectControls 
-        onCopyLink={() => setShowCopyLinkModal(true)} 
+        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
         onExport={() => { 
           const exportData = { ...data };
           delete exportData.isCloudSync; delete exportData.isPublic; delete exportData.publicRole; delete exportData.role;
@@ -256,49 +255,6 @@ function App() {
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
-      {showCopyLinkModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowCopyLinkModal(false)}>
-          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '500px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>リンクをコピー</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {isCloudProject ? (
-                <>
-                  <div>
-                    <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>1. クラウドの最新データへのリンク（推奨）</p>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>アクセス時に常にクラウド上の最新データを読み込みます。データ変更があってもURLは変わりません。</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="text" readOnly value={getShareUrl(false)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                      <button onClick={() => { navigator.clipboard.writeText(getShareUrl(false)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
-                    </div>
-                  </div>
-                  <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)' }} />
-                  <div>
-                    <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>2. 現在の編集状態（データ付き）のリンク</p>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>未保存の変更も含めて共有できます。データ変更ごとにURLが変わります。</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="text" readOnly value={getShareUrl(true)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                      <button onClick={() => { navigator.clipboard.writeText(getShareUrl(true)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '0.95em', fontWeight: 'bold' }}>現在のデータ付きリンク</p>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>ローカルプロジェクトのため、URLに全データが含まれます。データ変更ごとにURLが変わります。</p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="text" readOnly value={getShareUrl(true)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                    <button onClick={() => { navigator.clipboard.writeText(getShareUrl(true)); alert('コピーしました'); setShowCopyLinkModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button onClick={() => setShowCopyLinkModal(false)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>閉じる</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {importCloudCheck?.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>
@@ -351,10 +307,14 @@ function App() {
         <ProjectSettingsModal 
           currentName={data.projectName} currentId={data.id} projects={projects} 
           isSyncEnabled={!String(data.id).startsWith('local_') && data.isCloudSync !== false}
-          isPublic={!!data.isPublic} members={data.members || []} isAdmin={isAdmin} currentUserRole={currentUserRole}
+          isPublic={!!data.isPublic}
+          includeDataInLink={!!(data as any).includeDataInLink}
+          members={data.members || []} isAdmin={isAdmin} currentUserRole={currentUserRole}
           isCloudProject={isCloudProject} syncState={syncState}
           onClose={() => setShowSettingsModal(false)} onSaveName={(newName) => { handleUpdateProjectName(newName); }} 
-          onToggleSync={handleToggleSync} onTogglePublic={handleTogglePublic} onInviteUser={handleInviteUser}
+          onToggleSync={handleToggleSync} onTogglePublic={handleTogglePublic} 
+          onToggleIncludeDataInLink={handleToggleIncludeDataInLink}
+          onInviteUser={handleInviteUser}
           onChangeRole={handleChangeRole} onRemoveMember={handleRemoveMember}
           onDeleteProject={(isCloudDelete) => { deleteProject(data.id, isCloudDelete); setShowSettingsModal(false); }}
         />

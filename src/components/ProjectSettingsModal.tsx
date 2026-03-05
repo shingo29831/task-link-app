@@ -1,9 +1,9 @@
 // 役割: プロジェクト名変更、同期設定、共有設定、メンバー管理などを行うモーダルUI
 // なぜ: プロジェクト単位の設定を一元管理し、権限に応じた操作を提供するため
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppData, UserRole, ProjectMember } from '../types';
-import { IconWarning } from './Icons';
+import { IconWarning, IconLoader, IconCheckCircle, IconError } from './Icons';
 
 interface Props {
   currentName: string;
@@ -12,6 +12,7 @@ interface Props {
   
   isSyncEnabled: boolean;
   isPublic: boolean;
+  includeDataInLink: boolean;
   members: ProjectMember[];
   isAdmin: boolean;
   currentUserRole: string; 
@@ -22,32 +23,12 @@ interface Props {
   onSaveName: (newName: string) => void;
   onToggleSync: (enabled: boolean) => void;
   onTogglePublic: (isPublic: boolean) => void;
+  onToggleIncludeDataInLink: (enabled: boolean) => void;
   onInviteUser: (username: string) => void;
   onChangeRole: (memberId: string, newRole: UserRole) => void;
   onRemoveMember: (memberId: string) => void;
   onDeleteProject: (isCloudDelete: boolean) => void; 
 }
-
-const IconLoader = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-
-const IconError = ({ size = 20, color = "var(--color-danger)" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
 
 // 全角文字を2、半角文字を1として文字幅を計算する関数
 const getCharWidth = (str: string) => {
@@ -70,6 +51,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   projects, 
   isSyncEnabled,
   isPublic,
+  includeDataInLink,
   members,
   isAdmin,
   currentUserRole,
@@ -79,6 +61,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   onSaveName,
   onToggleSync,
   onTogglePublic,
+  onToggleIncludeDataInLink,
   onInviteUser,
   onChangeRole,
   onRemoveMember,
@@ -303,7 +286,29 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 4. ユーザー招待 */}
+            {/* 4. リンクにデータを保存設定 */}
+            <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>リンクにデータを保存</h4>
+                  <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--text-placeholder)', lineHeight: '1.4' }}>
+                    有効にするとリンクURLに現在のタスクデータが含まれます。<br/>
+                    このリンクで遷移することで、リンク生成時のタスク状況に復元できます。
+                  </p>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.9em' }}>{includeDataInLink ? 'オン' : 'オフ'}</span>
+                  <input 
+                    type="checkbox" 
+                    checked={includeDataInLink} 
+                    onChange={(e) => onToggleIncludeDataInLink(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                </label>
+              </div>
+            </section>
+
+            {/* 5. ユーザー招待 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>ユーザーを招待</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -332,7 +337,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 5. 招待済みメンバー一覧と権限変更 */}
+            {/* 6. 招待済みメンバー一覧と権限変更 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>メンバー一覧</h4>
               {members.length === 0 ? (
@@ -372,7 +377,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* 6. プロジェクト削除セクション */}
+        {/* 7. プロジェクト削除セクション */}
         <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: (isAdmin && isSyncEnabled) ? '20px' : '0' }}>
           <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>危険な操作</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

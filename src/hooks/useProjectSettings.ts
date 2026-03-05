@@ -175,5 +175,10 @@ export const useProjectSettings = (
       }
   }, [data, getToken, setData]);
 
-  return { handleUpdateProjectName, handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember };
+  const handleToggleIncludeDataInLink = useCallback((include: boolean) => {
+    if (!data) return;
+    setData({ ...data, includeDataInLink: include, lastSynced: Date.now() } as AppData);
+  }, [data, setData]);
+
+  return { handleUpdateProjectName, handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink };
 };

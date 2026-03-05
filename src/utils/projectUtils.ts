@@ -38,7 +38,7 @@ export const isEffectivelyIdentical = (local: AppData, incoming: AppData) => {
   return localSigs.join('::') === incomingSigs.join('::');
 };
 
-export const calculateHash = (project: AppData): number => {
+export const calculateHash = (project: AppData & { includeDataInLink?: boolean }): number => {
   const essentialTasks = project.tasks.map((t: Task) => ({
     id: t.id,
     name: t.name,
@@ -49,7 +49,7 @@ export const calculateHash = (project: AppData): number => {
     order: t.order
   }));
   const membersStr = project.members ? JSON.stringify(project.members) : '';
-  const str = project.projectName + JSON.stringify(essentialTasks) + String(project.isPublic) + membersStr;
+  const str = project.projectName + JSON.stringify(essentialTasks) + String(project.isPublic) + membersStr + String(project.includeDataInLink);
   
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {

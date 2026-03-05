@@ -21,9 +21,6 @@ export const useAppData = () => {
   const lastSyncedHashMap = useRef<Record<string, number>>({});
   const isLoaded = useRef(false);
   const initialUrlGuardRef = useRef(true);
-  
-  // URL に ?d= パラメータを省略する（クリーンURL）モードかどうかを保持
-  const omitDataParamRef = useRef(!new URLSearchParams(window.location.search).has('d'));
 
   // 2. クラウド同期ロジックの統合
   const cloudSync = useCloudSync(activeData, activeId, projectsRef, setProjects, setActiveId, lastSyncedHashMap);
@@ -110,10 +107,10 @@ export const useAppData = () => {
       }
 
       const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
+      const includeData = isLocal || !!(activeData as any).includeDataInLink;
       const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
       
-      // ?d=なしでアクセスした場合、クラウドプロジェクト表示中はdパラメータを付与しない
-      if (!isLocal && omitDataParamRef.current) {
+      if (!includeData) {
         window.history.replaceState(null, '', `${window.location.origin}${basePath}`);
       } else {
         const compressed = compressData(activeData);
@@ -138,13 +135,13 @@ export const useAppData = () => {
     if (id === activeId) setActiveId(newProjects[0].id);
   }, [projectsRef, getToken, setProjects, activeId, setActiveId]);
 
-  // 引数 withData で URL の出力形式を分ける
-  const getShareUrl = useCallback((withData: boolean = true) => {
+  const getShareUrl = useCallback(() => {
     if (!activeData) return '';
     const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
+    const includeData = isLocal || !!(activeData as any).includeDataInLink;
     const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
     
-    if (!withData && !isLocal && activeData.shortId) {
+    if (!includeData && activeData.shortId) {
       return `${window.location.origin}${basePath}`;
     }
     
