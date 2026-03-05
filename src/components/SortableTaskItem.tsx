@@ -16,6 +16,7 @@ const SortableInner: React.FC<Omit<Props, 'disabled'>> = ({ id, depth = 0, child
     listeners,
     setNodeRef,
     transform,
+    transition,
     isDragging,
   } = useSortable({ 
     id,
@@ -23,11 +24,13 @@ const SortableInner: React.FC<Omit<Props, 'disabled'>> = ({ id, depth = 0, child
   });
 
   const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
+    // isDragging の時のみ transform, transition を適用し、他の要素が避ける動きを無効化
+    transform: isDragging ? CSS.Translate.toString(transform) : undefined,
+    transition: isDragging ? transition : undefined,
     opacity: isDragging ? 0.3 : 1, 
     touchAction: 'manipulation', 
     position: 'relative',
-    zIndex: isDragging ? 0 : 'auto', 
+    zIndex: isDragging ? 999 : 'auto', 
     backgroundColor: isDragging ? 'var(--bg-item-hover)' : undefined, 
     borderRadius: isDragging ? '8px' : undefined,
     border: isDragging ? '1px dashed var(--text-secondary)' : 'none',
