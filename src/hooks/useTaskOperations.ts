@@ -550,7 +550,8 @@ export const useTaskOperations = () => {
               body: JSON.stringify({ isPublic })
           });
           if (res.ok) {
-              setData({ ...data, isPublic });
+              // lastSynced を更新して同期トリガーを発火させる
+              setData({ ...data, isPublic, lastSynced: Date.now() });
           } else {
                alert("公開設定の変更に失敗しました");
           }
@@ -573,7 +574,8 @@ export const useTaskOperations = () => {
               const resData = await res.json();
               if (resData.member) {
                   const newMembers = [...(data.members || []), resData.member];
-                  setData({ ...data, members: newMembers });
+                  // lastSynced を更新
+                  setData({ ...data, members: newMembers, lastSynced: Date.now() });
                   alert(`${username} を招待しました。`);
               }
           } else {
@@ -597,7 +599,8 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).map(m => m.id === memberId ? { ...m, role: newRole } : m);
-              setData({ ...data, members: newMembers });
+              // lastSynced を更新
+              setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
               alert("権限の変更に失敗しました");
           }
@@ -618,7 +621,8 @@ export const useTaskOperations = () => {
           });
           if (res.ok) {
               const newMembers = (data.members || []).filter(m => m.id !== memberId);
-              setData({ ...data, members: newMembers });
+              // lastSynced を更新
+              setData({ ...data, members: newMembers, lastSynced: Date.now() });
           } else {
                alert("メンバーの削除に失敗しました");
           }
