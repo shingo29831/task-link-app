@@ -190,7 +190,8 @@ const SyncLimitModal = ({ limitState, onResolve }: { limitState: any, onResolve:
   );
 };
 
-function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => void) {
+// モバイル時もパン操作を有効にするため isMobile の判定を削除
+function usePanning(isDragging: boolean, onBoardClick: () => void) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
@@ -198,14 +199,14 @@ function usePanning(isMobile: boolean, isDragging: boolean, onBoardClick: () => 
   const hasMovedRef = useRef(false);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
-    if (isMobile || isDragging || e.button !== 0) return; 
+    if (isDragging || e.button !== 0) return; 
     if ((e.target as Element).closest('[data-task-id]')) return; 
     setIsPanning(true); 
     hasMovedRef.current = false; 
     setStartPos({ x: e.clientX, y: e.clientY }); 
     if (scrollRef.current) setScrollPos({ left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop }); 
     (e.target as Element).setPointerCapture(e.pointerId); 
-  }, [isMobile, isDragging]);
+  }, [isDragging]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => { 
     if (!isPanning || !scrollRef.current) return; 
@@ -241,7 +242,7 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
   const pointerRef = useRef({ x: 0, y: 0 });
   useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
   
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, isDragging, onBoardClick);
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isDragging, onBoardClick);
   const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef, scrollRef]);
 
   useEffect(() => {
@@ -268,7 +269,7 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
       </div>
       {isMobile && !isDragging && (
@@ -290,11 +291,11 @@ const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, i
 };
 
 const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isMobile, false, onBoardClick);
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : (isMobile ? 'default' : 'grab'), userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
       </div>
       {isMobile && (
@@ -466,11 +467,23 @@ function App() {
   const renderProgressBar = () => {
     const { p0, p1, p2, p3 } = overallProgressData;
     return (
-      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
-        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', marginTop: '6px', zIndex: 1 }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: '2px', borderBottomLeftRadius: '2px' }}>
+          {p2 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 ? '2px' : '0' }}>
+          {p1 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '2px' : '0' }} />
+        <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '2px', borderBottomRightRadius: '2px', borderTopLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '2px' : '0' }} />
       </div>
     );
   };
