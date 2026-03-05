@@ -1,0 +1,85 @@
+// 役割: タスクを配置するボード領域（スクロールやパン操作、DnDターゲット）の提供
+
+import React, { useEffect, useRef, useCallback } from 'react';
+import { useDroppable, useDndMonitor } from '@dnd-kit/core';
+import { IconUndo, IconRedo, IconInputOutput, IconPlus } from './Icons';
+import { usePanning } from '../hooks/usePanning';
+
+export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
+  const { setNodeRef, isOver } = useDroppable({ id: 'root-board' });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  useDndMonitor({ onDragStart: () => setIsDragging(true), onDragEnd: () => setIsDragging(false), onDragCancel: () => setIsDragging(false) });
+  
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(isDragging, onBoardClick);
+  const setRef = useCallback((node: HTMLDivElement | null) => { setNodeRef(node); scrollRef.current = node; }, [setNodeRef, scrollRef]);
+
+  useEffect(() => {
+    if (!isDragging || !isMobile) return;
+    const updatePointer = (x: number, y: number) => { pointerRef.current = { x, y }; };
+    const handleTouchMove = (e: TouchEvent) => { if (e.touches.length > 0) updatePointer(e.touches[0].clientX, e.touches[0].clientY); };
+    const handlePointerMoveGlobal = (e: PointerEvent) => { updatePointer(e.clientX, e.clientY); };
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('pointermove', handlePointerMoveGlobal);
+    let animationFrameId: number;
+    const tick = () => {
+      if (scrollRef.current) {
+        const rect = scrollRef.current.getBoundingClientRect();
+        const ratioX = (pointerRef.current.x - (rect.left + rect.width / 2)) / (rect.width / 2);
+        const ratioY = (pointerRef.current.y - (rect.top + rect.height / 2)) / (rect.height / 2);
+        if (Math.abs(ratioX) > 0.4) scrollRef.current.scrollLeft += Math.sign(ratioX) * ((Math.abs(ratioX) - 0.4) / 0.6) * 15;
+        if (Math.abs(ratioY) > 0.4) scrollRef.current.scrollTop += Math.sign(ratioY) * ((Math.abs(ratioY) - 0.4) / 0.6) * 15;
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => { window.removeEventListener('touchmove', handleTouchMove); window.removeEventListener('pointermove', handlePointerMoveGlobal); cancelAnimationFrame(animationFrameId); };
+  }, [isDragging, isMobile]);
+
+  return (
+    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: isOver ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
+      </div>
+      {isMobile && !isDragging && (
+        <>
+          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
+            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
+          </div>
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
+            {isNarrowLayout && (
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
+  const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
+
+  return (
+    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクがありません</p> : children}
+      </div>
+      {isMobile && (
+        <>
+          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+            <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
+            <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
+          </div>
+          {isNarrowLayout && (
+            <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
