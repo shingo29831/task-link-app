@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { format, differenceInCalendarDays } from 'date-fns';
-import { useDroppable, useDndContext } from '@dnd-kit/core'; 
+import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core'; 
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
 import { IconCalendar, IconX, IconChevronDown, IconChevronRight } from './Icons';
@@ -30,7 +30,7 @@ interface Props {
 }
 
 // DnDが有効な場合のみマウントされるネスト用ドロップエリア
-const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }> = ({ task, tasks, depth }) => {
+const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }> = ({ task, tasks}) => {
   const { active } = useDndContext(); 
   const isDropDisabled = (() => {
     if (!active) return false;
@@ -57,7 +57,7 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
       {isOver && !isDropDisabled && (
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: '2px dashed var(--color-primary)', boxSizing: 'border-box', pointerEvents: 'none', zIndex: 20, borderRadius: '4px' }} />
       )}
-      <div ref={setNodeRef} style={{ position: 'absolute', top: 0, left: depth === 0 ? '10%' : 'auto', right: depth === 0 ? 'auto' : 0, width: '80%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
+      <div ref={setNodeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
     </>
   );
 };
@@ -74,6 +74,7 @@ export const TaskItem: React.FC<Props> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
+  const [insertPosition, setInsertPosition] = useState<'top' | 'bottom' | null>(null);
 
   const { windowWidth, isMobile } = useResponsive();
 
@@ -87,6 +88,28 @@ export const TaskItem: React.FC<Props> = ({
     }
     return { fontSize: '16px', indentWidth: 24, itemPadding: '10px 0', buttonPadding: '4px 12px', buttonFontSize: '0.85em' };
   }, [windowWidth]);
+
+  // 並び替え位置を示すインジケーターの制御
+  useDndMonitor({
+    onDragMove: (event) => {
+      const { active, over } = event;
+      if (over?.id === task.id && active.id !== task.id) {
+        const activeRect = active.rect.current.translated;
+        const targetElement = document.querySelector(`[data-task-id="${task.id}"]`);
+        if (targetElement && activeRect) {
+            const rect = targetElement.getBoundingClientRect();
+            const activeCenterY = activeRect.top + activeRect.height / 2;
+            const targetCenterY = rect.top + rect.height / 2;
+            const newPos = activeCenterY > targetCenterY ? 'bottom' : 'top';
+            setInsertPosition(prev => prev !== newPos ? newPos : prev);
+        }
+      } else {
+        setInsertPosition(prev => prev !== null ? null : prev);
+      }
+    },
+    onDragEnd: () => setInsertPosition(null),
+    onDragCancel: () => setInsertPosition(null),
+  });
 
   const config = { 
     0: { l: '未着手', c: 'var(--text-placeholder)' },
@@ -189,6 +212,9 @@ export const TaskItem: React.FC<Props> = ({
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none'
         }}
       >
+        {/* 閲覧者でない場合のみドロップエリアをマウント (タスク全体を覆う) */}
+        {!isViewer && <NestDroppableInner task={task} tasks={tasks} depth={depth} />}
+
         {/* hasChildrenがtrueの時のみ開閉buttonをレンダリングする */}
         {hasChildren && (
           <button
@@ -197,7 +223,7 @@ export const TaskItem: React.FC<Props> = ({
             style={{
                 background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', 
-                width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto'
+                width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto', zIndex: 21
             }}
             title={isExpanded ? "折りたたむ" : "展開する"}
           >
@@ -214,29 +240,25 @@ export const TaskItem: React.FC<Props> = ({
               onStatusChange(((task.status + 1) % 4) as 0|1|2|3); 
             }}
             onDoubleClick={stopPropagation}
-            style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? '68px' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', border: 'none', borderRadius: '4px', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap', textAlign: 'center' }}
+            style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? '68px' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', border: 'none', borderRadius: '4px', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap', textAlign: 'center', zIndex: 21 }}
           >
             {config.l}
           </button>
         )}
         
         <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: '2px' }}>
-          
-          {/* 閲覧者でない場合のみドロップエリアをマウント */}
-          {!isViewer && <NestDroppableInner task={task} tasks={tasks} depth={depth} />}
-
           <>
-            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4' }}>{task.name}</span>
-            {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal' }}>({progress}%)</span>}
+            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>{task.name}</span>
+            {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal', zIndex: 21, position: 'relative' }}>({progress}%)</span>}
             {isEditingDeadline && !isViewer && !isMobile ? (
-                <input type="date" defaultValue={currentDeadlineStr} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', colorScheme: 'dark', fontSize: 'inherit' }} />
+                <input type="date" defaultValue={currentDeadlineStr} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', colorScheme: 'dark', fontSize: 'inherit', zIndex: 21, position: 'relative' }} />
             ) : ( getDeadline() )}
           </>
         </div>
         
         {/* モバイル時はインラインのボタンを非表示にする */}
         {!isViewer && !isMobile && (
-          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 11 }}>
+          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21 }}>
             <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
@@ -273,6 +295,25 @@ export const TaskItem: React.FC<Props> = ({
             </div>
           );
         })()}
+
+        {/* 挿入インジケーター */}
+        {insertPosition && !isViewer && (
+          <div style={{
+            position: 'absolute',
+            [insertPosition === 'top' ? 'top' : 'bottom']: -1,
+            left: 0,
+            right: 0,
+            height: 0,
+            borderTop: '2px dashed var(--color-primary)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}>
+            {/* 左端の三角形（内側向き） */}
+            <div style={{ position: 'absolute', left: 0, top: -4, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: '6px solid var(--color-primary)' }} />
+            {/* 右端の三角形（内側向き） */}
+            <div style={{ position: 'absolute', right: 0, top: -4, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderRight: '6px solid var(--color-primary)' }} />
+          </div>
+        )}
       </div>
 
       {showStatusModal && !isViewer && (
