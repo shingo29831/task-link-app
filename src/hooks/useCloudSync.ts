@@ -25,6 +25,8 @@ export const useCloudSync = (
   const syncAbortControllerRef = useRef<AbortController | null>(null);
   const initialCloudFetchDone = useRef(false);
   const previousActiveIdRef = useRef<string>('');
+  
+  // previousHashRef の宣言をここに統合（再宣言エラーの修正）
   const previousHashRef = useRef<number>(0);
 
   const getWaitTime = useCallback(() => currentPlan === 'premium' ? 10000 : 15000, [currentPlan]);
@@ -68,13 +70,23 @@ export const useCloudSync = (
             return;
         }
 
+        // ?d= なしでアクセスされたプロジェクトは完全上書き（強制同期）する
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const params = new URLSearchParams(window.location.search);
+        const isCleanUrlAccess = pathParts.length === 1 && !params.has('d');
+        const targetShortId = isCleanUrlAccess ? pathParts[0] : null;
+
         const updatedProjects: AppData[] = [];
         setProjects(prev => {
             const next = [...prev];
             dbProjects.forEach((cp: any) => {
                 const exIdx = next.findIndex(p => p.id === cp.id);
                 let mergedProject: AppData;
-                if (exIdx === -1) {
+                
+                const isTargetCleanProject = isCleanUrlAccess && cp.shortId === targetShortId;
+
+                // 存在しないか、CleanURLモードでの対象プロジェクトであれば強制上書き
+                if (exIdx === -1 || isTargetCleanProject) {
                     mergedProject = {
                         id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
                         tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
@@ -82,7 +94,8 @@ export const useCloudSync = (
                         isCloudSync: true, role: cp.role || 'owner',
                         isPublic: cp.isPublic, members: cp.members || []
                     };
-                    next.push(mergedProject);
+                    if (exIdx === -1) next.push(mergedProject);
+                    else next[exIdx] = mergedProject;
                 } else {
                     const localP = next[exIdx];
                     const tMap = new Map<string, Task>();
@@ -152,7 +165,6 @@ export const useCloudSync = (
 
           let cloudProject = null;
           let fetchedRole = targetProject.role;
-          // ★ isPublic の宣言を削除
 
           const res = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${token}` } });
           if (!res.ok) throw new Error("Failed to fetch cloud projects");
@@ -238,7 +250,6 @@ export const useCloudSync = (
               const cloudLastSynced = cloudProject.data?.lastSynced || 0;
               if (cloudLastSynced > targetProject.lastSynced) {
                   mergedProjectName = cloudProject.projectName; 
-                  // ★ cloudProject.isPublic から取得
                   mergedIsPublic = cloudProject.isPublic ?? targetProject.isPublic;
               }
           }
