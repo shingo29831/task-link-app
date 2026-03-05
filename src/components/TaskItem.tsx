@@ -189,18 +189,21 @@ export const TaskItem: React.FC<Props> = ({
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none'
         }}
       >
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
-          onDoubleClick={stopPropagation}
-          style={{
-              background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', visibility: hasChildren ? 'visible' : 'hidden', 
-              width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto'
-          }}
-          title={isExpanded ? "折りたたむ" : "展開する"}
-        >
-          {isExpanded ? <IconChevronDown size={isMobile ? 20 : 14} /> : <IconChevronRight size={isMobile ? 20 : 14} />}
-        </button>
+        {/* hasChildrenがtrueの時のみ開閉buttonをレンダリングする */}
+        {hasChildren && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
+            onDoubleClick={stopPropagation}
+            style={{
+                background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', 
+                width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto'
+            }}
+            title={isExpanded ? "折りたたむ" : "展開する"}
+          >
+            {isExpanded ? <IconChevronDown size={isMobile ? 20 : 14} /> : <IconChevronRight size={isMobile ? 20 : 14} />}
+          </button>
+        )}
 
         {/* 子を持たないタスクのみ状態変更ボタンを表示 */}
         {!hasChildren && (
