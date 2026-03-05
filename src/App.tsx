@@ -28,49 +28,15 @@ import { MergeModal } from './components/MergeModal';
 import { SortableTaskItem } from './components/SortableTaskItem';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
-import { IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput } from './components/Icons';
+import { 
+  IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, IconInputOutput, 
+  IconHelp, IconCloudUpload, IconLoader, IconCheckCircle, IconError 
+} from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
 
 type TaskNode = Task & { children: TaskNode[] };
-
-const IconHelp = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-  </svg>
-);
-
-const IconCloudUpload = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.5 19C19.985 19 22 16.985 22 14.5C22 12.164 20.228 10.235 17.957 10.024C17.447 6.6 14.526 4 11 4C7.134 4 4 7.134 4 11C4 11.233 4.011 11.462 4.032 11.687C1.782 12.083 0 14.075 0 16.5C0 19.538 2.462 22 5.5 22H17.5Z"/>
-    <path d="M12 17V10"/>
-    <path d="M9 13L12 10L15 13"/>
-  </svg>
-);
-
-const IconLoader = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconCheckCircle = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-
-const IconError = ({ size = 20, color = "var(--color-danger)" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
 
 const getCharWidth = (str: string) => {
   let width = 0;
