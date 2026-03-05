@@ -58,7 +58,7 @@ export const useTaskOperations = () => {
   }, [baseHandleAddTask, inputTaskName, inputDateStr, activeParentId]);
 
   // 4. プロジェクト設定の処理 (useProjectSettings)
-  const { handleUpdateProjectName, handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember } = useProjectSettings(
+  const { handleUpdateProjectName, handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink } = useProjectSettings(
     data, setData, getToken, uploadProject, projectsRef, showSettingsModal
   );
 
@@ -116,7 +116,7 @@ export const useTaskOperations = () => {
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
-    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember,
+    handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
     undo, redo, canUndo, canRedo,
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
