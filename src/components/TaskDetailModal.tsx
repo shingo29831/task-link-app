@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
 import { IconX } from './Icons';
+import { FormattedTaskName } from './FormattedTaskName';
 
 interface Props {
   date: Date;
@@ -127,7 +128,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatu
                         textDecoration: t.status === 2 ? 'line-through' : 'none',
                         wordBreak: 'break-all'
                       }}>
-                        {t.name}
+                        <FormattedTaskName name={t.name} />
                       </div>
                     </div>
                   </div>
