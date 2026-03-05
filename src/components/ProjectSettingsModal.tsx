@@ -212,7 +212,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 placeholder="プロジェクト名"
                 maxLength={40}
                 style={{ 
-                  flex: 1, padding: '10px', borderRadius: '4px', 
+                  flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', 
                   border: nameError ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
                   backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', 
                   outline: 'none'
@@ -227,7 +227,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   color: '#fff', 
                   border: 'none', borderRadius: '4px', 
                   cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
-                  opacity: isSaveDisabled ? 0.6 : 1
+                  opacity: isSaveDisabled ? 0.6 : 1,
+                  whiteSpace: 'nowrap', flexShrink: 0
                 }}
               >
                 更新
@@ -253,7 +254,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               {isSyncEnabled ? (
                 <button 
                   onClick={() => setShowSyncDisableModal(true)}
-                  style={{backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
+                  style={{ backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
                 >
                   <IconX size={16} /> 同期解除
                 </button>
@@ -279,7 +280,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>全体への公開設定</h4>
                   <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--text-placeholder)' }}>
-                    リンクから全てのユーザがプロジェクトにアクセスできます
+                    リンクを知っている全員がプロジェクトにアクセスできるようにします
                   </p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -329,7 +330,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   onKeyDown={handleInviteKeyDown}
                   placeholder="ユーザー名を入力"
                   style={{ 
-                    flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
+                    flex: 1, minWidth: 0, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
                     backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)'
                   }}
                 />
@@ -339,7 +340,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   style={{
                     padding: '0 16px', backgroundColor: 'var(--color-primary)', color: '#fff', 
                     border: 'none', borderRadius: '4px', cursor: 'pointer',
-                    opacity: !inviteUsername.trim() ? 0.5 : 1
+                    opacity: !inviteUsername.trim() ? 0.5 : 1,
+                    whiteSpace: 'nowrap', flexShrink: 0
                   }}
                 >
                   招待
@@ -355,9 +357,9 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {members.map(member => (
-                    <li key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: '4px' }}>
-                      <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{member.username}</span>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <li key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: '4px', gap: '10px' }}>
+                      <span style={{ fontSize: '0.9em', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.username}</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                         <select 
                           value={member.role}
                           onChange={(e) => onChangeRole(member.id, e.target.value as UserRole)}
@@ -372,7 +374,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                         </select>
                         <button 
                           onClick={() => onRemoveMember(member.id)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-danger-text)', cursor: 'pointer', fontSize: '0.85em' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-danger-text)', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
                           title="メンバーから削除"
                         >
                           削除
@@ -435,7 +437,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                value={confirmName} 
                onChange={e => setConfirmName(e.target.value)} 
                placeholder={currentName}
-               style={{ width: '100%', padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
+               style={{ width: '100%', minWidth: 0, padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
              />
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
