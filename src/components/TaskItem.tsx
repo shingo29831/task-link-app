@@ -7,6 +7,7 @@ import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core';
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
 import { IconCalendar, IconX, IconChevronDown, IconChevronRight } from './Icons';
+import { FormattedTaskName } from './FormattedTaskName';
 
 type TaskNode = Task & { children: TaskNode[] };
 
@@ -248,7 +249,9 @@ export const TaskItem: React.FC<Props> = ({
         
         <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: '2px' }}>
           <>
-            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>{task.name}</span>
+            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
+              <FormattedTaskName name={task.name} />
+            </span>
             {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal', zIndex: 21, position: 'relative' }}>({progress}%)</span>}
             {isEditingDeadline && !isViewer && !isMobile ? (
                 <input type="date" defaultValue={currentDeadlineStr} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', colorScheme: 'dark', fontSize: 'inherit', zIndex: 21, position: 'relative' }} />

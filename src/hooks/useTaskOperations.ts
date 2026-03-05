@@ -1,7 +1,7 @@
 // 役割: 分割されたカスタムフック（設定、インポート、操作、計算）を統合し、Appコンポーネントに提供する Facade
 // なぜ: Appコンポーネントの肥大化を防ぎ、各機能の結合を整理するため
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
 import type { Task } from '../types'; 
@@ -36,7 +36,6 @@ export const useTaskOperations = () => {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false); 
   const [showAllProjectsInCalendar, setShowAllProjectsInCalendar] = useState(false);
-  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [inputTaskName, setInputTaskName] = useState('');
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export const useTaskOperations = () => {
   const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar);
 
   // 3. タスクの更新処理 (useTaskMutations)
-  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder } = useTaskMutations(
+  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand } = useTaskMutations(
     data, setData, projectsRef, activeId, updateProject, activeTasks, menuOpenTaskId, setMenuOpenTaskId
   );
 
@@ -96,14 +95,23 @@ export const useTaskOperations = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, canUndo, canRedo]);
 
+  // 互換性維持のため、タスクデータから閉じたノードのSetを生成する
+  const collapsedNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (data?.tasks) {
+      data.tasks.forEach(t => {
+        // デフォルトは展開とみなすため、明示的に false の場合のみ閉じる
+        if (t.isExpanded === false) {
+          set.add(t.id);
+        }
+      });
+    }
+    return set;
+  }, [data]);
+
   const toggleNodeExpansion = useCallback((nodeId: string) => { 
-    setCollapsedNodeIds(prev => { 
-      const next = new Set(prev); 
-      if (next.has(nodeId)) next.delete(nodeId); 
-      else next.add(nodeId); 
-      return next; 
-    }); 
-  }, []);
+    toggleTaskExpand(nodeId);
+  }, [toggleTaskExpand]);
 
   const handleTaskClick = useCallback((node: TaskNode) => { setActiveParentId(node.id); }, []);
   const handleBoardClick = useCallback(() => { setActiveParentId(null); setMenuOpenTaskId(null); }, []);

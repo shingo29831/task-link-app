@@ -46,7 +46,8 @@ export const calculateHash = (project: AppData & { includeDataInLink?: boolean }
     parentId: t.parentId,
     deadline: t.deadline,
     isDeleted: t.isDeleted,
-    order: t.order
+    order: t.order,
+    isExpanded: t.isExpanded // 新規追加: 開閉状態をハッシュ計算に含め、同期のトリガーにする
   }));
   const membersStr = project.members ? JSON.stringify(project.members) : '';
   const str = project.projectName + JSON.stringify(essentialTasks) + String(project.isPublic) + membersStr + String(project.includeDataInLink);
