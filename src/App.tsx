@@ -492,9 +492,21 @@ function App() {
   const renderProgressBar = () => {
     const { p0, p1, p2, p3 } = overallProgressData;
     return (
-      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
-        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+      <div style={{ width: '100%', height: '4px', display: 'flex', backgroundColor: 'transparent', borderRadius: '2px', marginTop: '6px' }}>
+        <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+          {p2 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+          {p1 > 0 && (
+            <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
+              <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
         <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
         <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
       </div>

@@ -249,7 +249,7 @@ export const TaskItem: React.FC<Props> = ({
             }}>
               {/* 完了 */}
               <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomLeftRadius: '4px' }}>
-                {p2 > 0 && (
+                {p2 > 0 && !task.parentId && (
                   <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
                     <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-success)" stroke="var(--color-success)" strokeWidth="3" strokeLinejoin="round" />
                   </svg>
@@ -257,7 +257,7 @@ export const TaskItem: React.FC<Props> = ({
               </div>
               {/* 進行中 */}
               <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomLeftRadius: p2 === 0 ? '4px' : '0' }}>
-                {p1 > 0 && (
+                {p1 > 0 && !task.parentId && (
                   <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
                     <path d="M 0 1 L 7 7 L 0 13 Z" fill="var(--color-info)" stroke="var(--color-info)" strokeWidth="3" strokeLinejoin="round" />
                   </svg>
