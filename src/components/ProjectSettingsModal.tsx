@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { AppData, UserRole, ProjectMember } from '../types';
-import { IconWarning, IconLoader, IconCheckCircle, IconError } from './Icons';
+import { IconWarning, IconLoader, IconCheckCircle, IconError, IconCloudUpload, IconX } from './Icons';
 
 interface Props {
   currentName: string;
@@ -74,6 +74,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [inviteUsername, setInviteUsername] = useState('');
 
   const [showCloudDeleteModal, setShowCloudDeleteModal] = useState(false);
+  const [showSyncDisableModal, setShowSyncDisableModal] = useState(false);
+  const [showIncludeDataModal, setShowIncludeDataModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
   useEffect(() => {
@@ -248,15 +250,21 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>クラウド同期</h3>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
-                <span style={{ fontSize: '0.9em' }}>{isSyncEnabled ? 'オン' : 'オフ'}</span>
-                <input 
-                  type="checkbox" 
-                  checked={isSyncEnabled} 
-                  onChange={(e) => onToggleSync(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-              </label>
+              {isSyncEnabled ? (
+                <button 
+                  onClick={() => setShowSyncDisableModal(true)}
+                  style={{backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
+                >
+                  <IconX size={16} /> 同期解除
+                </button>
+              ) : (
+                <button 
+                  onClick={() => onToggleSync(true)}
+                  style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
+                >
+                  <IconCloudUpload size={16} /> 同期する
+                </button>
+              )}
             </div>
           </section>
         )}
@@ -271,10 +279,10 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>全体への公開設定</h4>
                   <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--text-placeholder)' }}>
-                    リンクを知っている全員がプロジェクトにアクセスできるようにします
+                    リンクから全てのユーザがプロジェクトにアクセスできます
                   </p>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   <span style={{ fontSize: '0.9em' }}>{isPublic ? '公開' : '非公開'}</span>
                   <input 
                     type="checkbox" 
@@ -288,20 +296,22 @@ export const ProjectSettingsModal: React.FC<Props> = ({
 
             {/* 4. リンクにデータを保存設定 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>リンクにデータを保存</h4>
-                  <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--text-placeholder)', lineHeight: '1.4' }}>
-                    有効にするとリンクURLに現在のタスクデータが含まれます。<br/>
-                    このリンクで遷移することで、リンク生成時のタスク状況に復元できます。
-                  </p>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', marginTop: '4px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   <span style={{ fontSize: '0.9em' }}>{includeDataInLink ? 'オン' : 'オフ'}</span>
                   <input 
                     type="checkbox" 
                     checked={includeDataInLink} 
-                    onChange={(e) => onToggleIncludeDataInLink(e.target.checked)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setShowIncludeDataModal(true);
+                      } else {
+                        onToggleIncludeDataInLink(false);
+                      }
+                    }}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
                 </label>
@@ -430,6 +440,39 @@ export const ProjectSettingsModal: React.FC<Props> = ({
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
                <button onClick={handleCloudDeleteConfirm} disabled={confirmName !== currentName} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: confirmName === currentName ? 'pointer' : 'not-allowed', opacity: confirmName === currentName ? 1 : 0.5, fontWeight: 'bold' }}>完全に削除する</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 同期解除の確認モーダル */}
+      {showSyncDisableModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowSyncDisableModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
+             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>クラウド同期を解除しますか？</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
+               クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？
+             </p>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => setShowSyncDisableModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
+               <button onClick={() => { onToggleSync(false); setShowSyncDisableModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>解除する</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* リンクにデータを保存の説明モーダル */}
+      {showIncludeDataModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowIncludeDataModal(false)}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
+             <h3 style={{ margin: '0 0 10px 0' }}>リンクにデータを保存</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
+               有効にするとリンクURLに現在のタスクデータが含まれます。<br/>
+               このリンクで遷移することで、リンク生成時のタスク状況に復元することができます。
+             </p>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+               <button onClick={() => setShowIncludeDataModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
+               <button onClick={() => { onToggleIncludeDataInLink(true); setShowIncludeDataModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>有効にする</button>
              </div>
           </div>
         </div>

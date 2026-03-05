@@ -84,7 +84,6 @@ export const useProjectSettings = (
       if (enabled) {
           uploadProject(data.id);
       } else {
-           if (!confirm("クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？")) return;
            try {
                const token = await getToken();
                await fetch(`/api/projects/${data.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
