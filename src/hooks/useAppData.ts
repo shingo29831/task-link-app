@@ -33,7 +33,6 @@ export const useAppData = () => {
     const load = async () => {
       const localJson = localStorage.getItem(STORAGE_KEY);
       let loadedProjects: AppData[] = [];
-      let initialActiveId = '';
 
       if (localJson) {
         try {
@@ -61,12 +60,18 @@ export const useAppData = () => {
          loadedProjects.push(createDefaultProject());
       }
 
-      initialActiveId = loadedProjects[0].id;
+      let initialActiveId = loadedProjects[0].id;
       
       const pathParts = window.location.pathname.split('/').filter(Boolean);
       const isSharedLink = pathParts.length === 1;
 
-      if (!isSharedLink) {
+      if (isSharedLink) {
+        // 共有リンクの場合、すでにローカルに同じ shortId を持つプロジェクトがあればそれを開く
+        const existingProj = loadedProjects.find(p => p.shortId === pathParts[0]);
+        if (existingProj) {
+          initialActiveId = existingProj.id;
+        }
+      } else {
         const params = new URLSearchParams(window.location.search);
         const compressed = params.get('d');
         if (compressed) {
@@ -99,10 +104,17 @@ export const useAppData = () => {
     if (activeData) {
       if (initialUrlGuardRef.current) {
         const pathParts = window.location.pathname.split('/').filter(Boolean);
-        if (pathParts.length === 1 && activeData.shortId === pathParts[0]) {
+        if (pathParts.length === 1) {
+          if (activeData.shortId === pathParts[0]) {
+            // アクティブなプロジェクトがURLのshortIdと一致したらガードを解除
             initialUrlGuardRef.current = false;
-        } else if (pathParts.length !== 1) {
-            initialUrlGuardRef.current = false;
+          } else {
+            // アクセス時のshortIdと現在のactiveDataが違う場合（APIの読み込み待ちなど）は
+            // URLを上書きしないようにガードを維持し、処理をスキップする
+            return;
+          }
+        } else {
+          initialUrlGuardRef.current = false;
         }
       }
 

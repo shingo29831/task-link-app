@@ -164,7 +164,24 @@ function App() {
     );
   }
 
-  if (!data) return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
+  // ゲストユーザーや初回訪問の他ユーザーなど、ローカルに data が存在しない場合でも
+  // URLからの共有プロジェクトを展開できるように、SharedProjectModal の描画を優先する
+  if (!data) {
+    if (sharedProjectState) {
+      return (
+        <SharedProjectModal 
+          sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
+          onOpenAsProject={(sharedData) => { 
+            setData(sharedData); // UI描画用のステートに即座に反映させる
+            addOrUpdateProject(sharedData); 
+            switchProject(sharedData.id); // アクティブなプロジェクトとして切り替える
+          }}
+          onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
+        />
+      );
+    }
+    return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
+  }
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
     let BASE_WIDTH = 220, INDENT_WIDTH = 24, CHAR_WIDTH_PX = 12, DEADLINE_WIDTH = 80;
@@ -463,13 +480,19 @@ function App() {
       {sharedProjectState && (
         <SharedProjectModal 
           sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
-          onOpenAsProject={(sharedData) => { addOrUpdateProject(sharedData); }}
+          onOpenAsProject={(sharedData) => { 
+            setData(sharedData); // UI描画用のステートに即座に反映させる
+            addOrUpdateProject(sharedData); 
+            switchProject(sharedData.id); // アクティブなプロジェクトとして切り替える
+          }}
           onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
         />
       )}
 
       {isViewer ? (
-        <>{mainAppContent}</>
+        <DndContext>
+          {mainAppContent}
+        </DndContext>
       ) : (
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
           {mainAppContent}
