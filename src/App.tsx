@@ -47,7 +47,7 @@ function App() {
     collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
+    deleteTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
     updateTaskDetails, // ▼ 追加
     addTask, handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
