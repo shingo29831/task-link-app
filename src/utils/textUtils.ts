@@ -33,8 +33,8 @@ export const getCharGroup = (charClass: string) => {
 
 const isOpenBracket = (c: string) => /^[「（【\[{<『〈《〔〘〚(]$/.test(c);
 const isCloseBracket = (c: string) => /^[」）】\]}>』〉》〕〙〛)]$/.test(c);
-const multiParticleRegex = /(には|では|から|まで|ので|でも|つつ|また|なお|すると|として|ならば|ながら|および|または)$/;
-const multiParticleForwardRegex = /^(には|では|から|まで|ので|でも|つつ|また|なお|すると|として|ならば|ながら|および|または)/;
+const multiParticleRegex = /(には|では|から|まで|ので|でも|つつ|また|なお|すると|として|ならば|ながら|および|または|のみ|だけ|して)$/;
+const multiParticleForwardRegex = /^(には|では|から|まで|ので|でも|つつ|また|なお|すると|として|ならば|ながら|および|または|のみ|だけ|して)/;
 
 export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single' | 'multi'): string[] => {
   const totalWidth = getCharWidth(text);
@@ -76,9 +76,13 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
       } else if (prev === 'を') {
         // 「を」の後ろを有力な候補に
         baseScore = 180;
-      } else if ((/^[はがにでとやへもかの]$/.test(prev) || multiParticleRegex.test(prevStr)) && prevGroup !== currGroup) {
-        // 主要な助詞の後に文字種が変わる場合を有力な候補に
+      } else if (/^[はがにでとやへもかの]$/.test(prev) || multiParticleRegex.test(prevStr)) {
+        // 主要な助詞の後を有力な候補に（文字グループの変更有無にかかわらず）
         baseScore = 170;
+        // もし次がひらがなの場合は、助詞の連続や単語の一部かもしれないので少し下げる
+        if (currClass === 'hiragana') {
+            baseScore = 150;
+        }
       } else if (prevGroup === 'symbol' && currGroup !== 'symbol') {
         baseScore = 120;
       } else if (prevGroup !== currGroup && prevGroup !== 'symbol' && currGroup !== 'symbol') {
@@ -89,7 +93,15 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
         if (prevClass === 'lower' && currClass === 'upper') {
           baseScore = 60;
         } else if (prevGroup === 'japanese') {
-          baseScore = 40;
+          if (prevClass === 'hiragana' && currClass === 'kanji') {
+            // ひらがなから漢字への切り替わりは単語の区切りになりやすい
+            baseScore = 80;
+          } else if (prevClass === 'kanji' && currClass === 'hiragana') {
+            // ▼ 漢字からひらがなへの切り替わりは送り仮名の可能性が高いため、改行ポイントとしない
+            baseScore = -50; 
+          } else {
+            baseScore = 40;
+          }
         }
       }
 
@@ -103,6 +115,7 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
         baseScore -= 100;
       }
 
+      // 送り仮名の途中などでの分断を防ぐため、ベーススコアが0以下の場合は候補から除外
       if (baseScore > 0) {
         breakpoints.push({ index: i, score: baseScore, width: widthAt[i - 1] });
       }
