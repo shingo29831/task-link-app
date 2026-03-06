@@ -1,16 +1,25 @@
 // 役割: タスクを配置するボード領域（スクロールやパン操作、DnDターゲット）の提供
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useDroppable, useDndMonitor } from '@dnd-kit/core';
+import { useDroppable, useDndMonitor, useDndContext } from '@dnd-kit/core';
 import { IconUndo, IconRedo, IconInputOutput, IconPlus } from './Icons';
 import { usePanning } from '../hooks/usePanning';
 
 export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
   const { setNodeRef } = useDroppable({ id: 'root-board' });
+  const { active } = useDndContext();
   const [isDragging, setIsDragging] = useState(false);
   const [insertIndicator, setInsertIndicator] = useState<{ left: number } | null>(null);
   const pointerRef = useRef({ x: 0, y: 0 });
   
+  // ドラッグ中のタスクが存在しない場合は、確実にインジケーターとドラッグ状態をリセットする
+  useEffect(() => {
+    if (!active) {
+      setIsDragging(false);
+      setInsertIndicator(null);
+    }
+  }, [active]);
+
   useDndMonitor({ 
     onDragStart: () => setIsDragging(true), 
     onDragMove: (event) => {
@@ -91,7 +100,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>タスクを追加してください</p> : children}
         
         {/* rootTask 並び替え用の挿入位置インジケーター */}
-        {insertIndicator && isDragging && (
+        {insertIndicator && isDragging && active && (
           <div style={{
             position: 'absolute',
             left: insertIndicator.left,

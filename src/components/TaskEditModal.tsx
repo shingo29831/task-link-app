@@ -48,7 +48,27 @@ export const TaskEditModal: React.FC<Props> = ({
           
           <div>
             <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>タスク名</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginTop: '4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+            <textarea 
+              value={name} 
+              onChange={e => setName(e.target.value)} 
+              autoFocus 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                boxSizing: 'border-box', 
+                marginTop: '4px', 
+                borderRadius: '4px', 
+                border: '1px solid var(--border-color)', 
+                background: 'var(--bg-input)', 
+                color: 'var(--text-primary)',
+                minHeight: '80px',
+                maxHeight: '200px',
+                resize: 'vertical',
+                overflowY: 'auto',
+                fontFamily: 'inherit',
+                fontSize: '1em'
+              }} 
+            />
           </div>
 
           <div>
@@ -111,7 +131,8 @@ export const TaskEditModal: React.FC<Props> = ({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', alignItems: 'center' }}>
-            <button onClick={() => { if(confirm('本当に削除しますか？')) { onDelete(); } }} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--color-danger-text)', border: '1px solid var(--color-danger-text)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9em' }}>削除</button>
+            {/* ▼ 二重のconfirmを削除し、直接onDeleteを呼ぶ */}
+            <button onClick={onDelete} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--color-danger-text)', border: '1px solid var(--color-danger-text)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9em' }}>削除</button>
             
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={onClose} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontSize: '0.9em' }}>キャンセル</button>

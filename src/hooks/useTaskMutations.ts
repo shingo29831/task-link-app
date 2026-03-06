@@ -90,12 +90,19 @@ export const useTaskMutations = (
     });
   }, [data, applyCloudSyncForStatusChange]);
 
+  // ▼ 子タスクの有無で確認メッセージを切り替えるように修正
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
     const targetTask = (data.tasks || []).find((t: Task) => t.id === taskId);
     if (!targetTask) return;
-    const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
+
+    const hasChildren = (data.tasks || []).some((t: Task) => !t.isDeleted && t.parentId === taskId);
+    const message = hasChildren
+      ? `タスク：「${targetTask.name}」を子タスク含め削除します。\n本当に削除しますか？`
+      : `タスク：「${targetTask.name}」を削除します。\n本当に削除しますか？`;
+
     if (!confirm(message)) return;
+
     const idsToDelete = new Set<string>();
     const stack = [taskId];
     while (stack.length > 0) {
@@ -127,6 +134,60 @@ export const useTaskMutations = (
     const newTasks = (data.tasks || []).map((t: Task) => t.id === id ? { ...t, deadline: newDeadline, lastUpdated: Date.now() } : t);
     save(newTasks);
   }, [data, save]);
+
+  const updateTaskDetails = useCallback((id: string, newName: string, dateStr: string, newStatus?: 0 | 1 | 2 | 3, updateChildrenStatus: boolean = false) => {
+    if (!data || !newName.trim()) return;
+
+    let targetProjId = data.id;
+    let realTaskId = id;
+
+    if (id.includes('_')) {
+        const [projId, parsedTaskId] = id.split('_');
+        const isCurrent = (data?.tasks || []).some((t: Task) => t.id === id);
+        if (!isCurrent) {
+            targetProjId = projId;
+            realTaskId = parsedTaskId;
+        }
+    }
+    if (!targetProjId) return;
+
+    const targetTask = (data.tasks || []).find((t: Task) => t.id === realTaskId);
+    if (!targetTask) return;
+
+    const isDuplicate = (data.tasks || []).some((t: Task) => !t.isDeleted && t.id !== realTaskId && t.parentId === targetTask.parentId && t.name === newName);
+    if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
+
+    let newDeadline: number | undefined;
+    if (dateStr) { 
+        const [y, m, d] = dateStr.split('-').map(Number); 
+        newDeadline = new Date(y, m - 1, d).getTime(); 
+    } else { 
+        newDeadline = undefined; 
+    }
+
+    applyCloudSyncForStatusChange(targetProjId, (tasks) => {
+        let nextTasks = [...tasks];
+        const now = Date.now();
+
+        if (newStatus !== undefined && updateChildrenStatus) {
+            if (newStatus === 2) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: now } : t);
+            } else if (newStatus === 0) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: now } : t);
+            } else if (newStatus === 1) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: now } : t);
+            }
+        }
+
+        return nextTasks.map((t: Task) => {
+            if (t.id === realTaskId) {
+                const finalStatus = newStatus !== undefined ? newStatus : t.status;
+                return { ...t, name: newName, deadline: newDeadline, status: finalStatus, lastUpdated: now };
+            }
+            return t;
+        });
+    });
+  }, [data, applyCloudSyncForStatusChange]);
 
   const handleAddTaskWrapper = useCallback((taskName: string, dateStr: string, activeParentId: string | null, targetParentId?: string) => {
     if (!taskName.trim() || !data) return;
@@ -174,8 +235,8 @@ export const useTaskMutations = (
       const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
       const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
       const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order, lastUpdated: Date.now() };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp, lastUpdated: Date.now() };
       save(newTasks);
     } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
       const target = siblings[siblingIndex + 1];
@@ -183,20 +244,18 @@ export const useTaskMutations = (
       const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
       const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
       const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order, lastUpdated: Date.now() };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp, lastUpdated: Date.now() };
       save(newTasks);
     }
   }, [data, save]);
 
-  // 開閉状態のトグル（JSONデータに直接書き込む）
   const toggleTaskExpand = useCallback((taskId: string) => {
     if (!data) return;
     const newTasks = (data.tasks || []).map((t: Task) => {
       if (t.id === taskId) {
         return {
           ...t,
-          // undefined (デフォルト展開) または true なら false にする
           isExpanded: t.isExpanded === false ? true : false,
           lastUpdated: Date.now()
         };
@@ -206,5 +265,5 @@ export const useTaskMutations = (
     save(newTasks);
   }, [data, save]);
 
-  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand };
+  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand, updateTaskDetails };
 };
