@@ -1,4 +1,6 @@
+// 役割: プロジェクト名を変更する際のモーダルUI
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AppData } from '../types';
 import { IconWarning } from './Icons';
 
@@ -11,6 +13,7 @@ interface Props {
 }
 
 export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, projects, onClose, onSave }) => {
+  const { t } = useTranslation();
   const [value, setValue] = useState(currentName);
   const [error, setError] = useState('');
 
@@ -18,7 +21,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
   useEffect(() => {
     const trimmedValue = value.trim();
     if (!trimmedValue) {
-      setError('プロジェクト名を入力してください');
+      setError(t('error_project_name_required', 'プロジェクト名を入力してください'));
       return;
     }
     
@@ -30,11 +33,11 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
     );
     
     if (isDuplicate) {
-      setError('他のプロジェクト名で使用しています。');
+      setError(t('error_project_name_used', '他のプロジェクト名で使用しています。'));
     } else {
       setError('');
     }
-  }, [value, currentId, projects]);
+  }, [value, currentId, projects, t]);
 
   // 英数字を半角に強制変換するハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,7 +72,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
         width: '400px', maxWidth: '90%', color: 'var(--text-primary)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
       }} onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-          プロジェクト名の変更
+          {t('edit_project_name', 'プロジェクト名の変更')}
         </h3>
         
         <input 
@@ -78,7 +81,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           autoFocus
-          placeholder="プロジェクト名"
+          placeholder={t('project_name_placeholder', 'プロジェクト名')}
           style={{ 
             width: '100%', padding: '10px', borderRadius: '4px', 
             border: error ? '2px solid var(--color-danger)' : '1px solid var(--border-light)', 
@@ -100,7 +103,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
           <button onClick={onClose} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            キャンセル
+            {t('cancel')}
           </button>
           <button 
             onClick={handleSave} 
@@ -114,7 +117,7 @@ export const ProjectNameEditModal: React.FC<Props> = ({ currentName, currentId, 
               fontWeight: 'bold'
             }}
           >
-            保存
+            {t('save')}
           </button>
         </div>
       </div>
