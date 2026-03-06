@@ -76,7 +76,7 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
       } else if (prev === 'を') {
         // 「を」の後ろを有力な候補に
         baseScore = 180;
-      } else if ((/^[はがにでとやへもか]$/.test(prev) || multiParticleRegex.test(prevStr)) && prevGroup !== currGroup) {
+      } else if ((/^[はがにでとやへもかの]$/.test(prev) || multiParticleRegex.test(prevStr)) && prevGroup !== currGroup) {
         // 主要な助詞の後に文字種が変わる場合を有力な候補に
         baseScore = 170;
       } else if (prevGroup === 'symbol' && currGroup !== 'symbol') {
@@ -99,7 +99,7 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
       }
 
       // 助詞の手前での改行を防ぐため、ペナルティを与える
-      if (/^[はがにでとやへもかを]$/.test(curr) || multiParticleForwardRegex.test(currStr)) {
+      if (/^[はがにでとやへもかをの]$/.test(curr) || multiParticleForwardRegex.test(currStr)) {
         baseScore -= 100;
       }
 
