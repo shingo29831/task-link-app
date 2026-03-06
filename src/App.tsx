@@ -1,4 +1,3 @@
-// shingo29831/task-link-app/task-link-app-feature-backend/src/App.tsx
 // 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
@@ -10,6 +9,7 @@ import {
   SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/clerk-react";
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { useResponsive } from './hooks/useResponsive';
@@ -29,7 +29,7 @@ import {
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
-import { UserSettingsModal } from './components/UserSettingsModal'; // ▼ 追加
+import { UserSettingsModal } from './components/UserSettingsModal'; 
 
 import { FormattedProjectName } from './components/FormattedProjectName';
 import { SyncLimitModal } from './components/SyncLimitModal';
@@ -40,6 +40,7 @@ type TaskNode = Task & { children: TaskNode[] };
 function App() {
   const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
+  const { t } = useTranslation(); // ▼ 追加
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
@@ -68,7 +69,7 @@ function App() {
   const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false); // ▼ 追加
+  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false);
   
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -198,7 +199,7 @@ function App() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
         <IconLoader size={48} />
-        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>{isVerifyingProject ? 'プロジェクトを検証中...' : 'プロジェクトの権限を確認中...'}</p>
+        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>{isVerifyingProject ? t('verifying_project') : t('checking_permissions')}</p>
       </div>
     );
   }
@@ -217,7 +218,7 @@ function App() {
         />
       );
     }
-    return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
+    return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>{t('loading')}</div>;
   }
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
@@ -263,7 +264,7 @@ function App() {
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                     {projects.map((p: any) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
                 </div>
-                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>新規プロジェクト</span></div>
+                <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>{t('new_project')}</span></div>
             </div>
         )}
     </div>
@@ -293,7 +294,7 @@ function App() {
   const rightControls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <ProjectControls 
-        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert('コピー完了'))} 
+        onCopyLink={() => navigator.clipboard.writeText(getShareUrl()).then(() => alert(t('copy_complete')))} 
         onExport={() => { 
           const exportData = { ...data };
           delete exportData.isCloudSync; delete exportData.isPublic; delete exportData.publicRole; delete exportData.role;
@@ -308,13 +309,12 @@ function App() {
         <SignedIn>
           <UserButton>
             <UserButton.MenuItems>
-              {/* ▼ アカウント設定メニューを追加。アイコンはSVGを直接指定 */}
               <UserButton.Action 
-                label="設定" 
+                label={t('settings')} 
                 labelIcon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>} 
                 onClick={() => setShowUserSettingsModal(true)} 
               />
-              <UserButton.Action label="ヘルプ" labelIcon={<IconHelp size={16} />} onClick={() => setShowHelpModal(true)} />
+              <UserButton.Action label={t('help')} labelIcon={<IconHelp size={16} />} onClick={() => setShowHelpModal(true)} />
             </UserButton.MenuItems>
           </UserButton>
         </SignedIn>
@@ -323,9 +323,9 @@ function App() {
             <button onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-button)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-color)', padding: 0 }} aria-label="アカウントメニュー"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" /></svg></button>
             {isAuthMenuOpen && (
               <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
-                <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>ログイン</button></SignInButton>
-                <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>新規登録</button></SignUpButton>
-                <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><IconHelp size={16} /> ヘルプ</button>
+                <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>{t('login')}</button></SignInButton>
+                <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>{t('signup')}</button></SignUpButton>
+                <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><IconHelp size={16} /> {t('help')}</button>
               </div>
             )}
           </div>
@@ -337,7 +337,6 @@ function App() {
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
-      {/* ▼ ユーザー設定モーダル */}
       {showUserSettingsModal && (
         <UserSettingsModal onClose={() => setShowUserSettingsModal(false)} />
       )}
@@ -345,11 +344,14 @@ function App() {
       {importCloudCheck?.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>
-             <h3 style={{ marginTop: 0 }}>クラウドプロジェクトの検出</h3>
-             <p style={{ fontSize: '0.95em', lineHeight: 1.5, marginBottom: '20px' }}>このプロジェクトはクラウド上に存在します。<br/>クラウドの最新データを表示しますか？<br/><br/><span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>（[キャンセル]を選択すると、読み込んだJSONデータを表示・マージします）</span></p>
+             <h3 style={{ marginTop: 0 }}>{t('cloud_project_detected')}</h3>
+             <p style={{ fontSize: '0.95em', lineHeight: 1.5, marginBottom: '20px' }}>
+                {t('cloud_project_desc_1')}<br/>{t('cloud_project_desc_2')}<br/><br/>
+                <span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>{t('cloud_project_cancel_desc')}</span>
+             </p>
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-               <button onClick={() => handleCloudImportChoice(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>キャンセル</button>
-               <button onClick={() => handleCloudImportChoice(true)} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>最新データを表示</button>
+               <button onClick={() => handleCloudImportChoice(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>{t('cancel')}</button>
+               <button onClick={() => handleCloudImportChoice(true)} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>{t('show_latest_data')}</button>
              </div>
           </div>
         </div>
@@ -380,7 +382,7 @@ function App() {
             setData(finalMerged); 
             if (finalMerged.id !== activeId) switchProject(finalMerged.id); 
             setIncomingData(null); 
-            alert('マージが完了しました'); 
+            alert(t('merge_complete')); 
           }} 
           onCancel={() => setIncomingData(null)} onCreateNew={importNewProject} 
         />
@@ -419,13 +421,13 @@ function App() {
                                   {renderProjectMenu()}
                                   
                                   {isSignedIn && isCloudProject && (syncState === 'waiting' || syncState === 'syncing') ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={16} /></div>
+                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title={t('syncing')}><IconLoader size={16} /></div>
                                   ) : isSignedIn && isCloudProject && syncState === 'error' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={16} /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title={t('sync_error')}><IconError size={16} /></button>
                                   ) : isSignedIn && !isCloudProject ? (
-                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="クラウドに保存"><IconCloudUpload size={16} /></button>
+                                    <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /></button>
                                   ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={16} /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title={t('synced')}><IconCheckCircle size={16} /></button>
                                   ) : null}
                               </div>
                           </div>
@@ -434,12 +436,12 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingLeft: '44px', boxSizing: 'border-box' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginRight: '10px' }}>
-                          <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                          <span style={{ color: 'yellowgreen', fontSize: '0.9em', fontWeight: 'bold' }}>({t('total_progress')}: {projectProgress}%)</span>
                           {renderProgressBar()}
                       </div>
                       {isNarrowLayout && showSidebar && (
                         <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <span>全プロジェクト表示</span>
+                          <span>{t('all_projects')}</span>
                           <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
                         </label>
                       )}
@@ -456,23 +458,23 @@ function App() {
                           {renderProjectMenu()}
                           
                           {isSignedIn && isCloudProject && (syncState === 'waiting' || syncState === 'syncing') ? (
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title="同期待機中・同期中"><IconLoader size={18} /></div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title={t('syncing')}><IconLoader size={18} /></div>
                           ) : isSignedIn && isCloudProject && syncState === 'error' ? (
-                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title="同期エラー。クリックで再試行"><IconError size={18} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title={t('sync_error')}><IconError size={18} /></button>
                           ) : isSignedIn && !isCloudProject ? (
-                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title="このプロジェクトをクラウドに保存"><IconCloudUpload size={16} /> 保存</button>
+                            <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /> {t('save')}</button>
                           ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
-                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title="クラウド同期済み。クリックで手動同期"><IconCheckCircle size={18} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title={t('synced')}><IconCheckCircle size={18} /></button>
                           ) : null}
 
                           <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '150px' }}>
-                              <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>(全進捗: {projectProgress}%)</span>
+                              <span style={{ color: 'yellowgreen', fontSize: '1.2em', fontWeight: 'bold' }}>({t('total_progress')}: {projectProgress}%)</span>
                               {renderProgressBar()}
                           </div>
 
                           {isNarrowLayout && showSidebar && (
                             <label style={{ marginLeft: 'auto', fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>全プロジェクト表示</span>
+                              <span>{t('all_projects')}</span>
                               <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
                             </label>
                           )}
@@ -488,7 +490,7 @@ function App() {
             {!isNarrowLayout && (
               <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, marginBottom: isMobile ? '0px' : '21px' }}>
                 <label style={{ fontSize: '0.85em', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>全プロジェクト表示</span>
+                  <span>{t('all_projects')}</span>
                   <div className="toggle-switch"><input type="checkbox" checked={showAllProjectsInCalendar} onChange={(e) => setShowAllProjectsInCalendar(e.target.checked)} /><span className="slider"></span></div>
                 </label>
               </div>
@@ -522,13 +524,13 @@ function App() {
           {!isMobile && (
             <div style={{ marginTop: '10px', flexShrink: 0 }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '32px' }}>
-                {isDev && <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: 'var(--text-placeholder)', background: 'transparent', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} >{showDebug ? 'デバッグを隠す' : 'デバッグを表示'}</button>}
+                {isDev && <button onClick={() => setShowDebug(!showDebug)} style={{ fontSize: '0.7em', color: 'var(--text-placeholder)', background: 'transparent', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} >{showDebug ? t('hide_debug') : t('show_debug')}</button>}
                 <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: '15px' }}>
                   <button disabled={!canUndo} onClick={undo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canUndo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={18} /></button>
                   <button disabled={!canRedo} onClick={redo} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: canRedo ? 'pointer' : 'default', padding: '4px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={18} /></button>
                 </div>
               </div>
-              {isDev && showDebug && <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-button)', borderRadius: '8px', fontSize: '0.75em', color: 'var(--text-secondary)', maxHeight: '400px', overflowY: 'auto' }}><p><b>プロジェクト名:</b> {data.projectName}</p><p><b>適用マッピング:</b> <span style={{ color: 'var(--color-info)' }}>{debugInfo.mappingInfo}</span></p></div>}
+              {isDev && showDebug && <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-button)', borderRadius: '8px', fontSize: '0.75em', color: 'var(--text-secondary)', maxHeight: '400px', overflowY: 'auto' }}><p><b>{t('project_name')}:</b> {data.projectName}</p><p><b>{t('applied_mapping')}</b> <span style={{ color: 'var(--color-info)' }}>{debugInfo.mappingInfo}</span></p></div>}
             </div>
           )}
         </div>

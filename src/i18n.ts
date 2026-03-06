@@ -5,7 +5,6 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getBrowserLanguage } from './utils/languageUtils';
 
-// TODO: 翻訳データが増えた場合は、別ファイル(JSONなど)に分割してimportすることを推奨します
 const resources = {
   en: {
     translation: {
@@ -38,7 +37,21 @@ const resources = {
       status_todo: 'Todo',
       status_doing: 'Doing',
       status_done: 'Done',
-      status_suspend: 'Suspend'
+      status_suspend: 'Suspend',
+      cloud_project_detected: 'Cloud Project Detected',
+      cloud_project_desc_1: 'This project exists in the cloud.',
+      cloud_project_desc_2: 'Do you want to display the latest cloud data?',
+      cloud_project_cancel_desc: '(Selecting [Cancel] will display and merge the loaded JSON data)',
+      show_latest_data: 'Show Latest Data',
+      syncing: 'Syncing...',
+      sync_error: 'Sync error. Click to retry.',
+      save_to_cloud: 'Save to Cloud',
+      synced: 'Synced to cloud. Click to sync manually.',
+      total_progress: 'Total Progress',
+      hide_debug: 'Hide Debug',
+      show_debug: 'Show Debug',
+      applied_mapping: 'Applied Mapping:',
+      copy_complete: 'Copy completed'
     }
   },
   ja: {
@@ -72,7 +85,21 @@ const resources = {
       status_todo: '未着手',
       status_doing: '進行中',
       status_done: '完了',
-      status_suspend: '休止'
+      status_suspend: '休止',
+      cloud_project_detected: 'クラウドプロジェクトの検出',
+      cloud_project_desc_1: 'このプロジェクトはクラウド上に存在します。',
+      cloud_project_desc_2: 'クラウドの最新データを表示しますか？',
+      cloud_project_cancel_desc: '（[キャンセル]を選択すると、読み込んだJSONデータを表示・マージします）',
+      show_latest_data: '最新データを表示',
+      syncing: '同期待機中・同期中',
+      sync_error: '同期エラー。クリックで再試行',
+      save_to_cloud: 'クラウドに保存',
+      synced: 'クラウド同期済み。クリックで手動同期',
+      total_progress: '全進捗',
+      hide_debug: 'デバッグを隠す',
+      show_debug: 'デバッグを表示',
+      applied_mapping: '適用マッピング:',
+      copy_complete: 'コピー完了'
     }
   }
 };
