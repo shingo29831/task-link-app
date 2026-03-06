@@ -51,7 +51,21 @@ const resources = {
       hide_debug: 'Hide Debug',
       show_debug: 'Show Debug',
       applied_mapping: 'Applied Mapping:',
-      copy_complete: 'Copy completed'
+      copy_complete: 'Copy completed',
+      // ▼ ここから TaskItem.tsx 用の追加分
+      collapse: 'Collapse',
+      expand: 'Expand',
+      double_click_to_edit: 'Double click to edit details',
+      overdue_days: '{{days}} days overdue',
+      due_today: 'Due today',
+      days_remaining: '{{days}} days left',
+      set_deadline: 'Set deadline',
+      batch_change_status: 'Batch Change Status',
+      status_todo_label: 'Todo',
+      status_doing_label: 'Doing',
+      status_done_label: 'Done',
+      confirm_complete_all_children: 'This will mark all subtasks as "Done".\nAre you sure?',
+      status_suspend_label: 'Suspend'
     }
   },
   ja: {
@@ -99,7 +113,21 @@ const resources = {
       hide_debug: 'デバッグを隠す',
       show_debug: 'デバッグを表示',
       applied_mapping: '適用マッピング:',
-      copy_complete: 'コピー完了'
+      copy_complete: 'コピー完了',
+      // ▼ ここから TaskItem.tsx 用の追加分
+      collapse: '折りたたむ',
+      expand: '展開する',
+      double_click_to_edit: 'ダブルクリックで詳細編集',
+      overdue_days: '{{days}}日超過',
+      due_today: '今日まで',
+      days_remaining: 'あと{{days}}日',
+      set_deadline: '期限を設定',
+      batch_change_status: '状態を一括変更',
+      status_todo_label: '未着手 (Todo)',
+      status_doing_label: '進行中 (Doing)',
+      status_done_label: '完了 (Done)',
+      confirm_complete_all_children: 'すべての子タスクを「完了」にします。\nよろしいですか？',
+      status_suspend_label: '休止 (Suspend)'
     }
   }
 };
