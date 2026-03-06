@@ -1,7 +1,5 @@
-// 役割: プロジェクト単位の操作（リンク共有、データ出力・読み込み）を提供するコントロールUI
-// なぜ: ヘッダー部分から共通操作へアクセスできるようにするため
-
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useResponsive } from '../hooks/useResponsive';
 import { IconLink, IconArrowUp, IconArrowDown, IconInputOutput} from './Icons';
 
@@ -15,6 +13,7 @@ interface Props {
 }
 
 export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImport, onImportFromUrl, showModal, setShowModal }) => {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [urlInput, setUrlInput] = useState('');
   
@@ -23,7 +22,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onImport(e.target.files[0]);
-      e.target.value = ''; // Reset input
+      e.target.value = ''; 
       setShowModal(false);
     }
   };
@@ -47,21 +46,19 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         justifyContent: 'flex-end'
       }}>
         
-        {/* リンクコピーボタン */}
         {!isNarrowLayout && (
-          <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }} title="リンクをコピー">
+          <button onClick={onCopyLink} style={{ backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }} title={t('copy_link')}>
             <IconLink size={18} />
-            <span>{windowWidth < 1280 ? "リンク" : "リンクをコピー"}</span>
+            <span>{windowWidth < 1280 ? t('link') : t('copy_link')}</span>
           </button>
         )}
         
-        {/* 入出力ボタン */}
         {!isNarrowLayout && (
-          <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
+          <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title={t('export_import')}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <IconInputOutput size={20} />
+              <IconInputOutput size={14} />
             </div>
-            <span>{windowWidth < 1280 ? "入出力" : "出力 / 読み込み"}</span>
+            <span>{windowWidth < 1280 ? t('io') : t('export_import')}</span>
           </button>
         )}
 
@@ -74,7 +71,6 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         />
       </div>
 
-      {/* 入出力選択モーダル */}
       {showModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -87,34 +83,34 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
             display: 'flex', flexDirection: 'column', gap: '20px'
           }} onClick={e => e.stopPropagation()}>
             
-            <h3 style={{ margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>メニュー</h3>
+            <h3 style={{ margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>{t('menu')}</h3>
 
             {isNarrowLayout && (
               <div>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>共有</h4>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>{t('share')}</h4>
                 <button 
                   onClick={() => { onCopyLink(); setShowModal(false); }} 
                   style={{ width: '100%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                  <IconLink size={18} /> リンクをコピー
+                  <IconLink size={18} /> {t('copy_link')}
                 </button>
               </div>
             )}
 
             <div>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>ファイル操作 (.json)</h4>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>{t('file_operations')}</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={onExport} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  <IconArrowUp size={16} /> ファイル出力
+                  <IconArrowUp size={16} /> {t('export_file')}
                 </button>
                 <button onClick={() => fileInputRef.current?.click()} style={{ flex: 1, backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  <IconArrowDown size={16} /> ファイル読み込み
+                  <IconArrowDown size={16} /> {t('import_file')}
                 </button>
               </div>
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>共有URLから読み込み</h4>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--text-placeholder)' }}>{t('import_from_url')}</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input 
                   type="text" 
@@ -124,16 +120,16 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
                   style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
                 <button onClick={handleUrlImport} style={{ backgroundColor: 'var(--color-info)', color: '#fff' }}>
-                  読み込み
+                  {t('import')}
                 </button>
               </div>
               <p style={{ fontSize: '0.75em', color: 'var(--text-secondary)', marginTop: '5px' }}>
-                ※共有リンクに含まれるデータを現在の環境にインポートします。
+                {t('import_url_desc')}
               </p>
             </div>
 
             <button onClick={() => setShowModal(false)} style={{ marginTop: '10px', backgroundColor: 'var(--border-light)', color: 'var(--text-primary)' }}>
-              閉じる
+              {t('close')}
             </button>
           </div>
         </div>

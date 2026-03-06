@@ -1,4 +1,3 @@
-// shingo29831/task-link-app/task-link-app-feature-backend/src/i18n.ts
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getBrowserLanguage } from './utils/languageUtils';
@@ -16,7 +15,7 @@ const resources = {
       add_task: 'Add Task',
       save: 'Save',
       cancel: 'Cancel',
-      close: 'Close', // ▼ 追加
+      close: 'Close',
       delete: 'Delete',
       settings: 'Settings',
       help: 'Help',
@@ -83,8 +82,6 @@ const resources = {
       confirm_child_change_desc: 'Changing the parent task status will overwrite all subtasks.\nAre you sure?',
       confirm_change: 'Confirm Change',
       task_name_empty_error: 'Task name cannot be empty.',
-
-      // ▼ 今回の追加分
       others_count: '+{{count}} more...',
       task_for_date: 'Tasks for {{date}}',
       no_tasks: 'No tasks',
@@ -92,7 +89,74 @@ const resources = {
       change_status_title: 'Change status',
       add_task_title: 'Add task',
       parent_status_warning: 'Changing parent status affects subtasks.',
-      please_add_task: 'Please add a task'
+      please_add_task: 'Please add a task',
+
+      // ProjectSettingsModal
+      project_settings: 'Project Settings',
+      update: 'Update',
+      error_project_name_required: 'Please enter a project name',
+      error_project_name_length: 'Project name must be within 40 characters',
+      error_project_name_duplicate: 'This project name is already in use.',
+      cloud_sync: 'Cloud Sync',
+      disable_sync: 'Disable Sync',
+      enable_sync: 'Enable Sync',
+      public_access_settings: 'Public Access Settings',
+      public_access_desc: 'Allow anyone with the link to access the project',
+      public: 'Public',
+      private: 'Private',
+      save_data_in_link: 'Save Data in Link',
+      on: 'On',
+      off: 'Off',
+      invite_user: 'Invite User',
+      placeholder_username: 'Enter username',
+      invite: 'Invite',
+      member_list: 'Member List',
+      no_members: 'No members',
+      role_viewer: 'Viewer',
+      role_editor: 'Editor',
+      role_admin: 'Admin',
+      remove_member: 'Remove',
+      danger_zone: 'Danger Zone',
+      delete_cloud_data: 'Delete Cloud Data',
+      delete_local_project: 'Delete Local Project',
+      confirm_local_delete: 'Are you sure you want to delete this project locally?\n(Cloud data will not be deleted)',
+      delete_project_from_cloud: 'Delete Project from Cloud',
+      cloud_delete_warning: 'This action cannot be undone. All tasks and sharing settings associated with this project will be permanently deleted from the cloud.\n\nTo confirm, please type the project name',
+      permanently_delete: 'Permanently Delete',
+      confirm_disable_sync_title: 'Disable Cloud Sync?',
+      confirm_disable_sync_desc: 'If you turn off cloud sync, data on the cloud will be deleted and saved only locally. Are you sure?',
+      disable: 'Disable',
+      save_data_in_link_desc: 'When enabled, the current task data is included in the link URL.\nBy accessing this link, you can restore the task state at the time the link was generated.',
+      enable: 'Enable',
+
+      // SharedProjectModal
+      select_data_to_display: 'Select Data to Display',
+      select_data_desc: 'The URL contains data at the time the link was shared. Which data do you want to display?',
+      latest_cloud_data: 'Latest Cloud Data',
+      data_at_link_time: 'Data at URL Link Time',
+      how_to_open_project: 'How to Open Project',
+      your_role: 'Your Role:',
+      role_view_only: 'View Only',
+      role_can_edit: 'Can Edit',
+      role_owner: 'Owner',
+      view_edit_as_is: 'View/Edit as is',
+      merge_into_local: 'Merge into current local project',
+      back_to_data_selection: 'Back to Data Selection',
+      link_data_corrupted: 'Link data is corrupted. Displaying latest data.',
+
+      // ProjectControls
+      copy_link: 'Copy Link',
+      link: 'Link',
+      export_import: 'Export / Import',
+      io: 'I/O',
+      menu: 'Menu',
+      share: 'Share',
+      file_operations: 'File Operations (.json)',
+      export_file: 'Export File',
+      import_file: 'Import File',
+      import_from_url: 'Import from Shared URL',
+      import: 'Import',
+      import_url_desc: 'Imports data included in the shared link into the current environment.'
     }
   },
   ja: {
@@ -107,7 +171,7 @@ const resources = {
       add_task: 'タスクを追加',
       save: '保存',
       cancel: 'キャンセル',
-      close: '閉じる', // ▼ 追加
+      close: '閉じる',
       delete: '削除',
       settings: '設定',
       help: 'ヘルプ',
@@ -174,8 +238,6 @@ const resources = {
       confirm_child_change_desc: '親タスクの状態を変更すると、すべての子タスクの状態も上書きされます。\n本当によろしいですか？',
       confirm_change: '変更する',
       task_name_empty_error: 'タスク名は空にできません',
-
-      // ▼ 今回の追加分
       others_count: '他{{count}}件...',
       task_for_date: '{{date}}のタスク',
       no_tasks: 'タスクはありません',
@@ -183,7 +245,74 @@ const resources = {
       change_status_title: '状態を変更',
       add_task_title: 'タスクを追加',
       parent_status_warning: '親タスクの状態を変更すると、子タスクにも影響します。',
-      please_add_task: 'タスクを追加してください'
+      please_add_task: 'タスクを追加してください',
+
+      // ProjectSettingsModal
+      project_settings: 'プロジェクト設定',
+      update: '更新',
+      error_project_name_required: 'プロジェクト名を入力してください',
+      error_project_name_length: 'プロジェクト名は全角20文字（半角40文字）以内で入力してください',
+      error_project_name_duplicate: '他のプロジェクト名で使用しています。',
+      cloud_sync: 'クラウド同期',
+      disable_sync: '同期解除',
+      enable_sync: '同期する',
+      public_access_settings: '全体への公開設定',
+      public_access_desc: 'リンクを知っている全員がプロジェクトにアクセスできるようにします',
+      public: '公開',
+      private: '非公開',
+      save_data_in_link: 'リンクにデータを保存',
+      on: 'オン',
+      off: 'オフ',
+      invite_user: 'ユーザーを招待',
+      placeholder_username: 'ユーザー名を入力',
+      invite: '招待',
+      member_list: 'メンバー一覧',
+      no_members: 'メンバーはいません',
+      role_viewer: '閲覧者',
+      role_editor: '編集者',
+      role_admin: '管理者',
+      remove_member: '削除',
+      danger_zone: '危険な操作',
+      delete_cloud_data: 'クラウドデータを削除',
+      delete_local_project: 'ローカルからプロジェクト削除',
+      confirm_local_delete: 'このプロジェクトをローカルから削除しますか？\n(クラウド上のデータは削除されません)',
+      delete_project_from_cloud: 'クラウドからプロジェクトを削除',
+      cloud_delete_warning: 'この操作は取り消せません。プロジェクトに関連するすべてのタスクと共有設定がクラウドから完全に削除されます。\n\n確認のため、プロジェクト名',
+      permanently_delete: '完全に削除する',
+      confirm_disable_sync_title: 'クラウド同期を解除しますか？',
+      confirm_disable_sync_desc: 'クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？',
+      disable: '解除する',
+      save_data_in_link_desc: '有効にするとリンクURLに現在のタスクデータが含まれます。\nこのリンクで遷移することで、リンク生成時のタスク状況に復元することができます。',
+      enable: '有効にする',
+
+      // SharedProjectModal
+      select_data_to_display: '表示するデータの選択',
+      select_data_desc: 'URLにリンク共有時点でのデータが含まれています。どちらのデータを表示しますか？',
+      latest_cloud_data: 'クラウド上の最新データ',
+      data_at_link_time: 'URLリンク時点のデータ',
+      how_to_open_project: 'プロジェクトの開き方',
+      your_role: 'あなたの権限:',
+      role_view_only: '閲覧のみ',
+      role_can_edit: '編集可能',
+      role_owner: 'オーナー',
+      view_edit_as_is: 'このまま閲覧・編集する',
+      merge_into_local: '現在のローカルプロジェクトにマージ',
+      back_to_data_selection: 'データ選択に戻る',
+      link_data_corrupted: 'リンクのデータが破損しています。最新データを表示します。',
+
+      // ProjectControls
+      copy_link: 'リンクをコピー',
+      link: 'リンク',
+      export_import: '出力 / 読み込み',
+      io: '入出力',
+      menu: 'メニュー',
+      share: '共有',
+      file_operations: 'ファイル操作 (.json)',
+      export_file: 'ファイル出力',
+      import_file: 'ファイル読み込み',
+      import_from_url: '共有URLから読み込み',
+      import: '読み込み',
+      import_url_desc: '※共有リンクに含まれるデータを現在の環境にインポートします。'
     }
   }
 };
