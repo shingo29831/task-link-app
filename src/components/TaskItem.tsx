@@ -1,3 +1,4 @@
+// shingo29831/task-link-app/task-link-app-feature-backend/src/components/TaskItem.tsx
 // 役割: 個別のタスクを表示し、ステータス変更やドラッグ＆ドロップのターゲットとなるUIコンポーネント
 // なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
 
@@ -78,6 +79,8 @@ export const TaskItem: React.FC<Props> = ({
   const [insertPosition, setInsertPosition] = useState<'top' | 'bottom' | null>(null);
 
   const { windowWidth, isMobile } = useResponsive();
+  const { active } = useDndContext();
+  const isDraggingAny = !!active;
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
@@ -275,8 +278,8 @@ export const TaskItem: React.FC<Props> = ({
           </>
         </div>
         
-        {/* モバイル時はインラインのボタンを非表示にする */}
-        {!isViewer && !isMobile && (
+        {/* モバイル時、またはDnD中はインラインのボタンを非表示にする */}
+        {!isViewer && !isMobile && !isDraggingAny && (
           <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21 }}>
             <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
