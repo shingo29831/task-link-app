@@ -128,6 +128,61 @@ export const useTaskMutations = (
     save(newTasks);
   }, [data, save]);
 
+  // ▼ 新規追加: タスクの詳細（名前・期限・ステータス）を一括で更新する関数
+  const updateTaskDetails = useCallback((id: string, newName: string, dateStr: string, newStatus?: 0 | 1 | 2 | 3, updateChildrenStatus: boolean = false) => {
+    if (!data || !newName.trim()) return;
+
+    let targetProjId = data.id;
+    let realTaskId = id;
+
+    if (id.includes('_')) {
+        const [projId, parsedTaskId] = id.split('_');
+        const isCurrent = (data?.tasks || []).some((t: Task) => t.id === id);
+        if (!isCurrent) {
+            targetProjId = projId;
+            realTaskId = parsedTaskId;
+        }
+    }
+    if (!targetProjId) return;
+
+    const targetTask = (data.tasks || []).find((t: Task) => t.id === realTaskId);
+    if (!targetTask) return;
+
+    const isDuplicate = (data.tasks || []).some((t: Task) => !t.isDeleted && t.id !== realTaskId && t.parentId === targetTask.parentId && t.name === newName);
+    if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
+
+    let newDeadline: number | undefined;
+    if (dateStr) { 
+        const [y, m, d] = dateStr.split('-').map(Number); 
+        newDeadline = new Date(y, m - 1, d).getTime(); 
+    } else { 
+        newDeadline = undefined; 
+    }
+
+    applyCloudSyncForStatusChange(targetProjId, (tasks) => {
+        let nextTasks = [...tasks];
+        const now = Date.now();
+
+        if (newStatus !== undefined && updateChildrenStatus) {
+            if (newStatus === 2) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: now } : t);
+            } else if (newStatus === 0) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: now } : t);
+            } else if (newStatus === 1) { 
+                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: now } : t);
+            }
+        }
+
+        return nextTasks.map((t: Task) => {
+            if (t.id === realTaskId) {
+                const finalStatus = newStatus !== undefined ? newStatus : t.status;
+                return { ...t, name: newName, deadline: newDeadline, status: finalStatus, lastUpdated: now };
+            }
+            return t;
+        });
+    });
+  }, [data, applyCloudSyncForStatusChange]);
+
   const handleAddTaskWrapper = useCallback((taskName: string, dateStr: string, activeParentId: string | null, targetParentId?: string) => {
     if (!taskName.trim() || !data) return;
     let deadline: number | undefined;
@@ -189,14 +244,12 @@ export const useTaskMutations = (
     }
   }, [data, save]);
 
-  // 開閉状態のトグル（JSONデータに直接書き込む）
   const toggleTaskExpand = useCallback((taskId: string) => {
     if (!data) return;
     const newTasks = (data.tasks || []).map((t: Task) => {
       if (t.id === taskId) {
         return {
           ...t,
-          // undefined (デフォルト展開) または true なら false にする
           isExpanded: t.isExpanded === false ? true : false,
           lastUpdated: Date.now()
         };
@@ -206,5 +259,6 @@ export const useTaskMutations = (
     save(newTasks);
   }, [data, save]);
 
-  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand };
+  // updateTaskDetails を戻り値に追加
+  return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand, updateTaskDetails };
 };
