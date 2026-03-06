@@ -1,7 +1,11 @@
+// 役割: Reactアプリケーションのエントリーポイント
+// なぜ: ルートコンポーネントのレンダリング、グローバルなプロバイダー(Clerk)および初期設定(CSS, i18n)を適用するため
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './theme.css' // 追加
 import './index.css'
+import './i18n' // ★追加: i18nの初期化を読み込む
 import App from './App.tsx'
 import { ClerkProvider } from '@clerk/clerk-react'
 
