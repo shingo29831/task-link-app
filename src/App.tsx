@@ -47,7 +47,8 @@ function App() {
     collapsedNodeIds, inputTaskName, setInputTaskName, inputDateStr, setInputDateStr, activeParentId,
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
-    deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
+    deleteTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
+    updateTaskDetails, // ▼ 追加
     addTask, handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
@@ -164,7 +165,22 @@ function App() {
     );
   }
 
-  if (!data) return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
+  if (!data) {
+    if (sharedProjectState) {
+      return (
+        <SharedProjectModal 
+          sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
+          onOpenAsProject={(sharedData) => { 
+            setData(sharedData);
+            addOrUpdateProject(sharedData); 
+            switchProject(sharedData.id); 
+          }}
+          onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
+        />
+      );
+    }
+    return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>Loading...</div>;
+  }
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
     let BASE_WIDTH = 220, INDENT_WIDTH = 24, CHAR_WIDTH_PX = 12, DEADLINE_WIDTH = 80;
@@ -274,14 +290,11 @@ function App() {
         <TaskEditModal 
           task={editingTask} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
+          // ▼ 単一の関数呼び出しで一括更新するように修正
           onSave={(newName, newDateStr, newStatus) => {
-            if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
-            updateTaskDeadline(editingTask.id, newDateStr);
-            if (newStatus !== editingTask.status) {
-              const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
-              if (hasChild) updateParentStatus(editingTask.id, newStatus);
-              else updateTaskStatus(editingTask.id, newStatus);
-            }
+            const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
+            const statusChanged = newStatus !== editingTask.status;
+            updateTaskDetails(editingTask.id, newName, newDateStr, statusChanged ? newStatus : undefined, hasChild && statusChanged);
             setEditingTask(null);
           }}
           onDelete={() => { deleteTask(editingTask.id); setEditingTask(null); }}
@@ -463,13 +476,19 @@ function App() {
       {sharedProjectState && (
         <SharedProjectModal 
           sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
-          onOpenAsProject={(sharedData) => { addOrUpdateProject(sharedData); }}
+          onOpenAsProject={(sharedData) => { 
+            setData(sharedData);
+            addOrUpdateProject(sharedData); 
+            switchProject(sharedData.id); 
+          }}
           onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
         />
       )}
 
       {isViewer ? (
-        <>{mainAppContent}</>
+        <DndContext>
+          {mainAppContent}
+        </DndContext>
       ) : (
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
           {mainAppContent}

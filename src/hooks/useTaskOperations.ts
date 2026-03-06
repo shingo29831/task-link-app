@@ -47,7 +47,8 @@ export const useTaskOperations = () => {
   const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar);
 
   // 3. タスクの更新処理 (useTaskMutations)
-  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand } = useTaskMutations(
+  // ▼ updateTaskDetails を追加して受け取る
+  const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand, updateTaskDetails } = useTaskMutations(
     data, setData, projectsRef, activeId, updateProject, activeTasks, menuOpenTaskId, setMenuOpenTaskId
   );
 
@@ -95,12 +96,10 @@ export const useTaskOperations = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, canUndo, canRedo]);
 
-  // 互換性維持のため、タスクデータから閉じたノードのSetを生成する
   const collapsedNodeIds = useMemo(() => {
     const set = new Set<string>();
     if (data?.tasks) {
       data.tasks.forEach(t => {
-        // デフォルトは展開とみなすため、明示的に false の場合のみ閉じる
         if (t.isExpanded === false) {
           set.add(t.id);
         }
@@ -123,6 +122,7 @@ export const useTaskOperations = () => {
     menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
+    updateTaskDetails, // ▼ 追加
     addTask: baseHandleAddTask,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
