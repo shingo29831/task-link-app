@@ -8,11 +8,13 @@ import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   tasks: Task[];
+  activeTasks: Task[];
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
+  onAddTask: (name: string, dateStr: string, parentId?: string) => void;
 }
 
-export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentStatusChange }) => {
+export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChange, onParentStatusChange, onAddTask }) => {
   const { isMobile } = useResponsive();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -122,8 +124,10 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, onStatusChange, onParentS
             <TaskDetailModal 
                 date={selectedDate} 
                 tasks={getDayTasks(selectedDate)} 
+                activeTasks={activeTasks}
                 onStatusChange={onStatusChange}
                 onParentStatusChange={onParentStatusChange}
+                onAddTask={onAddTask}
                 onClose={() => setSelectedDate(null)} 
             />
         )}
