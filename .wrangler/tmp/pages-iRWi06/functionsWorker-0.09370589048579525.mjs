@@ -23188,6 +23188,45 @@ app.post("/user/sync", async (c) => {
     return c.json({ error: "Database error" }, 500);
   }
 });
+app.get("/user/settings", async (c) => {
+  const auth = getAuth(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const db = getDb(c.env.DATABASE_URL);
+  try {
+    const userRecord = await db.select().from(users).where(eq(users.id, auth.userId));
+    if (userRecord.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const settings = {
+      language: userRecord[0].language,
+      timezone: userRecord[0].timezone,
+      theme: userRecord[0].theme,
+      weekStartsOn: userRecord[0].weekStartsOn
+    };
+    return c.json(settings);
+  } catch (error) {
+    console.error("Fetch settings error:", error);
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.put("/user/settings", async (c) => {
+  const auth = getAuth(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json();
+  const db = getDb(c.env.DATABASE_URL);
+  try {
+    await db.update(users).set({
+      language: body.language,
+      timezone: body.timezone,
+      theme: body.theme,
+      weekStartsOn: body.weekStartsOn
+    }).where(eq(users.id, auth.userId));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Update settings error:", error);
+    return c.json({ error: "Database error" }, 500);
+  }
+});
 app.post("/projects", async (c) => {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
@@ -23935,7 +23974,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-rfFM5Z/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-zTjw28/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -23967,7 +24006,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-rfFM5Z/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-zTjw28/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
