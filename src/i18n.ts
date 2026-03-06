@@ -1,3 +1,4 @@
+// shingo29831/task-link-app/task-link-app-feature-backend/src/i18n.ts
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getBrowserLanguage } from './utils/languageUtils';
@@ -15,6 +16,7 @@ const resources = {
       add_task: 'Add Task',
       save: 'Save',
       cancel: 'Cancel',
+      close: 'Close', // ▼ 追加
       delete: 'Delete',
       settings: 'Settings',
       help: 'Help',
@@ -62,8 +64,6 @@ const resources = {
       status_done_label: 'Done',
       confirm_complete_all_children: 'This will mark all subtasks as "Done".\nAre you sure?',
       status_suspend_label: 'Suspend',
-      
-      // ▼ 追加: TaskAddModal, TaskEditModal, TaskInput
       add_new_task: 'Add New Task',
       placeholder_enter_task: 'Enter task...',
       placeholder_enter_new_task: 'Enter new task...',
@@ -82,7 +82,17 @@ const resources = {
       confirm_child_change_title: 'Confirm Subtask Change',
       confirm_child_change_desc: 'Changing the parent task status will overwrite all subtasks.\nAre you sure?',
       confirm_change: 'Confirm Change',
-      task_name_empty_error: 'Task name cannot be empty.'
+      task_name_empty_error: 'Task name cannot be empty.',
+
+      // ▼ 今回の追加分
+      others_count: '+{{count}} more...',
+      task_for_date: 'Tasks for {{date}}',
+      no_tasks: 'No tasks',
+      change_parent_status_title: 'Change parent status (updates subtasks)',
+      change_status_title: 'Change status',
+      add_task_title: 'Add task',
+      parent_status_warning: 'Changing parent status affects subtasks.',
+      please_add_task: 'Please add a task'
     }
   },
   ja: {
@@ -97,6 +107,7 @@ const resources = {
       add_task: 'タスクを追加',
       save: '保存',
       cancel: 'キャンセル',
+      close: '閉じる', // ▼ 追加
       delete: '削除',
       settings: '設定',
       help: 'ヘルプ',
@@ -144,8 +155,6 @@ const resources = {
       status_done_label: '完了 (Done)',
       confirm_complete_all_children: 'すべての子タスクを「完了」にします。\nよろしいですか？',
       status_suspend_label: '休止 (Suspend)',
-
-      // ▼ 追加: TaskAddModal, TaskEditModal, TaskInput
       add_new_task: '新規タスク追加',
       placeholder_enter_task: 'タスクを入力...',
       placeholder_enter_new_task: '新しいタスクを入力...',
@@ -164,7 +173,17 @@ const resources = {
       confirm_child_change_title: '⚠️ 子タスクの変更確認',
       confirm_child_change_desc: '親タスクの状態を変更すると、すべての子タスクの状態も上書きされます。\n本当によろしいですか？',
       confirm_change: '変更する',
-      task_name_empty_error: 'タスク名は空にできません'
+      task_name_empty_error: 'タスク名は空にできません',
+
+      // ▼ 今回の追加分
+      others_count: '他{{count}}件...',
+      task_for_date: '{{date}}のタスク',
+      no_tasks: 'タスクはありません',
+      change_parent_status_title: '親タスクの状態変更 (子タスクも更新)',
+      change_status_title: '状態を変更',
+      add_task_title: 'タスクを追加',
+      parent_status_warning: '親タスクの状態を変更すると、子タスクにも影響します。',
+      please_add_task: 'タスクを追加してください'
     }
   }
 };

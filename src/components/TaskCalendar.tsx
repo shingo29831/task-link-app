@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { ja, enUS } from 'date-fns/locale'; // ▼ 英語ロケールを追加
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 import type { Task } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { IconChevronLeft, IconChevronRight } from './Icons';
@@ -16,6 +17,7 @@ interface Props {
 
 export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChange, onParentStatusChange, onAddTask }) => {
   const { isMobile } = useResponsive();
+  const { t, i18n } = useTranslation(); // ▼ 追加
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -26,7 +28,14 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
   const endDate = addDays(startDate, 41);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+  
+  // ▼ i18nの言語設定に応じて曜日やフォーマットを切り替え
+  const isEnglish = i18n.language === 'en';
+  const dateLocale = isEnglish ? enUS : ja;
+  const monthYearFormat = isEnglish ? 'MMMM yyyy' : 'yyyy年 M月';
+  const weekDays = isEnglish 
+    ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    : ['日', '月', '火', '水', '木', '金', '土'];
 
   const getDayTasks = (day: Date) => {
      return tasks.filter(t => {
@@ -45,7 +54,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
                 <IconChevronLeft size={16} />
             </button>
-            <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{format(currentMonth, 'yyyy年 M月', { locale: ja })}</span>
+            <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{format(currentMonth, monthYearFormat, { locale: dateLocale })}</span>
             <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', minWidth: 'auto', backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)' }}>
                 <IconChevronRight size={16} />
             </button>
@@ -111,7 +120,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
                             })}
                             {dayTasks.length > MAX_DISPLAY_TASKS && (
                                 <div style={{ fontSize: '0.75em', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                    他{dayTasks.length - MAX_DISPLAY_TASKS}件...
+                                    {t('others_count', { count: dayTasks.length - MAX_DISPLAY_TASKS })}
                                 </div>
                             )}
                         </div>
