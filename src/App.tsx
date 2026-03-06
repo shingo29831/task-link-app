@@ -1,9 +1,10 @@
+// shingo29831/task-link-app/task-link-app-feature-backend/src/App.tsx
 // 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  DndContext, DragOverlay, type DragStartEvent, type DragEndEvent
+  DndContext, DragOverlay, type DragStartEvent, type DragEndEvent, type DragOverEvent
 } from '@dnd-kit/core';
 import {
   SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy
@@ -48,7 +49,7 @@ function App() {
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
-    updateTaskDetails, // ▼ 追加
+    updateTaskDetails,
     addTask, handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
@@ -61,6 +62,7 @@ function App() {
 
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null); // ▼ 追加: DnD中の親タスクハイライト用
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
@@ -113,8 +115,43 @@ function App() {
     setActiveDragId(event.active.id as string); 
     if (navigator.vibrate) navigator.vibrate(50); 
   };
-  const handleDragEndWrapper = (event: DragEndEvent) => { setActiveDragId(null); handleDragEnd(event); };
-  const handleDragCancel = () => { setActiveDragId(null); };
+  
+  // ▼ 追加: ドラッグ中の移動を検知して、挿入予定の親タスクIDを特定する
+  const handleDragMove = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over) {
+      if (activeDropParentId !== null) setActiveDropParentId(null);
+      return;
+    }
+    const overIdStr = String(over.id);
+    if (overIdStr === 'root-board') {
+      if (activeDropParentId !== null) setActiveDropParentId(null);
+      return;
+    }
+    const isNestDrop = overIdStr.startsWith('nest-');
+    const targetIdRaw = isNestDrop ? overIdStr.replace('nest-', '') : overIdStr;
+    
+    const overTask = data?.tasks?.find((t: Task) => t.id === targetIdRaw);
+    if (!overTask) {
+      if (activeDropParentId !== null) setActiveDropParentId(null);
+      return;
+    }
+
+    const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
+    if (activeDropParentId !== (nextParentId || null)) {
+      setActiveDropParentId(nextParentId || null);
+    }
+  };
+
+  const handleDragEndWrapper = (event: DragEndEvent) => { 
+    setActiveDragId(null); 
+    setActiveDropParentId(null);
+    handleDragEnd(event); 
+  };
+  const handleDragCancel = () => { 
+    setActiveDragId(null); 
+    setActiveDropParentId(null);
+  };
 
   const activeDragTask = data?.tasks?.find((t: Task) => t.id === activeDragId);
 
@@ -194,14 +231,26 @@ function App() {
   };
 
   const renderColumnChildren = (nodes: TaskNode[], depth = 0) => {
-    const content = nodes.map(n => (
-      <React.Fragment key={n.id}>
-        <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
-            {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
-        </SortableTaskItem>
-      </React.Fragment>
-    ));
+    const content = nodes.map(n => {
+      const isTargetParent = activeDropParentId === n.id;
+      return (
+        <React.Fragment key={n.id}>
+          <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
+            {/* ▼ 追加: 対象の親タスクおよびその子タスク全体を囲うコンテナ */}
+            <div style={{
+              outline: isTargetParent ? '2px dashed var(--color-primary)' : 'none',
+              outlineOffset: '2px',
+              borderRadius: '4px',
+              transition: 'outline 0.2s',
+              backgroundColor: isTargetParent ? 'var(--bg-item-hover)' : 'transparent',
+            }}>
+              <TaskItem task={n} tasks={data.tasks || []} depth={depth} hasChildren={n.children.length > 0} onStatusChange={(s) => updateTaskStatus(n.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(n.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(n.id, dateStr)} isExpanded={!collapsedNodeIds.has(n.id)} onToggleExpand={() => toggleNodeExpansion(n.id)} onClick={() => handleTaskClick(n)} isMenuOpen={menuOpenTaskId === n.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === n.id ? null : n.id)} isActiveParent={activeParentId === n.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(n)} />
+              {n.children.length > 0 && !collapsedNodeIds.has(n.id) && <div style={{ paddingLeft: '0px' }}>{renderColumnChildren(n.children, depth + 1)}</div>}
+            </div>
+          </SortableTaskItem>
+        </React.Fragment>
+      );
+    });
 
     return isViewer ? <>{content}</> : <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>{content}</SortableContext>;
   };
@@ -222,9 +271,16 @@ function App() {
 
   const rootNodesContent = rootNodes.map(root => {
     const colWidth = calculateColumnWidth(root);
+    const isTargetParent = activeDropParentId === root.id; // ▼ 追加
     return (
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
-        <div style={{ minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, backgroundColor: 'var(--bg-task)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab' }}>
+        <div style={{ 
+            minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, 
+            backgroundColor: 'var(--bg-task)', borderRadius: '8px', 
+            border: isTargetParent ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', // ▼ 修正
+            padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab',
+            transition: 'border 0.2s' // ▼ 追加
+        }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
                 <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
             </div>
@@ -290,7 +346,6 @@ function App() {
         <TaskEditModal 
           task={editingTask} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
-          // ▼ 単一の関数呼び出しで一括更新するように修正
           onSave={(newName, newDateStr, newStatus) => {
             const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
             const statusChanged = newStatus !== editingTask.status;
@@ -490,7 +545,7 @@ function App() {
           {mainAppContent}
         </DndContext>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
+        <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEndWrapper} onDragCancel={handleDragCancel} autoScroll={!isMobile} >
           {mainAppContent}
           <DragOverlay dropAnimation={null}>
             {activeDragTask ? (
