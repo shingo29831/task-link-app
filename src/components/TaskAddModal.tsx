@@ -1,5 +1,5 @@
-// 役割: 新規タスクを追加するためのモーダルUI（親タスクの指定や期限設定を含む）
 import React, { useState, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 import { IconPlus, IconCalendar, IconX } from './Icons';
 import type { Task } from '../types';
 
@@ -17,6 +17,7 @@ interface Props {
 export const TaskAddModal: React.FC<Props> = ({ 
   taskName, setTaskName, dateStr, setDateStr, activeTasks, initialParentId, onSubmit, onClose 
 }) => {
+  const { t } = useTranslation(); // ▼ 追加
   const [searchWord, setSearchWord] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string | null>(initialParentId || null);
 
@@ -76,12 +77,12 @@ export const TaskAddModal: React.FC<Props> = ({
         }}
         onClick={stopPropagation}
       >
-        <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>新規タスク追加</h3>
+        <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>{t('add_new_task')}</h3>
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <input 
             type="text" 
-            placeholder="タスクを入力..." 
+            placeholder={t('placeholder_enter_task')} 
             autoFocus
             value={taskName} 
             onChange={(e) => setTaskName(e.target.value)} 
@@ -103,7 +104,7 @@ export const TaskAddModal: React.FC<Props> = ({
               }}
             >
               <IconCalendar size={20} />
-              <span>{dateStr || '期限を設定しない'}</span>
+              <span>{dateStr || t('no_deadline')}</span>
             </button>
             <input 
               type="date" 
@@ -118,17 +119,17 @@ export const TaskAddModal: React.FC<Props> = ({
 
           {activeTasks && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
-                <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>親タスクを選択 (任意)</span>
+                <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{t('select_parent_task')}</span>
                 {selectedParentId ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-item-hover)', borderRadius: '8px', border: '1px solid var(--color-primary)' }}>
-                        <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{getHierarchyName(activeTasks.find(t => t.id === selectedParentId) || { name: '不明' } as any)}</span>
+                        <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{getHierarchyName(activeTasks.find(t => t.id === selectedParentId) || { name: t('unknown') } as any)}</span>
                         <button type="button" onClick={() => setSelectedParentId(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}><IconX size={16} /></button>
                     </div>
                 ) : (
                     <div>
                         <input 
                             type="text" 
-                            placeholder="親タスクを検索..." 
+                            placeholder={t('search_parent_task')} 
                             value={searchWord} 
                             onChange={(e) => setSearchWord(e.target.value)} 
                             style={{ 
@@ -167,7 +168,7 @@ export const TaskAddModal: React.FC<Props> = ({
                 borderRadius: '8px', fontWeight: 'bold' 
               }}
             >
-              キャンセル
+              {t('cancel')}
             </button>
             <button 
               type="submit" 
@@ -181,7 +182,7 @@ export const TaskAddModal: React.FC<Props> = ({
               }}
             >
               <IconPlus size={20} />
-              <span>追加</span>
+              <span>{t('add')}</span>
             </button>
           </div>
         </form>
