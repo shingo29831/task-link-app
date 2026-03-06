@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 import { IconPlus } from './Icons';
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, setDateStr, onSubmit }) => {
+  const { t } = useTranslation(); // ▼ 追加
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName.trim()) return;
@@ -22,14 +25,13 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'row', gap: '8px', marginBottom: '20px', alignItems: 'center', width: '100%' }}>
       <input 
         type="text" 
-        placeholder="新しいタスクを入力..." 
+        placeholder={t('placeholder_enter_new_task')} 
         value={taskName} 
         onChange={(e) => setTaskName(e.target.value)} 
         onPointerDown={stopPropagation} 
         style={{ flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', border: '2px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '16px' }} 
       />
 
-      {/* PC表示用の期限入力 */}
       <input 
         type="date" 
         value={dateStr} 
@@ -51,7 +53,7 @@ export const TaskInput: React.FC<Props> = ({ taskName, setTaskName, dateStr, set
 
       <button type="submit" disabled={!taskName.trim()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 20px', backgroundColor: !taskName.trim() ? 'var(--border-light)' : 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: !taskName.trim() ? 'not-allowed' : 'pointer', fontWeight: 'bold', flexShrink: 0, whiteSpace: 'nowrap' }}>
         <IconPlus size={20} />
-        <span style={{ marginLeft: '4px' }}>追加</span>
+        <span style={{ marginLeft: '4px' }}>{t('add')}</span>
       </button>
     </form>
   );

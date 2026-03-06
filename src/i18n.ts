@@ -1,6 +1,3 @@
-// 役割: react-i18next の初期化および翻訳データの定義
-// なぜ: アプリケーション全体で一貫した多言語対応（UIテキストの切り替え）を実現するため
-
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getBrowserLanguage } from './utils/languageUtils';
@@ -52,7 +49,6 @@ const resources = {
       show_debug: 'Show Debug',
       applied_mapping: 'Applied Mapping:',
       copy_complete: 'Copy completed',
-      // ▼ ここから TaskItem.tsx 用の追加分
       collapse: 'Collapse',
       expand: 'Expand',
       double_click_to_edit: 'Double click to edit details',
@@ -65,7 +61,28 @@ const resources = {
       status_doing_label: 'Doing',
       status_done_label: 'Done',
       confirm_complete_all_children: 'This will mark all subtasks as "Done".\nAre you sure?',
-      status_suspend_label: 'Suspend'
+      status_suspend_label: 'Suspend',
+      
+      // ▼ 追加: TaskAddModal, TaskEditModal, TaskInput
+      add_new_task: 'Add New Task',
+      placeholder_enter_task: 'Enter task...',
+      placeholder_enter_new_task: 'Enter new task...',
+      no_deadline: 'No deadline',
+      select_parent_task: 'Select parent task (optional)',
+      search_parent_task: 'Search parent task...',
+      unknown: 'Unknown',
+      add: 'Add',
+      task_details: 'Task Details',
+      task_name: 'Task Name',
+      deadline: 'Deadline',
+      status_batch_change: 'Status (Update subtasks)',
+      change_order: 'Change Order',
+      move_up: 'Move Up',
+      move_down: 'Move Down',
+      confirm_child_change_title: 'Confirm Subtask Change',
+      confirm_child_change_desc: 'Changing the parent task status will overwrite all subtasks.\nAre you sure?',
+      confirm_change: 'Confirm Change',
+      task_name_empty_error: 'Task name cannot be empty.'
     }
   },
   ja: {
@@ -114,7 +131,6 @@ const resources = {
       show_debug: 'デバッグを表示',
       applied_mapping: '適用マッピング:',
       copy_complete: 'コピー完了',
-      // ▼ ここから TaskItem.tsx 用の追加分
       collapse: '折りたたむ',
       expand: '展開する',
       double_click_to_edit: 'ダブルクリックで詳細編集',
@@ -127,7 +143,28 @@ const resources = {
       status_doing_label: '進行中 (Doing)',
       status_done_label: '完了 (Done)',
       confirm_complete_all_children: 'すべての子タスクを「完了」にします。\nよろしいですか？',
-      status_suspend_label: '休止 (Suspend)'
+      status_suspend_label: '休止 (Suspend)',
+
+      // ▼ 追加: TaskAddModal, TaskEditModal, TaskInput
+      add_new_task: '新規タスク追加',
+      placeholder_enter_task: 'タスクを入力...',
+      placeholder_enter_new_task: '新しいタスクを入力...',
+      no_deadline: '期限を設定しない',
+      select_parent_task: '親タスクを選択 (任意)',
+      search_parent_task: '親タスクを検索...',
+      unknown: '不明',
+      add: '追加',
+      task_details: 'タスク詳細',
+      task_name: 'タスク名',
+      deadline: '期限',
+      status_batch_change: '状態（子タスクも一括変更）',
+      change_order: '順番の変更',
+      move_up: '↑ 上へ',
+      move_down: '↓ 下へ',
+      confirm_child_change_title: '⚠️ 子タスクの変更確認',
+      confirm_child_change_desc: '親タスクの状態を変更すると、すべての子タスクの状態も上書きされます。\n本当によろしいですか？',
+      confirm_change: '変更する',
+      task_name_empty_error: 'タスク名は空にできません'
     }
   }
 };
