@@ -23114,6 +23114,11 @@ var users = pgTable("users", {
   username: varchar("username", { length: 255 }).unique(),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   plan: varchar("plan", { length: 50 }).default("free").notNull(),
+  language: varchar("language", { length: 20 }).default("ja").notNull(),
+  timezone: varchar("timezone", { length: 100 }).default("Asia/Tokyo").notNull(),
+  theme: varchar("theme", { length: 20 }).default("system").notNull(),
+  weekStartsOn: integer("week_starts_on").default(0).notNull(),
+  // 0: 日曜日, 1: 月曜日
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 var projects = pgTable("projects", {
@@ -23930,7 +23935,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-Cf6evq/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-rfFM5Z/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -23962,7 +23967,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-Cf6evq/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-rfFM5Z/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

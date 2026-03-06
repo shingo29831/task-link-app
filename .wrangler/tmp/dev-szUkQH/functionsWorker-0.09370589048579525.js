@@ -24194,6 +24194,11 @@ var users = pgTable("users", {
   username: varchar("username", { length: 255 }).unique(),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   plan: varchar("plan", { length: 50 }).default("free").notNull(),
+  language: varchar("language", { length: 20 }).default("ja").notNull(),
+  timezone: varchar("timezone", { length: 100 }).default("Asia/Tokyo").notNull(),
+  theme: varchar("theme", { length: 20 }).default("system").notNull(),
+  weekStartsOn: integer("week_starts_on").default(0).notNull(),
+  // 0: 日曜日, 1: 月曜日
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 var projects = pgTable("projects", {

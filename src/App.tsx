@@ -29,6 +29,7 @@ import {
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { TaskEditModal } from './components/TaskEditModal';
+import { UserSettingsModal } from './components/UserSettingsModal'; // ▼ 追加
 
 import { FormattedProjectName } from './components/FormattedProjectName';
 import { SyncLimitModal } from './components/SyncLimitModal';
@@ -62,11 +63,12 @@ function App() {
 
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null); // ▼ 追加: DnD中の親タスクハイライト用
+  const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIOModal, setShowIOModal] = useState(false);
   const [isVerifyingProject, setIsVerifyingProject] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false); // ▼ 追加
   
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -116,7 +118,6 @@ function App() {
     if (navigator.vibrate) navigator.vibrate(50); 
   };
   
-  // ▼ 追加: ドラッグ中の移動を検知して、挿入予定の親タスクIDを特定する
   const handleDragMove = (event: DragOverEvent) => {
     const { over } = event;
     if (!over) {
@@ -236,7 +237,6 @@ function App() {
       return (
         <React.Fragment key={n.id}>
           <SortableTaskItem id={n.id} depth={depth} disabled={isViewer}>
-            {/* ▼ 追加: 対象の親タスクおよびその子タスク全体を囲うコンテナ */}
             <div style={{
               outline: isTargetParent ? '2px dashed var(--color-primary)' : 'none',
               outlineOffset: '2px',
@@ -271,15 +271,15 @@ function App() {
 
   const rootNodesContent = rootNodes.map(root => {
     const colWidth = calculateColumnWidth(root);
-    const isTargetParent = activeDropParentId === root.id; // ▼ 追加
+    const isTargetParent = activeDropParentId === root.id;
     return (
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ 
             minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, 
             backgroundColor: 'var(--bg-task)', borderRadius: '8px', 
-            border: isTargetParent ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)', // ▼ 修正
+            border: isTargetParent ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)',
             padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab',
-            transition: 'border 0.2s' // ▼ 追加
+            transition: 'border 0.2s'
         }}>
             <div style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '4px' }}>
                 <TaskItem task={root} tasks={data.tasks || []} depth={0} hasChildren={root.children.length > 0} onStatusChange={(s) => updateTaskStatus(root.id, s)} onParentStatusChange={updateParentStatus} onDelete={() => deleteTask(root.id)} onDeadlineChange={(dateStr) => updateTaskDeadline(root.id, dateStr)} isExpanded={!collapsedNodeIds.has(root.id)} onToggleExpand={() => toggleNodeExpansion(root.id)} onClick={() => handleTaskClick(root)} isMenuOpen={menuOpenTaskId === root.id} onToggleMenu={() => setMenuOpenTaskId(prev => prev === root.id ? null : root.id)} isActiveParent={activeParentId === root.id} isViewer={isViewer} onEditModalOpen={() => setEditingTask(root)} />
@@ -306,7 +306,17 @@ function App() {
       />
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <SignedIn>
-          <UserButton><UserButton.MenuItems><UserButton.Action label="ヘルプ" labelIcon={<IconHelp size={16} />} onClick={() => setShowHelpModal(true)} /></UserButton.MenuItems></UserButton>
+          <UserButton>
+            <UserButton.MenuItems>
+              {/* ▼ アカウント設定メニューを追加。アイコンはSVGを直接指定 */}
+              <UserButton.Action 
+                label="設定" 
+                labelIcon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>} 
+                onClick={() => setShowUserSettingsModal(true)} 
+              />
+              <UserButton.Action label="ヘルプ" labelIcon={<IconHelp size={16} />} onClick={() => setShowHelpModal(true)} />
+            </UserButton.MenuItems>
+          </UserButton>
         </SignedIn>
         <SignedOut>
           <div ref={authMenuRef} style={{ position: 'relative' }}>
@@ -327,6 +337,11 @@ function App() {
   const mainAppContent = (
     <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
+      {/* ▼ ユーザー設定モーダル */}
+      {showUserSettingsModal && (
+        <UserSettingsModal onClose={() => setShowUserSettingsModal(false)} />
+      )}
+
       {importCloudCheck?.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }}>
