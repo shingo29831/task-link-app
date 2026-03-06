@@ -59,7 +59,7 @@ export const ProjectControls: React.FC<Props> = ({ onCopyLink, onExport, onImpor
         {!isNarrowLayout && (
           <button onClick={() => setShowModal(true)} style={{ backgroundColor: 'var(--bg-button)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }} title="データの出力 / 読み込み">
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <IconInputOutput size={14} />
+              <IconInputOutput size={20} />
             </div>
             <span>{windowWidth < 1280 ? "入出力" : "出力 / 読み込み"}</span>
           </button>
