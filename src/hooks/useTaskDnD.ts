@@ -101,7 +101,9 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
             const newTasks = data.tasks.map(t => {
                 const rootIdx = newRootIds.indexOf(t.id);
                 if (rootIdx !== -1) {
-                    return { ...t, parentId: undefined, order: rootIdx + 1, lastUpdated: Date.now() };
+                    const newOrder = rootIdx + 1;
+                    const isChanged = t.parentId !== undefined || t.order !== newOrder;
+                    return { ...t, parentId: undefined, order: newOrder, lastUpdated: isChanged ? Date.now() : t.lastUpdated };
                 }
                 return t;
             });
@@ -170,11 +172,16 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
     siblings.forEach((t, index) => {
       const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
       if (globalIndex !== -1) {
+        const newOrder = index + 1;
+        const newParentId = t.id === active.id ? nextParentId : newTasks[globalIndex].parentId;
+        // orderやparentIdが変更された場合はlastUpdatedを更新する
+        const isChanged = newTasks[globalIndex].order !== newOrder || newTasks[globalIndex].parentId !== newParentId;
+
         newTasks[globalIndex] = { 
             ...newTasks[globalIndex], 
-            parentId: t.id === active.id ? nextParentId : newTasks[globalIndex].parentId, 
-            order: index + 1, 
-            lastUpdated: t.id === active.id ? Date.now() : newTasks[globalIndex].lastUpdated 
+            parentId: newParentId, 
+            order: newOrder, 
+            lastUpdated: isChanged ? Date.now() : newTasks[globalIndex].lastUpdated 
         };
       }
     });
