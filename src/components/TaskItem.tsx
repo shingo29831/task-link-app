@@ -137,10 +137,26 @@ export const TaskItem: React.FC<Props> = ({
   const getDeadline = () => {
     if (daysRemaining === null) return null;
     let color = 'var(--text-placeholder)';
-    if (daysRemaining < 0) color = 'var(--color-danger)';
-    else if (daysRemaining === 0) color = 'var(--color-warning)';
+    
+    // 完了状態(2)でない場合のみ警告色を適用
+    if (task.status !== 2) {
+      if (daysRemaining < 0) color = 'var(--color-danger)';
+      else if (daysRemaining === 0) color = 'var(--color-warning)';
+    }
+
     let label = daysRemaining < 0 ? `${Math.abs(daysRemaining)}日超過` : daysRemaining === 0 ? '今日まで' : `あと${daysRemaining}日`;
-    return <span style={{ color, fontSize: '0.85em', marginLeft: '6px', whiteSpace: 'nowrap' }}>{label}</span>;
+    
+    return (
+      <span style={{ 
+        color, 
+        fontSize: '0.85em', 
+        marginLeft: '6px', 
+        whiteSpace: 'nowrap',
+        opacity: task.status === 2 ? 0.6 : 1 // 完了時はさらに薄くする
+      }}>
+        {label}
+      </span>
+    );
   };
 
   const calculateProgress = (): number | null => {
