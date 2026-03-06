@@ -48,6 +48,7 @@ function App() {
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
+    updateTaskDetails, // ▼ 追加
     addTask, handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
@@ -164,17 +165,15 @@ function App() {
     );
   }
 
-  // ゲストユーザーや初回訪問の他ユーザーなど、ローカルに data が存在しない場合でも
-  // URLからの共有プロジェクトを展開できるように、SharedProjectModal の描画を優先する
   if (!data) {
     if (sharedProjectState) {
       return (
         <SharedProjectModal 
           sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
           onOpenAsProject={(sharedData) => { 
-            setData(sharedData); // UI描画用のステートに即座に反映させる
+            setData(sharedData);
             addOrUpdateProject(sharedData); 
-            switchProject(sharedData.id); // アクティブなプロジェクトとして切り替える
+            switchProject(sharedData.id); 
           }}
           onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
         />
@@ -291,14 +290,11 @@ function App() {
         <TaskEditModal 
           task={editingTask} hasChildren={(data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted)}
           onClose={() => setEditingTask(null)}
+          // ▼ 単一の関数呼び出しで一括更新するように修正
           onSave={(newName, newDateStr, newStatus) => {
-            if (newName.trim() !== editingTask.name) renameTask(editingTask.id, newName);
-            updateTaskDeadline(editingTask.id, newDateStr);
-            if (newStatus !== editingTask.status) {
-              const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
-              if (hasChild) updateParentStatus(editingTask.id, newStatus);
-              else updateTaskStatus(editingTask.id, newStatus);
-            }
+            const hasChild = (data.tasks || []).some((t: Task) => t.parentId === editingTask.id && !t.isDeleted);
+            const statusChanged = newStatus !== editingTask.status;
+            updateTaskDetails(editingTask.id, newName, newDateStr, statusChanged ? newStatus : undefined, hasChild && statusChanged);
             setEditingTask(null);
           }}
           onDelete={() => { deleteTask(editingTask.id); setEditingTask(null); }}
@@ -481,9 +477,9 @@ function App() {
         <SharedProjectModal 
           sharedState={sharedProjectState} onClose={() => setSharedProjectState(null)}
           onOpenAsProject={(sharedData) => { 
-            setData(sharedData); // UI描画用のステートに即座に反映させる
+            setData(sharedData);
             addOrUpdateProject(sharedData); 
-            switchProject(sharedData.id); // アクティブなプロジェクトとして切り替える
+            switchProject(sharedData.id); 
           }}
           onMergeProject={(sharedData) => { setIncomingData(sharedData); }}
         />
