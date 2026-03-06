@@ -1,7 +1,5 @@
-// 役割: プロジェクト名変更、同期設定、共有設定、メンバー管理などを行うモーダルUI
-// なぜ: プロジェクト単位の設定を一元管理し、権限に応じた操作を提供するため
-
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AppData, UserRole, ProjectMember } from '../types';
 import { IconWarning, IconLoader, IconCheckCircle, IconError, IconCloudUpload, IconX } from './Icons';
 
@@ -30,12 +28,10 @@ interface Props {
   onDeleteProject: (isCloudDelete: boolean) => void; 
 }
 
-// 全角文字を2、半角文字を1として文字幅を計算する関数
 const getCharWidth = (str: string) => {
   let width = 0;
   for (let i = 0; i < str.length; i++) {
     const c = str.charCodeAt(i);
-    // ASCII文字（半角英数字・記号）および半角カタカナ領域は1としてカウント
     if ((c >= 0x0 && c <= 0x7f) || (c >= 0xff61 && c <= 0xff9f)) {
       width += 1;
     } else {
@@ -67,6 +63,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   onRemoveMember,
   onDeleteProject
 }) => {
+  const { t } = useTranslation();
   const [nameValue, setNameValue] = useState(currentName);
   const [normalizedName, setNormalizedName] = useState(currentName);
   const [nameError, setNameError] = useState('');
@@ -87,13 +84,12 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     setNormalizedName(trimmedValue);
 
     if (!trimmedValue) {
-      setNameError('プロジェクト名を入力してください');
+      setNameError(t('error_project_name_required'));
       return;
     }
 
-    // 文字幅の制限チェック (半角40文字 / 全角20文字)
     if (getCharWidth(trimmedValue) > 40) {
-      setNameError('プロジェクト名は全角20文字（半角40文字）以内で入力してください');
+      setNameError(t('error_project_name_length'));
       return;
     }
     
@@ -103,11 +99,11 @@ export const ProjectSettingsModal: React.FC<Props> = ({
     );
     
     if (isDuplicate) {
-      setNameError('他のプロジェクト名で使用しています。');
+      setNameError(t('error_project_name_duplicate'));
     } else {
       setNameError('');
     }
-  }, [nameValue, currentId, projects]);
+  }, [nameValue, currentId, projects, t]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNameValue(e.target.value);
@@ -115,7 +111,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({
 
   const handleSaveName = () => {
     if (nameError || normalizedName === currentName) return;
-    
     onSaveName(normalizedName);
   };
 
@@ -157,7 +152,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   };
 
   const handleLocalDeleteClick = () => {
-    if (window.confirm('このプロジェクトをローカルから削除しますか？\n(クラウド上のデータは削除されません)')) {
+    if (window.confirm(t('confirm_local_delete'))) {
       onDeleteProject(false);
     }
   };
@@ -177,19 +172,19 @@ export const ProjectSettingsModal: React.FC<Props> = ({
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.2em' }}>プロジェクト設定</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2em' }}>{t('project_settings')}</h2>
             {(syncState === 'waiting' || syncState === 'syncing') && (
-              <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} title="同期待機中・同期中">
+              <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} title={t('syncing')}>
                 <IconLoader size={18} />
               </div>
             )}
             {syncState === 'error' && (
-              <div style={{ display: 'flex', alignItems: 'center' }} title="同期エラー">
+              <div style={{ display: 'flex', alignItems: 'center' }} title={t('sync_error')}>
                 <IconError size={18} />
               </div>
             )}
             {syncState === 'synced' && (
-              <div style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center' }} title="同期完了">
+              <div style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center' }} title={t('synced')}>
                 <IconCheckCircle size={18} />
               </div>
             )}
@@ -199,9 +194,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* 1. プロジェクト名変更セクション */}
         <section>
-          <h3 style={{ fontSize: '1em', margin: '0 0 10px 0', color: 'var(--text-secondary)' }}>プロジェクト名</h3>
+          <h3 style={{ fontSize: '1em', margin: '0 0 10px 0', color: 'var(--text-secondary)' }}>{t('project_name')}</h3>
           {isAdmin ? (
             <div style={{ display: 'flex', gap: '10px' }}>
               <input 
@@ -209,7 +203,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                 value={nameValue}
                 onChange={handleNameChange}
                 onKeyDown={handleNameKeyDown}
-                placeholder="プロジェクト名"
+                placeholder={t('project_name')}
                 maxLength={40}
                 style={{ 
                   flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', 
@@ -231,7 +225,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   whiteSpace: 'nowrap', flexShrink: 0
                 }}
               >
-                更新
+                {t('update')}
               </button>
             </div>
           ) : (
@@ -246,45 +240,42 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           )}
         </section>
 
-        {/* 2. 同期設定セクション (管理者のみ) */}
         {isAdmin && (
           <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>クラウド同期</h3>
+              <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>{t('cloud_sync')}</h3>
               {isSyncEnabled ? (
                 <button 
                   onClick={() => setShowSyncDisableModal(true)}
                   style={{ backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
                 >
-                  <IconX size={16} /> 同期解除
+                  <IconX size={16} /> {t('disable_sync')}
                 </button>
               ) : (
                 <button 
                   onClick={() => onToggleSync(true)}
                   style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
                 >
-                  <IconCloudUpload size={16} /> 同期する
+                  <IconCloudUpload size={16} /> {t('enable_sync')}
                 </button>
               )}
             </div>
           </section>
         )}
 
-        {/* 同期ONの時のみ表示されるセクション (管理者のみ) */}
         {isAdmin && isSyncEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: 'var(--bg-panel)', padding: '16px', borderRadius: '6px' }}>
             
-            {/* 3. 公開設定 */}
             <section>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>全体への公開設定</h4>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>{t('public_access_settings')}</h4>
                   <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--text-placeholder)' }}>
-                    リンクを知っている全員がプロジェクトにアクセスできるようにします
+                    {t('public_access_desc')}
                   </p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <span style={{ fontSize: '0.9em' }}>{isPublic ? '公開' : '非公開'}</span>
+                  <span style={{ fontSize: '0.9em' }}>{isPublic ? t('public') : t('private')}</span>
                   <input 
                     type="checkbox" 
                     checked={isPublic} 
@@ -295,14 +286,13 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 4. リンクにデータを保存設定 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>リンクにデータを保存</h4>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em' }}>{t('save_data_in_link')}</h4>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <span style={{ fontSize: '0.9em' }}>{includeDataInLink ? 'オン' : 'オフ'}</span>
+                  <span style={{ fontSize: '0.9em' }}>{includeDataInLink ? t('on') : t('off')}</span>
                   <input 
                     type="checkbox" 
                     checked={includeDataInLink} 
@@ -319,16 +309,15 @@ export const ProjectSettingsModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 5. ユーザー招待 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>ユーザーを招待</h4>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>{t('invite_user')}</h4>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input 
                   type="text" 
                   value={inviteUsername}
                   onChange={(e) => setInviteUsername(e.target.value)}
                   onKeyDown={handleInviteKeyDown}
-                  placeholder="ユーザー名を入力"
+                  placeholder={t('placeholder_username')}
                   style={{ 
                     flex: 1, minWidth: 0, padding: '8px', borderRadius: '4px', border: '1px solid var(--border-light)', 
                     backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)'
@@ -344,16 +333,15 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                     whiteSpace: 'nowrap', flexShrink: 0
                   }}
                 >
-                  招待
+                  {t('invite')}
                 </button>
               </div>
             </section>
 
-            {/* 6. 招待済みメンバー一覧と権限変更 */}
             <section style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>メンバー一覧</h4>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em' }}>{t('member_list')}</h4>
               {members.length === 0 ? (
-                <p style={{ fontSize: '0.85em', color: 'var(--text-placeholder)' }}>メンバーはいません</p>
+                <p style={{ fontSize: '0.85em', color: 'var(--text-placeholder)' }}>{t('no_members')}</p>
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {members.map(member => (
@@ -368,16 +356,16 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                             backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '0.85em'
                           }}
                         >
-                          <option value="viewer">閲覧者</option>
-                          <option value="editor">編集者</option>
-                          <option value="admin">管理者</option>
+                          <option value="viewer">{t('role_viewer')}</option>
+                          <option value="editor">{t('role_editor')}</option>
+                          <option value="admin">{t('role_admin')}</option>
                         </select>
                         <button 
                           onClick={() => onRemoveMember(member.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--color-danger-text)', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
-                          title="メンバーから削除"
+                          title={t('remove_member')}
                         >
-                          削除
+                          {t('remove_member')}
                         </button>
                       </div>
                     </li>
@@ -389,9 +377,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* 7. プロジェクト削除セクション */}
         <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: (isAdmin && isSyncEnabled) ? '20px' : '0' }}>
-          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>危険な操作</h4>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95em', color: 'var(--color-danger-text)' }}>{t('danger_zone')}</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {canDeleteCloud && (
               <button 
@@ -402,7 +389,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   fontSize: '0.9em', textAlign: 'center', width: 'fit-content'
                 }}
               >
-                クラウドデータを削除
+                {t('delete_cloud_data')}
               </button>
             )}
             
@@ -415,7 +402,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                   fontSize: '0.9em', textAlign: 'center', width: 'fit-content'
                 }}
               >
-                ローカルからプロジェクト削除
+                {t('delete_local_project')}
               </button>
             )}
           </div>
@@ -423,14 +410,12 @@ export const ProjectSettingsModal: React.FC<Props> = ({
 
       </div>
 
-      {/* クラウドデータ削除の確認モーダル */}
       {showCloudDeleteModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowCloudDeleteModal(false)}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>クラウドからプロジェクトを削除</h3>
-             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
-               この操作は取り消せません。プロジェクトに関連するすべてのタスクと共有設定がクラウドから完全に削除されます。<br/><br/>
-               確認のため、プロジェクト名 <strong>{currentName}</strong> を入力してください。
+             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>{t('delete_project_from_cloud')}</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px', whiteSpace: 'pre-wrap' }}>
+               {t('cloud_delete_warning')} <strong>{currentName}</strong>
              </p>
              <input 
                type="text" 
@@ -440,41 +425,38 @@ export const ProjectSettingsModal: React.FC<Props> = ({
                style={{ width: '100%', minWidth: 0, padding: '10px', boxSizing: 'border-box', marginBottom: '20px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1em' }}
              />
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-               <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
-               <button onClick={handleCloudDeleteConfirm} disabled={confirmName !== currentName} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: confirmName === currentName ? 'pointer' : 'not-allowed', opacity: confirmName === currentName ? 1 : 0.5, fontWeight: 'bold' }}>完全に削除する</button>
+               <button onClick={() => setShowCloudDeleteModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('cancel')}</button>
+               <button onClick={handleCloudDeleteConfirm} disabled={confirmName !== currentName} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: confirmName === currentName ? 'pointer' : 'not-allowed', opacity: confirmName === currentName ? 1 : 0.5, fontWeight: 'bold' }}>{t('permanently_delete')}</button>
              </div>
           </div>
         </div>
       )}
 
-      {/* 同期解除の確認モーダル */}
       {showSyncDisableModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowSyncDisableModal(false)}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
-             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>クラウド同期を解除しますか？</h3>
+             <h3 style={{ color: 'var(--color-danger-text)', margin: '0 0 10px 0' }}>{t('confirm_disable_sync_title')}</h3>
              <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
-               クラウド同期をオフにすると、クラウド上のデータは削除されローカルのみの保存になります。よろしいですか？
+               {t('confirm_disable_sync_desc')}
              </p>
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-               <button onClick={() => setShowSyncDisableModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
-               <button onClick={() => { onToggleSync(false); setShowSyncDisableModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>解除する</button>
+               <button onClick={() => setShowSyncDisableModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('cancel')}</button>
+               <button onClick={() => { onToggleSync(false); setShowSyncDisableModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-danger)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('disable')}</button>
              </div>
           </div>
         </div>
       )}
 
-      {/* リンクにデータを保存の説明モーダル */}
       {showIncludeDataModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowIncludeDataModal(false)}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
-             <h3 style={{ margin: '0 0 10px 0' }}>リンクにデータを保存</h3>
-             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px' }}>
-               有効にするとリンクURLに現在のタスクデータが含まれます。<br/>
-               このリンクで遷移することで、リンク生成時のタスク状況に復元することができます。
+             <h3 style={{ margin: '0 0 10px 0' }}>{t('save_data_in_link')}</h3>
+             <p style={{ fontSize: '0.9em', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '20px', whiteSpace: 'pre-wrap' }}>
+               {t('save_data_in_link_desc')}
              </p>
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-               <button onClick={() => setShowIncludeDataModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
-               <button onClick={() => { onToggleIncludeDataInLink(true); setShowIncludeDataModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>有効にする</button>
+               <button onClick={() => setShowIncludeDataModal(false)} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('cancel')}</button>
+               <button onClick={() => { onToggleIncludeDataInLink(true); setShowIncludeDataModal(false); }} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('enable')}</button>
              </div>
           </div>
         </div>
