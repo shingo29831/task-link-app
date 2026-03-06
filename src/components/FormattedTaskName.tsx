@@ -10,14 +10,16 @@ export const FormattedTaskName = ({ name }: { name: string }) => {
   
   if (lines.length <= 1) return <>{name}</>;
 
+  // span (inline-block) で囲むと親要素からの text-decoration (line-through) が
+  // 各行に正しく適用されないため、フラグメントで直接展開する
   return (
-    <span style={{ display: 'inline-block', lineHeight: '1.4', textAlign: 'left', verticalAlign: 'middle' }}>
+    <>
       {lines.map((line, idx) => (
         <React.Fragment key={idx}>
           {line}
           {idx < lines.length - 1 && <br />}
         </React.Fragment>
       ))}
-    </span>
+    </>
   );
 };
