@@ -48,7 +48,7 @@ function App() {
     menuOpenTaskId, setMenuOpenTaskId,
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
-    handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
+    addTask, handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick,
     handleBoardClick, handleProjectNameClick, toggleNodeExpansion, undo, redo, canUndo, canRedo, 
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, syncState,
@@ -320,7 +320,7 @@ function App() {
         />
       )}
       
-      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={handleAddTaskWrapper} onClose={() => setShowAddModal(false)} />}
+      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} activeTasks={activeTasks} onSubmit={(parentId) => handleAddTaskWrapper(parentId)} onClose={() => setShowAddModal(false)} />}
 
       <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
           {isMobile ? (
@@ -411,7 +411,13 @@ function App() {
               </div>
             )}
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0px' }}>
-              <TaskCalendar tasks={calendarTasks} onStatusChange={isViewer ? () => {} : updateTaskStatus} onParentStatusChange={isViewer ? () => {} : updateParentStatus} />
+              <TaskCalendar 
+                tasks={calendarTasks} 
+                activeTasks={activeTasks}
+                onStatusChange={isViewer ? () => {} : updateTaskStatus} 
+                onParentStatusChange={isViewer ? () => {} : updateParentStatus} 
+                onAddTask={(name, dateStr, parentId) => addTask(name, dateStr, null, parentId)}
+              />
             </div>
         </div>
 
