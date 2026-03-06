@@ -1,10 +1,10 @@
-// shingo29831/task-link-app/task-link-app-feature-backend/src/components/TaskItem.tsx
 // 役割: 個別のタスクを表示し、ステータス変更やドラッグ＆ドロップのターゲットとなるUIコンポーネント
 // なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
 
 import React, { useState, useMemo } from 'react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core'; 
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
 import { IconCalendar, IconX, IconChevronDown, IconChevronRight } from './Icons';
@@ -31,7 +31,6 @@ interface Props {
   onEditModalOpen?: () => void;
 }
 
-// DnDが有効な場合のみマウントされるネスト用ドロップエリア
 const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }> = ({ task, tasks}) => {
   const { active } = useDndContext(); 
   const isDropDisabled = (() => {
@@ -70,6 +69,7 @@ export const TaskItem: React.FC<Props> = ({
   isViewer = false,
   onEditModalOpen
 }) => {
+  const { t } = useTranslation(); // ▼ 追加
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -90,7 +90,6 @@ export const TaskItem: React.FC<Props> = ({
     return { fontSize: '16px', indentWidth: 24, itemPadding: '10px 0', buttonPadding: '4px 12px', buttonFontSize: '0.85em' };
   }, [windowWidth]);
 
-  // 並び替え位置を示すインジケーターの制御
   useDndMonitor({
     onDragMove: (event) => {
       const { active, over } = event;
@@ -112,11 +111,12 @@ export const TaskItem: React.FC<Props> = ({
     onDragCancel: () => setInsertPosition(null),
   });
 
+  // ▼ t() を使って多言語化
   const config = { 
-    0: { l: '未着手', c: 'var(--text-placeholder)' },
-    1: { l: '進行中', c: 'var(--color-info)' }, 
-    2: { l: '完了', c: 'var(--color-success)' }, 
-    3: { l: '休止', c: 'var(--color-suspend)' } 
+    0: { l: t('status_todo'), c: 'var(--text-placeholder)' },
+    1: { l: t('status_doing'), c: 'var(--color-info)' }, 
+    2: { l: t('status_done'), c: 'var(--color-success)' }, 
+    3: { l: t('status_suspend'), c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
   const currentDeadlineStr = task.deadline !== undefined ? format(task.deadline, 'yyyy-MM-dd') : '';
@@ -138,13 +138,17 @@ export const TaskItem: React.FC<Props> = ({
     if (daysRemaining === null) return null;
     let color = 'var(--text-placeholder)';
     
-    // 完了状態(2)でない場合のみ警告色を適用
     if (task.status !== 2) {
       if (daysRemaining < 0) color = 'var(--color-danger)';
       else if (daysRemaining === 0) color = 'var(--color-warning)';
     }
 
-    let label = daysRemaining < 0 ? `${Math.abs(daysRemaining)}日超過` : daysRemaining === 0 ? '今日まで' : `あと${daysRemaining}日`;
+    // ▼ t() を使って多言語化（引数付き）
+    let label = daysRemaining < 0 
+      ? t('overdue_days', { days: Math.abs(daysRemaining) }) 
+      : daysRemaining === 0 
+        ? t('due_today') 
+        : t('days_remaining', { days: daysRemaining });
     
     return (
       <span style={{ 
@@ -152,7 +156,7 @@ export const TaskItem: React.FC<Props> = ({
         fontSize: '0.85em', 
         marginLeft: '6px', 
         whiteSpace: 'nowrap',
-        opacity: task.status === 2 ? 0.6 : 1 // 完了時はさらに薄くする
+        opacity: task.status === 2 ? 0.6 : 1
       }}>
         {label}
       </span>
@@ -191,10 +195,10 @@ export const TaskItem: React.FC<Props> = ({
     if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
 
     return {
-      p2: (counts[2] / total) * 100, // 完了
-      p1: (counts[1] / total) * 100, // 進行中
-      p0: (counts[0] / total) * 100, // 未着手
-      p3: (counts[3] / total) * 100  // 休止
+      p2: (counts[2] / total) * 100,
+      p1: (counts[1] / total) * 100,
+      p0: (counts[0] / total) * 100,
+      p3: (counts[3] / total) * 100
     };
   };
 
@@ -229,10 +233,8 @@ export const TaskItem: React.FC<Props> = ({
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none'
         }}
       >
-        {/* 閲覧者でない場合のみドロップエリアをマウント (タスク全体を覆う) */}
         {!isViewer && <NestDroppableInner task={task} tasks={tasks} depth={depth} />}
 
-        {/* hasChildrenがtrueの時のみ開閉buttonをレンダリングする */}
         {hasChildren && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
@@ -242,13 +244,12 @@ export const TaskItem: React.FC<Props> = ({
                 padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', 
                 width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto', zIndex: 21
             }}
-            title={isExpanded ? "折りたたむ" : "展開する"}
+            title={isExpanded ? t('collapse') : t('expand')} /* ▼ 多言語化 */
           >
             {isExpanded ? <IconChevronDown size={isMobile ? 20 : 14} /> : <IconChevronRight size={isMobile ? 20 : 14} />}
           </button>
         )}
 
-        {/* 子を持たないタスクのみ状態変更ボタンを表示 */}
         {!hasChildren && (
           <button 
             onClick={(e) => { 
@@ -265,7 +266,7 @@ export const TaskItem: React.FC<Props> = ({
         
         <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: '2px' }}>
           <>
-            <span title={isViewer ? "" : "ダブルクリックで詳細編集"} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
+            <span title={isViewer ? "" : t('double_click_to_edit')} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
               <FormattedTaskName name={task.name} />
             </span>
             {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal', zIndex: 21, position: 'relative' }}>({progress}%)</span>}
@@ -275,15 +276,13 @@ export const TaskItem: React.FC<Props> = ({
           </>
         </div>
         
-        {/* モバイル時、またはDnD中はインラインのボタンを非表示にする */}
         {!isViewer && !isMobile && !isDraggingAny && (
           <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21 }}>
-            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title="期限を設定" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title="削除" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title={t('set_deadline')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title={t('delete')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
         )}
 
-        {/* 状態の割合を示す細長いゲージ (アニメーション付き) */}
         {hasChildren && (() => {
           const { p0, p1, p2, p3 } = getProgressData();
           return (
@@ -291,7 +290,6 @@ export const TaskItem: React.FC<Props> = ({
               position: 'absolute', bottom: 0, left: 0, width: '100%', height: '4px',
               display: 'flex', zIndex: 1, backgroundColor: 'transparent'
             }}>
-              {/* 完了 */}
               <div style={{ width: `${p2}%`, backgroundColor: 'var(--color-success)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomLeftRadius: '4px' }}>
                 {p2 > 0 && !task.parentId && (
                   <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 3, overflow: 'visible' }}>
@@ -299,7 +297,6 @@ export const TaskItem: React.FC<Props> = ({
                   </svg>
                 )}
               </div>
-              {/* 進行中 */}
               <div style={{ width: `${p1}%`, backgroundColor: 'var(--color-info)', position: 'relative', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomLeftRadius: p2 === 0 ? '4px' : '0' }}>
                 {p1 > 0 && !task.parentId && (
                   <svg width="12" height="14" viewBox="0 0 12 14" style={{ position: 'absolute', right: -9, top: '50%', transform: 'translateY(-50%)', zIndex: 2, overflow: 'visible' }}>
@@ -307,15 +304,12 @@ export const TaskItem: React.FC<Props> = ({
                   </svg>
                 )}
               </div>
-              {/* 未着手 */}
               <div style={{ width: `${p0}%`, backgroundColor: 'var(--text-placeholder)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomLeftRadius: p2 === 0 && p1 === 0 ? '4px' : '0' }} />
-              {/* 休止 */}
               <div style={{ width: `${p3}%`, backgroundColor: 'var(--color-suspend)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)', borderBottomRightRadius: '4px', borderBottomLeftRadius: p2 === 0 && p1 === 0 && p0 === 0 ? '4px' : '0' }} />
             </div>
           );
         })()}
 
-        {/* 挿入インジケーター */}
         {insertPosition && !isViewer && (
           <div style={{
             position: 'absolute',
@@ -327,9 +321,7 @@ export const TaskItem: React.FC<Props> = ({
             zIndex: 9999,
             pointerEvents: 'none',
           }}>
-            {/* 左端の三角形（内側向き） */}
             <div style={{ position: 'absolute', left: 0, top: -4, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: '6px solid var(--color-primary)' }} />
-            {/* 右端の三角形（内側向き） */}
             <div style={{ position: 'absolute', right: 0, top: -4, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderRight: '6px solid var(--color-primary)' }} />
           </div>
         )}
@@ -338,14 +330,14 @@ export const TaskItem: React.FC<Props> = ({
       {showStatusModal && !isViewer && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }} onClick={(e) => { e.stopPropagation(); setShowStatusModal(false); }}>
           <div style={{ backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid var(--border-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>状態を一括変更</h4>
+            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>{t('batch_change_status')}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => { onParentStatusChange(task.id, 0); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>未着手 (Todo)</button>
-              <button onClick={() => { onParentStatusChange(task.id, 1); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>進行中 (Doing)</button>
-              <button onClick={() => { if(confirm('すべての子タスクを「完了」にします。\nよろしいですか？')) { onParentStatusChange(task.id, 2); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>完了 (Done)</button>
-              <button onClick={() => { onParentStatusChange(task.id, 3); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>休止 (Suspend)</button>
+              <button onClick={() => { onParentStatusChange(task.id, 0); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
+              <button onClick={() => { onParentStatusChange(task.id, 1); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_complete_all_children'))) { onParentStatusChange(task.id, 2); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
+              <button onClick={() => { onParentStatusChange(task.id, 3); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
             </div>
-            <button onClick={() => setShowStatusModal(false)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>キャンセル</button>
+            <button onClick={() => setShowStatusModal(false)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{t('cancel')}</button>
           </div>
         </div>
       )}
