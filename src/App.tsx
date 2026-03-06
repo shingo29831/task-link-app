@@ -320,7 +320,7 @@ function App() {
         />
       )}
       
-      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} activeTasks={activeTasks} onSubmit={(parentId) => handleAddTaskWrapper(parentId)} onClose={() => setShowAddModal(false)} />}
+      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} activeTasks={activeTasks} initialParentId={activeParentId} onSubmit={(parentId) => handleAddTaskWrapper(parentId)} onClose={() => setShowAddModal(false)} />}
 
       <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
           {isMobile ? (
