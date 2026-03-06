@@ -174,8 +174,8 @@ export const useTaskMutations = (
       const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
       const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
       const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order, lastUpdated: Date.now() };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp, lastUpdated: Date.now() };
       save(newTasks);
     } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
       const target = siblings[siblingIndex + 1];
@@ -183,8 +183,8 @@ export const useTaskMutations = (
       const tIndex = newTasks.findIndex((t: Task) => t.id === taskToMove.id);
       const targetIndex = newTasks.findIndex((t: Task) => t.id === target.id);
       const temp = newTasks[tIndex].order;
-      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order };
-      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp };
+      newTasks[tIndex] = { ...newTasks[tIndex], order: newTasks[targetIndex].order, lastUpdated: Date.now() };
+      newTasks[targetIndex] = { ...newTasks[targetIndex], order: temp, lastUpdated: Date.now() };
       save(newTasks);
     }
   }, [data, save]);
