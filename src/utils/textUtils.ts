@@ -115,6 +115,11 @@ export const splitTextIntoLines = (text: string, maxWidth: number, mode: 'single
         baseScore -= 100;
       }
 
+      // 複数文字で構成される助詞や連語の途中での分断を防ぐ
+      if (/^(のみ|ので|では|には|から|まで|でも|つつ|また|なお|して|だけ)$/.test(prev + curr)) {
+        baseScore -= 200;
+      }
+
       // 送り仮名の途中などでの分断を防ぐため、ベーススコアが0以下の場合は候補から除外
       if (baseScore > 0) {
         breakpoints.push({ index: i, score: baseScore, width: widthAt[i - 1] });
