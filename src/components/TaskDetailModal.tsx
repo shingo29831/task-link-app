@@ -2,19 +2,27 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import type { Task } from '../types';
-import { IconX } from './Icons';
+import { IconX, IconPlus } from './Icons';
 import { FormattedTaskName } from './FormattedTaskName';
+import { TaskAddModal } from './TaskAddModal';
 
 interface Props {
   date: Date;
   tasks: Task[];
+  activeTasks: Task[];
   onClose: () => void;
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
+  onAddTask: (name: string, dateStr: string, parentId?: string) => void;
 }
 
-export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatusChange, onParentStatusChange }) => {
+export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onClose, onStatusChange, onParentStatusChange, onAddTask }) => {
   const [statusModalTargetId, setStatusModalTargetId] = useState<string | null>(null);
+
+  // 新規タスク追加用の状態
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskDateStr, setNewTaskDateStr] = useState('');
 
   const handleStatusClick = (task: Task) => {
       // 編集制限を解除: どのプロジェクトのタスクでも変更可能にする
@@ -26,6 +34,17 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatu
           const next = ((task.status + 1) % 4) as 0 | 1 | 2 | 3;
           onStatusChange(task.id, next);
       }
+  };
+
+  const handleOpenAddModal = () => {
+    setNewTaskName('');
+    setNewTaskDateStr(format(date, 'yyyy-MM-dd'));
+    setIsAddModalOpen(true);
+  };
+
+  const handleAddTask = (parentId?: string) => {
+    onAddTask(newTaskName, newTaskDateStr, parentId);
+    setIsAddModalOpen(false);
   };
 
   const getConfig = (status: number) => ({ 
@@ -43,103 +62,129 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatu
         alignItems: 'center', zIndex: 1000
       }} onClick={onClose}>
         <div style={{
+          position: 'relative',
           backgroundColor: 'var(--bg-surface)', 
-          padding: '30px', 
           borderRadius: '12px', 
           width: '500px', 
           maxWidth: '90%', 
           maxHeight: '85vh', 
-          overflowY: 'auto',
           boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-          color: 'var(--text-primary)'
+          color: 'var(--text-primary)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }} onClick={e => e.stopPropagation()}>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.5em' }}>
-              {format(date, 'M月d日のタスク', { locale: ja })}
-            </h3>
-            <button 
-              onClick={onClose} 
-              style={{ 
-                padding: '8px', 
-                fontSize: '1.2em', 
-                background: 'transparent', 
-                border: '1px solid var(--border-light)', 
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="閉じる"
-            >
-              <IconX size={20} />
-            </button>
-          </div>
+          <div style={{ padding: '30px', overflowY: 'auto', flex: 1, paddingBottom: '80px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.5em' }}>
+                {format(date, 'M月d日のタスク', { locale: ja })}
+              </h3>
+              <button 
+                onClick={onClose} 
+                style={{ 
+                  padding: '8px', 
+                  fontSize: '1.2em', 
+                  background: 'transparent', 
+                  border: '1px solid var(--border-light)', 
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="閉じる"
+              >
+                <IconX size={20} />
+              </button>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {tasks.length === 0 ? (
-              <p style={{ color: 'var(--text-placeholder)', fontSize: '1.1em', textAlign: 'center', margin: '20px 0' }}>
-                タスクはありません
-              </p>
-            ) : (
-              tasks.map(t => {
-                const config = getConfig(t.status);
-                // 子タスクがあるかどうかは t.hasChildren を参照
-                const hasChildren = !!t.hasChildren;
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {tasks.length === 0 ? (
+                <p style={{ color: 'var(--text-placeholder)', fontSize: '1.1em', textAlign: 'center', margin: '20px 0' }}>
+                  タスクはありません
+                </p>
+              ) : (
+                tasks.map(t => {
+                  const config = getConfig(t.status);
+                  const hasChildren = !!t.hasChildren;
 
-                return (
-                  <div key={t.id} style={{
-                    padding: '16px', 
-                    borderRadius: '6px', 
-                    backgroundColor: 'var(--bg-input)',
-                    border: '1px solid var(--border-color)',
-                    display: 'flex', alignItems: 'center', gap: '12px'
-                  }}>
-                    {/* Status Button */}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleStatusClick(t); }}
-                      style={{ 
-                        backgroundColor: config.c, 
-                        color: '#fff', 
-                        minWidth: '80px', 
-                        fontSize: '0.9em', 
-                        cursor: 'pointer', // 常にクリック可能
-                        opacity: hasChildren ? 0.9 : 1, 
-                        border: hasChildren ? '1px dashed var(--text-inverse)' : 'none', 
-                        padding: '6px 12px',
-                        flexShrink: 0
-                      }}
-                      title={hasChildren ? "親タスクの状態変更 (子タスクも更新)" : "状態を変更"}
-                    >
-                      {config.l}
-                    </button>
+                  return (
+                    <div key={t.id} style={{
+                      padding: '16px', 
+                      borderRadius: '6px', 
+                      backgroundColor: 'var(--bg-input)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex', alignItems: 'center', gap: '12px'
+                    }}>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleStatusClick(t); }}
+                        style={{ 
+                          backgroundColor: config.c, 
+                          color: '#fff', 
+                          minWidth: '80px', 
+                          fontSize: '0.9em', 
+                          cursor: 'pointer',
+                          opacity: hasChildren ? 0.9 : 1, 
+                          border: hasChildren ? '1px dashed var(--text-inverse)' : 'none', 
+                          padding: '6px 12px',
+                          flexShrink: 0
+                        }}
+                        title={hasChildren ? "親タスクの状態変更 (子タスクも更新)" : "状態を変更"}
+                      >
+                        {config.l}
+                      </button>
 
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      {t.sourceProjectName && (
-                          <div style={{ fontSize: '0.85em', opacity: 0.7, fontWeight: 'bold', marginBottom: '2px', color: 'var(--text-secondary)' }}>
-                              [{t.sourceProjectName}]
-                          </div>
-                      )}
-                      <div style={{ 
-                        fontSize: '1.1em', 
-                        color: 'var(--text-primary)', 
-                        textDecoration: t.status === 2 ? 'line-through' : 'none',
-                        wordBreak: 'break-all'
-                      }}>
-                        <FormattedTaskName name={t.name} />
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        {t.sourceProjectName && (
+                            <div style={{ fontSize: '0.85em', opacity: 0.7, fontWeight: 'bold', marginBottom: '2px', color: 'var(--text-secondary)' }}>
+                                [{t.sourceProjectName}]
+                            </div>
+                        )}
+                        <div style={{ 
+                          fontSize: '1.1em', 
+                          color: 'var(--text-primary)', 
+                          textDecoration: t.status === 2 ? 'line-through' : 'none',
+                          wordBreak: 'break-all'
+                        }}>
+                          <FormattedTaskName name={t.name} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
+
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleOpenAddModal(); }} 
+            style={{ 
+              position: 'absolute', 
+              bottom: '20px', 
+              right: '20px', 
+              width: '56px', 
+              height: '56px', 
+              borderRadius: '50%', 
+              backgroundColor: 'var(--color-primary)', 
+              color: 'white', 
+              border: 'none', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              opacity: 0.85, 
+              cursor: 'pointer',
+              zIndex: 100
+            }}
+            title="タスクを追加"
+          >
+            <IconPlus size={28} />
+          </button>
         </div>
       </div>
 
-      {/* Parent Status Modal */}
       {statusModalTargetId && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -162,6 +207,18 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, onClose, onStatu
             <button onClick={() => setStatusModalTargetId(null)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>キャンセル</button>
           </div>
         </div>
+      )}
+
+      {isAddModalOpen && (
+        <TaskAddModal
+          taskName={newTaskName}
+          setTaskName={setNewTaskName}
+          dateStr={newTaskDateStr}
+          setDateStr={setNewTaskDateStr}
+          activeTasks={activeTasks}
+          onSubmit={handleAddTask}
+          onClose={() => setIsAddModalOpen(false)}
+        />
       )}
     </>
   );

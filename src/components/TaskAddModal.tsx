@@ -1,28 +1,62 @@
-import React from 'react';
-import { IconPlus, IconCalendar } from './Icons';
+// 役割: 新規タスクを追加するためのモーダルUI（親タスクの指定や期限設定を含む）
+import React, { useState, useMemo, useCallback } from 'react';
+import { IconPlus, IconCalendar, IconX } from './Icons';
+import type { Task } from '../types';
 
 interface Props {
   taskName: string;
   setTaskName: (val: string) => void;
   dateStr: string;
   setDateStr: (val: string) => void;
-  onSubmit: () => void;
+  activeTasks?: Task[];
+  initialParentId?: string | null;
+  onSubmit: (parentId?: string) => void;
   onClose: () => void;
 }
 
 export const TaskAddModal: React.FC<Props> = ({ 
-  taskName, setTaskName, dateStr, setDateStr, onSubmit, onClose 
+  taskName, setTaskName, dateStr, setDateStr, activeTasks, initialParentId, onSubmit, onClose 
 }) => {
+  const [searchWord, setSearchWord] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(initialParentId || null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName.trim()) return;
-    onSubmit();
+    onSubmit(selectedParentId || undefined);
     onClose();
   };
 
   const stopPropagation = (e: React.PointerEvent | React.MouseEvent) => {
     e.stopPropagation();
   };
+
+  const getHierarchyName = useCallback((task: Task) => {
+    if (!activeTasks) return task.name;
+    let path = [task.name];
+    let current = task;
+    let depth = 0;
+    while (current.parentId && depth < 2) {
+        const parent = activeTasks.find(t => t.id === current.parentId);
+        if (parent) {
+            path.unshift(parent.name);
+            current = parent;
+            depth++;
+        } else {
+            break;
+        }
+    }
+    const truncate = (str: string) => str.length > 15 ? str.slice(0, 15) + '...' : str;
+    return path.map(truncate).join(' > ');
+  }, [activeTasks]);
+
+  const candidates = useMemo(() => {
+    if (!searchWord.trim() || !activeTasks) return [];
+    const lowerWord = searchWord.toLowerCase();
+    return activeTasks
+        .filter(t => !t.isDeleted && t.name.toLowerCase().includes(lowerWord))
+        .slice(0, 10);
+  }, [searchWord, activeTasks]);
 
   return (
     <div 
@@ -81,6 +115,47 @@ export const TaskAddModal: React.FC<Props> = ({
               }} 
             />
           </div>
+
+          {activeTasks && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>親タスクを選択 (任意)</span>
+                {selectedParentId ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-item-hover)', borderRadius: '8px', border: '1px solid var(--color-primary)' }}>
+                        <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{getHierarchyName(activeTasks.find(t => t.id === selectedParentId) || { name: '不明' } as any)}</span>
+                        <button type="button" onClick={() => setSelectedParentId(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}><IconX size={16} /></button>
+                    </div>
+                ) : (
+                    <div>
+                        <input 
+                            type="text" 
+                            placeholder="親タスクを検索..." 
+                            value={searchWord} 
+                            onChange={(e) => setSearchWord(e.target.value)} 
+                            style={{ 
+                                width: '100%', padding: '10px', borderRadius: '8px', 
+                                border: '1px solid var(--border-light)', background: 'var(--bg-input)', 
+                                color: 'var(--text-primary)', fontSize: '14px', boxSizing: 'border-box'
+                            }} 
+                        />
+                        {candidates.length > 0 && (
+                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', marginTop: '4px', zIndex: 10, maxHeight: '150px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                                {candidates.map(c => (
+                                    <div 
+                                        key={c.id} 
+                                        onClick={() => { setSelectedParentId(c.id); setSearchWord(''); }}
+                                        style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)', fontSize: '13px', color: 'var(--text-primary)' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-item-hover)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        {getHierarchyName(c)}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
             <button 
