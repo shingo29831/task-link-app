@@ -90,12 +90,19 @@ export const useTaskMutations = (
     });
   }, [data, applyCloudSyncForStatusChange]);
 
+  // ▼ 子タスクの有無で確認メッセージを切り替えるように修正
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
     const targetTask = (data.tasks || []).find((t: Task) => t.id === taskId);
     if (!targetTask) return;
-    const message = `タスク：" ${targetTask.name} "を子タスク含め削除します。\n本当に削除しますか？`;
+
+    const hasChildren = (data.tasks || []).some((t: Task) => !t.isDeleted && t.parentId === taskId);
+    const message = hasChildren
+      ? `タスク：「${targetTask.name}」を子タスク含め削除します。\n本当に削除しますか？`
+      : `タスク：「${targetTask.name}」を削除します。\n本当に削除しますか？`;
+
     if (!confirm(message)) return;
+
     const idsToDelete = new Set<string>();
     const stack = [taskId];
     while (stack.length > 0) {
@@ -128,7 +135,6 @@ export const useTaskMutations = (
     save(newTasks);
   }, [data, save]);
 
-  // ▼ 新規追加: タスクの詳細（名前・期限・ステータス）を一括で更新する関数
   const updateTaskDetails = useCallback((id: string, newName: string, dateStr: string, newStatus?: 0 | 1 | 2 | 3, updateChildrenStatus: boolean = false) => {
     if (!data || !newName.trim()) return;
 
@@ -259,6 +265,5 @@ export const useTaskMutations = (
     save(newTasks);
   }, [data, save]);
 
-  // updateTaskDetails を戻り値に追加
   return { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper, moveTaskOrder, toggleTaskExpand, updateTaskDetails };
 };
