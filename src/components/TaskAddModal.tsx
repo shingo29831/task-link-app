@@ -1,3 +1,4 @@
+// 役割: 新規タスクを追加するためのモーダルUI（親タスクの指定や期限設定を含む）
 import React, { useState, useMemo, useCallback } from 'react';
 import { IconPlus, IconCalendar, IconX } from './Icons';
 import type { Task } from '../types';
@@ -8,15 +9,16 @@ interface Props {
   dateStr: string;
   setDateStr: (val: string) => void;
   activeTasks?: Task[];
+  initialParentId?: string | null;
   onSubmit: (parentId?: string) => void;
   onClose: () => void;
 }
 
 export const TaskAddModal: React.FC<Props> = ({ 
-  taskName, setTaskName, dateStr, setDateStr, activeTasks, onSubmit, onClose 
+  taskName, setTaskName, dateStr, setDateStr, activeTasks, initialParentId, onSubmit, onClose 
 }) => {
   const [searchWord, setSearchWord] = useState('');
-  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(initialParentId || null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
