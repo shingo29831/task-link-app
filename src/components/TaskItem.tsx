@@ -48,7 +48,7 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
     return false;
   })();
 
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: `nest-${task.id}`,
     data: { type: 'nest', task },
     disabled: isDropDisabled
@@ -56,9 +56,6 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
 
   return (
     <>
-      {isOver && !isDropDisabled && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: '2px dashed var(--color-primary)', boxSizing: 'border-box', pointerEvents: 'none', zIndex: 20, borderRadius: '4px' }} />
-      )}
       <div ref={setNodeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
     </>
   );
