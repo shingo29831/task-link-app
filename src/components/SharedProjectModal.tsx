@@ -1,3 +1,7 @@
+// src/components/SharedProjectModal.tsx
+// 役割: 共有リンクからアクセスした際のプロジェクトデータの展開と表示モード選択を管理する
+// なぜ: URLに含まれる過去のデータとクラウド上の最新データのどちらを表示するかユーザーに選ばせ、適切に読み込むため
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppData } from '../types';
@@ -43,16 +47,19 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       }
     }
 
+    const isLinkData = selectedDataMode === 'link' && !!compressedData;
+
     const sharedData: AppData = {
       id: projectData.id,
       shortId: shortId,
       projectName: projectData.projectName,
       tasks: targetTasks,
       lastSynced: Date.now(),
-      isCloudSync: true,
+      isCloudSync: !isLinkData, // なぜ: 過去のスナップショットを展開した際に誤ってクラウドを上書きしないよう同期をオフにするため
       isPublic: projectData.isPublic,
       publicRole: projectData.publicRole || role,
       role: role, 
+      isSnapshot: isLinkData, // なぜ: スナップショットであることをアイコン表示等で判定できるようにするため
     };
 
     window.history.replaceState(null, '', `/${shortId}`);
@@ -67,13 +74,13 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
   }, [projectData, selectedDataMode, compressedData, shortId, role, onMergeProject, onOpenAsProject, onClose, t]);
 
   useEffect(() => {
-    if (step === 2 && role === 'viewer' && projectData && !autoOpenedRef.current) {
+    if (step === 2 && projectData && !autoOpenedRef.current) {
       autoOpenedRef.current = true;
       handleActionSelect('open');
     }
-  }, [step, role, projectData, handleActionSelect]);
+  }, [step, projectData, handleActionSelect]);
 
-  if (!projectData || role === 'none' || role === 'error' || (step === 2 && role === 'viewer')) {
+  if (!projectData || role === 'none' || role === 'error' || step === 2) {
     return null; 
   }
 
@@ -94,34 +101,6 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
             <button onClick={() => handleDataSelect('latest')} style={{ padding: '10px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{t('latest_cloud_data')}</button>
             <button onClick={() => handleDataSelect('link')} style={{ padding: '10px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{t('data_at_link_time')}</button>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 2) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', maxWidth: '400px', width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
-          <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>{t('how_to_open_project')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9em', margin: '4px 0' }}>{t('project_name')}: <strong style={{color: 'var(--text-primary)'}}>{projectData.projectName}</strong></p>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9em', marginBottom: '20px' }}>{t('your_role')} <strong style={{color: 'var(--color-info)'}}>{role === 'viewer' ? t('role_view_only') : role === 'editor' ? t('role_can_edit') : t('role_owner')}</strong></p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button onClick={() => handleActionSelect('open')} style={{ padding: '12px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{t('view_edit_as_is')}</button>
-            
-            {role !== 'viewer' && (
-              <button onClick={() => handleActionSelect('merge')} style={{ padding: '12px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{t('merge_into_local')}</button>
-            )}
-          </div>
-
-          {compressedData && (
-            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-              <button onClick={() => setStep(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85em' }}>
-                {t('back_to_data_selection')}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
