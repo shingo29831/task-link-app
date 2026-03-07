@@ -98,6 +98,20 @@ function App() {
   const isViewer = isCloudProject ? !hasEditPermission : false;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
 
+  // なぜ: モバイルブラウザのUI（アドレスバーやナビゲーションバー）の表示・非表示によって変わる実際の表示高さを取得し、画面全体がスクロールしないようにするため
+  useEffect(() => {
+    const updateAppHeight = () => {
+      document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+    };
+    window.addEventListener('resize', updateAppHeight);
+    window.addEventListener('orientationchange', updateAppHeight);
+    updateAppHeight();
+    return () => {
+      window.removeEventListener('resize', updateAppHeight);
+      window.removeEventListener('orientationchange', updateAppHeight);
+    };
+  }, []);
+
   useEffect(() => {
     const handler = (e: any) => setIsVerifyingProject(e.detail);
     window.addEventListener('project-verifying', handler);
@@ -154,7 +168,6 @@ function App() {
 
     const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
     
-    // なぜ: ドラッグ中のタスク自身、またはその子孫タスクへのドロップは不正であるため、青い枠を出さないようにする
     let currentCheckId = nextParentId;
     let isInvalidDropTarget = false;
     while (currentCheckId) {
@@ -369,7 +382,7 @@ function App() {
   );
 
   const mainAppContent = (
-    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: 'var(--app-height, 100vh)', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
       {showUserSettingsModal && (
         <UserSettingsModal onClose={() => setShowUserSettingsModal(false)} />

@@ -30,7 +30,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
         if (over && over.id === 'root-board') {
             const activeIdStr = String(active.id);
             
-            // なぜ: ルートタスクのみを抽出し、元の配列上のインデックスを把握するため
             const allRootTasks = activeTasks.filter((t: any) => !t.parentId).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
             const originalIndex = allRootTasks.findIndex((t: any) => t.id === activeIdStr);
             const rootTasks = allRootTasks.filter((t: any) => t.id !== activeIdStr);
@@ -41,7 +40,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
             if (activeRect && container) {
                 const containerRect = container.getBoundingClientRect();
                 let found = false;
-                let insertIndex = rootTasks.length; // 初期値は末尾
+                let insertIndex = rootTasks.length; 
 
                 if (boardLayout === 'vertical') {
                     const dropCenterY = activeRect.top + activeRect.height / 2;
@@ -66,7 +65,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         targetTop = lastItem.rect.bottom - containerRect.top + container.scrollTop + 16;
                     }
                     
-                    // なぜ: 元の並び順と変わらない場合はインジケーターを表示させないため
                     if (insertIndex === originalIndex) {
                         setInsertIndicator(null);
                     } else {
@@ -95,7 +93,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         targetLeft = lastItem.rect.right - containerRect.left + container.scrollLeft + (isMobile ? 4 : 8);
                     }
                     
-                    // なぜ: 元の並び順と変わらない場合はインジケーターを表示させないため
                     if (insertIndex === originalIndex) {
                         setInsertIndicator(null);
                     } else {
@@ -197,11 +194,12 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
 
       {isMobile && !isDragging && (
         <>
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+          {/* なぜ: Androidなどでsafe-area-inset-bottomが0の場合でもナビゲーションバーの上に表示されるよう、max関数で最低でも48px浮かせる */}
+          <div style={{ position: 'absolute', bottom: 'calc(max(48px, env(safe-area-inset-bottom) + 24px))', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
             <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
+          <div style={{ position: 'absolute', bottom: 'calc(max(48px, env(safe-area-inset-bottom) + 24px))', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
             {isNarrowLayout && (
               <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
             )}
@@ -245,12 +243,12 @@ export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile,
       </div>
       {isMobile && (
         <>
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
+          <div style={{ position: 'absolute', bottom: 'calc(max(48px, env(safe-area-inset-bottom) + 24px))', left: '16px', display: 'flex', gap: '10px', zIndex: 100 }}>
             <button disabled={!canUndo} onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canUndo ? 'pointer' : 'default', opacity: canUndo ? 1 : 0.4 }}><IconUndo size={20} /></button>
             <button disabled={!canRedo} onClick={(e) => { e.stopPropagation(); onRedo(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: canRedo ? 'pointer' : 'default', opacity: canRedo ? 1 : 0.4 }}><IconRedo size={20} /></button>
           </div>
           {isNarrowLayout && (
-            <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
+            <div style={{ position: 'absolute', bottom: 'calc(max(48px, env(safe-area-inset-bottom) + 24px))', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
               <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
             </div>
           )}
