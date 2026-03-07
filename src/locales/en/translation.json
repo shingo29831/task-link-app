@@ -147,5 +147,9 @@
   "import_url_desc": "Imports data included in the shared link into the current environment.",
   "board_layout": "Root Task Layout",
   "layout_horizontal": "Horizontal",
-  "layout_vertical": "Vertical"
+  "layout_vertical": "Vertical",
+  "custom_board_layout": "Customize by device",
+  "layout_desktop": "Desktop",
+  "layout_tablet": "Tablet",
+  "layout_mobile": "Mobile"
 }

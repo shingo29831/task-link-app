@@ -147,5 +147,9 @@
   "import_url_desc": "※共有リンクに含まれるデータを現在の環境にインポートします。",
   "board_layout": "最上位タスクの並べ方",
   "layout_horizontal": "横並び",
-  "layout_vertical": "縦並び"
+  "layout_vertical": "縦並び",
+  "custom_board_layout": "デバイスごとにカスタマイズする",
+  "layout_desktop": "PC",
+  "layout_tablet": "タブレット",
+  "layout_mobile": "スマホ"
 }

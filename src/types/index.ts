@@ -45,6 +45,10 @@ export interface UserSettings {
   timezone: string;
   theme: string;
   weekStartsOn: number;
-  boardLayout?: 'horizontal' | 'vertical'; // なぜ: ユーザーの端末幅に応じた最適なレイアウトを提供するため
+  boardLayout?: 'horizontal' | 'vertical'; 
+  customBoardLayout?: boolean; // なぜ: デバイスごとにレイアウト設定を分けられるようにするため
+  boardLayoutDesktop?: 'horizontal' | 'vertical';
+  boardLayoutTablet?: 'horizontal' | 'vertical';
+  boardLayoutMobile?: 'horizontal' | 'vertical';
   lastUpdated?: number;
 }
