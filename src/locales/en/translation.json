@@ -39,6 +39,7 @@
   "sync_error": "Sync error. Click to retry.",
   "save_to_cloud": "Save to Cloud",
   "synced": "Synced to cloud. Click to sync manually.",
+  "sync_disabled": "Sync Disabled (Viewing Snapshot)",
   "total_progress": "Total Progress",
   "hide_debug": "Hide Debug",
   "show_debug": "Show Debug",

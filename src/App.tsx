@@ -26,7 +26,7 @@ import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { TaskAddModal } from './components/TaskAddModal';
 import { 
   IconUndo, IconRedo, IconCalendar, IconCaretDown, IconPlus, 
-  IconHelp, IconCloudUpload, IconLoader, IconCheckCircle, IconError 
+  IconHelp, IconCloudUpload, IconLoader, IconCheckCircle, IconError, IconCloudOff 
 } from './components/Icons';
 import { SharedProjectModal } from './components/SharedProjectModal';
 import { HelpModal } from './components/HelpModal';
@@ -98,7 +98,6 @@ function App() {
   const isViewer = isCloudProject ? !hasEditPermission : false;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
 
-  // なぜ: モバイルブラウザのUI（アドレスバーやナビゲーションバー）の表示・非表示によって変わる実際の表示高さを取得し、画面全体がスクロールしないようにするため
   useEffect(() => {
     const updateAppHeight = () => {
       document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
@@ -471,6 +470,8 @@ function App() {
                                     <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title={t('syncing')}><IconLoader size={16} /></div>
                                   ) : isSignedIn && isCloudProject && syncState === 'error' ? (
                                     <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title={t('sync_error')}><IconError size={16} /></button>
+                                  ) : isSignedIn && data?.isSnapshot ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title={t('sync_disabled')}><IconCloudOff size={16} /></div>
                                   ) : isSignedIn && !isCloudProject ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /></button>
                                   ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
@@ -508,6 +509,8 @@ function App() {
                             <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title={t('syncing')}><IconLoader size={18} /></div>
                           ) : isSignedIn && isCloudProject && syncState === 'error' ? (
                             <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title={t('sync_error')}><IconError size={18} /></button>
+                          ) : isSignedIn && data?.isSnapshot ? (
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title={t('sync_disabled')}><IconCloudOff size={18} /></div>
                           ) : isSignedIn && !isCloudProject ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /> {t('save')}</button>
                           ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
