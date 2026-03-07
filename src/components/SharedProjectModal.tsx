@@ -47,16 +47,19 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       }
     }
 
+    const isLinkData = selectedDataMode === 'link' && !!compressedData;
+
     const sharedData: AppData = {
       id: projectData.id,
       shortId: shortId,
       projectName: projectData.projectName,
       tasks: targetTasks,
       lastSynced: Date.now(),
-      isCloudSync: true,
+      isCloudSync: !isLinkData, // なぜ: 過去のスナップショットを展開した際に誤ってクラウドを上書きしないよう同期をオフにするため
       isPublic: projectData.isPublic,
       publicRole: projectData.publicRole || role,
       role: role, 
+      isSnapshot: isLinkData, // なぜ: スナップショットであることをアイコン表示等で判定できるようにするため
     };
 
     window.history.replaceState(null, '', `/${shortId}`);
@@ -70,7 +73,6 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
     onClose();
   }, [projectData, selectedDataMode, compressedData, shortId, role, onMergeProject, onOpenAsProject, onClose, t]);
 
-  // なぜ: クラウドプロジェクトの場合はマージの選択肢を提示せず、自動でプロジェクトをそのまま開くようにするため
   useEffect(() => {
     if (step === 2 && projectData && !autoOpenedRef.current) {
       autoOpenedRef.current = true;

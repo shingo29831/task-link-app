@@ -38,6 +38,7 @@ export interface AppData {
   members?: ProjectMember[];
   isCloudSync?: boolean; 
   role?: UserRole | string;
+  isSnapshot?: boolean; // なぜ: リンクから展開したスナップショットデータであることを識別するため
 }
 
 export interface UserSettings {
@@ -46,7 +47,7 @@ export interface UserSettings {
   theme: string;
   weekStartsOn: number;
   boardLayout?: 'horizontal' | 'vertical'; 
-  customBoardLayout?: boolean; // なぜ: デバイスごとにレイアウト設定を分けられるようにするため
+  customBoardLayout?: boolean;
   boardLayoutDesktop?: 'horizontal' | 'vertical';
   boardLayoutTablet?: 'horizontal' | 'vertical';
   boardLayoutMobile?: 'horizontal' | 'vertical';
