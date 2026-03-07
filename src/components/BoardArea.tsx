@@ -29,13 +29,19 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
         const { active, over } = event;
         if (over && over.id === 'root-board') {
             const activeIdStr = String(active.id);
-            const rootTasks = activeTasks.filter((t: any) => t.id !== activeIdStr);
+            
+            // なぜ: ルートタスクのみを抽出し、元の配列上のインデックスを把握するため
+            const allRootTasks = activeTasks.filter((t: any) => !t.parentId).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+            const originalIndex = allRootTasks.findIndex((t: any) => t.id === activeIdStr);
+            const rootTasks = allRootTasks.filter((t: any) => t.id !== activeIdStr);
+            
             const activeRect = active.rect.current.translated;
             const container = scrollRef.current;
 
             if (activeRect && container) {
                 const containerRect = container.getBoundingClientRect();
                 let found = false;
+                let insertIndex = rootTasks.length; // 初期値は末尾
 
                 if (boardLayout === 'vertical') {
                     const dropCenterY = activeRect.top + activeRect.height / 2;
@@ -50,6 +56,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         const centerY = item.rect.top + item.rect.height / 2;
                         if (dropCenterY < centerY) {
                             targetTop = item.rect.top - containerRect.top + container.scrollTop - 16;
+                            insertIndex = i;
                             found = true;
                             break;
                         }
@@ -58,7 +65,13 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         const lastItem = sortedElements[sortedElements.length - 1];
                         targetTop = lastItem.rect.bottom - containerRect.top + container.scrollTop + 16;
                     }
-                    setInsertIndicator({ top: targetTop });
+                    
+                    // なぜ: 元の並び順と変わらない場合はインジケーターを表示させないため
+                    if (insertIndex === originalIndex) {
+                        setInsertIndicator(null);
+                    } else {
+                        setInsertIndicator({ top: targetTop });
+                    }
                 } else {
                     const dropCenterX = activeRect.left + activeRect.width / 2;
                     const sortedElements = rootTasks.map((t: any) => {
@@ -72,6 +85,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         const centerX = item.rect.left + item.rect.width / 2;
                         if (dropCenterX < centerX) {
                             targetLeft = item.rect.left - containerRect.left + container.scrollLeft - (isMobile ? 4 : 8);
+                            insertIndex = i;
                             found = true;
                             break;
                         }
@@ -80,7 +94,13 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                         const lastItem = sortedElements[sortedElements.length - 1];
                         targetLeft = lastItem.rect.right - containerRect.left + container.scrollLeft + (isMobile ? 4 : 8);
                     }
-                    setInsertIndicator({ left: targetLeft });
+                    
+                    // なぜ: 元の並び順と変わらない場合はインジケーターを表示させないため
+                    if (insertIndex === originalIndex) {
+                        setInsertIndicator(null);
+                    } else {
+                        setInsertIndicator({ left: targetLeft });
+                    }
                 }
             }
         } else {
@@ -127,7 +147,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
              alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', 
              paddingTop: isMobile ? '8px' : '16px', 
              paddingBottom: boardLayout === 'vertical' ? '400px' : '240px',
-             // 横並びの時に左右の余白を少し増やす
              paddingLeft: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
              paddingRight: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
              cursor: isPanning ? 'grabbing' : 'grab', 
@@ -139,7 +158,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
         ) : (
           <>
             {children}
-            {/* Flexboxの右余白無視バグを回避するため、一番右に透明なスペーサーを置く */}
             {boardLayout === 'horizontal' && <div style={{ minWidth: isMobile ? '32px' : '64px', height: '1px', flexShrink: 0, pointerEvents: 'none' }} />}
           </>
         )}
