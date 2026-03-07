@@ -1,3 +1,4 @@
+// src/components/UserSettingsModal.tsx
 // 役割: ユーザーの個人設定（言語、タイムゾーン、テーマ、カレンダー等）を変更するモーダルUI
 // なぜ: アカウントに紐づく設定をユーザー自身でカスタマイズし、データベースに保存できるようにするため
 
@@ -71,6 +72,14 @@ export const UserSettingsModal: React.FC<Props> = ({ onClose }) => {
             <select value={settings.weekStartsOn} onChange={e => setSettings({...settings, weekStartsOn: parseInt(e.target.value)})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
               <option value={0}>{t('sunday')}</option>
               <option value={1}>{t('monday')}</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('board_layout')}</label>
+            <select value={settings.boardLayout || 'horizontal'} onChange={e => setSettings({...settings, boardLayout: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+              <option value="horizontal">{t('layout_horizontal')}</option>
+              <option value="vertical">{t('layout_vertical')}</option>
             </select>
           </div>
         </div>

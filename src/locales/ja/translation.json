@@ -144,5 +144,8 @@
   "import_file": "ファイル読み込み",
   "import_from_url": "共有URLから読み込み",
   "import": "読み込み",
-  "import_url_desc": "※共有リンクに含まれるデータを現在の環境にインポートします。"
+  "import_url_desc": "※共有リンクに含まれるデータを現在の環境にインポートします。",
+  "board_layout": "最上位タスクの並べ方",
+  "layout_horizontal": "横並び",
+  "layout_vertical": "縦並び"
 }

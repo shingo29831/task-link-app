@@ -1,15 +1,19 @@
+// src/components/BoardArea.tsx
+// 役割: タスクを配置するメインのボードエリアのレンダリングとドラッグ時のスクロール・位置計算
+// なぜ: タスクのドラッグ＆ドロップ時に視覚的なフィードバックと挿入位置の表示を提供するため
+
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useDroppable, useDndMonitor, useDndContext } from '@dnd-kit/core';
-import { useTranslation } from 'react-i18next'; // ▼ 追加
+import { useTranslation } from 'react-i18next';
 import { IconUndo, IconRedo, IconInputOutput, IconPlus } from './Icons';
 import { usePanning } from '../hooks/usePanning';
 
-export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { t } = useTranslation(); // ▼ 追加
+export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal' }: any) => { 
+  const { t } = useTranslation();
   const { setNodeRef } = useDroppable({ id: 'root-board' });
   const { active } = useDndContext();
   const [isDragging, setIsDragging] = useState(false);
-  const [insertIndicator, setInsertIndicator] = useState<{ left: number } | null>(null);
+  const [insertIndicator, setInsertIndicator] = useState<{ left?: number, top?: number } | null>(null);
   const pointerRef = useRef({ x: 0, y: 0 });
   
   useEffect(() => {
@@ -28,36 +32,61 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
             const rootTasks = activeTasks.filter((t: any) => t.id !== activeIdStr);
             const activeRect = active.rect.current.translated;
             if (activeRect && scrollRef.current) {
-                const dropCenterX = activeRect.left + activeRect.width / 2;
-                
                 let insertIndex = rootTasks.length;
-                for (let i = 0; i < rootTasks.length; i++) {
-                    const el = document.querySelector(`[data-task-id="${rootTasks[i].id}"]`) as HTMLElement;
-                    if (el) {
-                        const rect = el.getBoundingClientRect();
-                        const centerX = rect.left + rect.width / 2;
-                        if (dropCenterX < centerX) {
-                            insertIndex = i;
-                            break;
+
+                if (boardLayout === 'vertical') {
+                    const dropCenterY = activeRect.top + activeRect.height / 2;
+                    for (let i = 0; i < rootTasks.length; i++) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[i].id}"]`) as HTMLElement;
+                        if (el) {
+                            const rect = el.getBoundingClientRect();
+                            const centerY = rect.top + rect.height / 2;
+                            if (dropCenterY < centerY) {
+                                insertIndex = i;
+                                break;
+                            }
                         }
                     }
-                }
-
-                let targetLeft = isMobile ? 8 : 16;
-
-                if (insertIndex < rootTasks.length) {
-                    const el = document.querySelector(`[data-task-id="${rootTasks[insertIndex].id}"]`) as HTMLElement;
-                    if (el) {
-                        targetLeft = el.offsetLeft - (isMobile ? 4 : 8);
+                    let targetTop = isMobile ? 8 : 16;
+                    if (insertIndex < rootTasks.length) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[insertIndex].id}"]`) as HTMLElement;
+                        if (el) {
+                            targetTop = el.offsetTop - (isMobile ? 4 : 8);
+                        }
+                    } else if (rootTasks.length > 0) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[rootTasks.length - 1].id}"]`) as HTMLElement;
+                        if (el) {
+                            targetTop = el.offsetTop + el.offsetHeight + (isMobile ? 4 : 8);
+                        }
                     }
-                } else if (rootTasks.length > 0) {
-                    const el = document.querySelector(`[data-task-id="${rootTasks[rootTasks.length - 1].id}"]`) as HTMLElement;
-                    if (el) {
-                        targetLeft = el.offsetLeft + el.offsetWidth + (isMobile ? 4 : 8);
+                    setInsertIndicator({ top: targetTop });
+                } else {
+                    const dropCenterX = activeRect.left + activeRect.width / 2;
+                    for (let i = 0; i < rootTasks.length; i++) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[i].id}"]`) as HTMLElement;
+                        if (el) {
+                            const rect = el.getBoundingClientRect();
+                            const centerX = rect.left + rect.width / 2;
+                            if (dropCenterX < centerX) {
+                                insertIndex = i;
+                                break;
+                            }
+                        }
                     }
+                    let targetLeft = isMobile ? 8 : 16;
+                    if (insertIndex < rootTasks.length) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[insertIndex].id}"]`) as HTMLElement;
+                        if (el) {
+                            targetLeft = el.offsetLeft - (isMobile ? 4 : 8);
+                        }
+                    } else if (rootTasks.length > 0) {
+                        const el = document.querySelector(`[data-task-id="${rootTasks[rootTasks.length - 1].id}"]`) as HTMLElement;
+                        if (el) {
+                            targetLeft = el.offsetLeft + el.offsetWidth + (isMobile ? 4 : 8);
+                        }
+                    }
+                    setInsertIndicator({ left: targetLeft });
                 }
-
-                setInsertIndicator({ left: targetLeft });
             }
         } else {
             setInsertIndicator(null);
@@ -94,23 +123,39 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', position: 'relative', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: isMobile ? '8px' : '16px', alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('please_add_task')}</p> : children}
         
         {insertIndicator && isDragging && active && (
-          <div style={{
-            position: 'absolute',
-            left: insertIndicator.left,
-            top: 0,
-            bottom: 0,
-            width: 0,
-            borderLeft: '2px dashed var(--color-primary)',
-            zIndex: 9999,
-            pointerEvents: 'none'
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid var(--color-primary)' }} />
-            <div style={{ position: 'absolute', bottom: 0, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '6px solid var(--color-primary)' }} />
-          </div>
+          insertIndicator.left !== undefined ? (
+            <div style={{
+              position: 'absolute',
+              left: insertIndicator.left,
+              top: 0,
+              bottom: 0,
+              width: 0,
+              borderLeft: '2px dashed var(--color-primary)',
+              zIndex: 9999,
+              pointerEvents: 'none'
+            }}>
+              <div style={{ position: 'absolute', top: 0, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid var(--color-primary)' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '6px solid var(--color-primary)' }} />
+            </div>
+          ) : (
+            <div style={{
+              position: 'absolute',
+              top: insertIndicator.top,
+              left: 0,
+              right: 0,
+              height: 0,
+              borderTop: '2px dashed var(--color-primary)',
+              zIndex: 9999,
+              pointerEvents: 'none'
+            }}>
+              <div style={{ position: 'absolute', left: 0, top: -3, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: '6px solid var(--color-primary)' }} />
+              <div style={{ position: 'absolute', right: 0, top: -3, width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderRight: '6px solid var(--color-primary)' }} />
+            </div>
+          )
         )}
       </div>
 
@@ -132,13 +177,13 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
   );
 };
 
-export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo }: any) => { 
-  const { t } = useTranslation(); // ▼ 追加
+export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal' }: any) => { 
+  const { t } = useTranslation();
   const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', position: 'relative', gap: isMobile ? '8px' : '16px', alignItems: 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: isMobile ? '8px' : '16px', alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('no_tasks')}</p> : children}
       </div>
       {isMobile && (

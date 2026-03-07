@@ -1,3 +1,4 @@
+// src/hooks/useUserSettings.ts
 // 役割: ユーザー設定（言語、テーマ等）のローカルDBとクラウド同期を管理
 // なぜ: ログイン前後の設定の一貫性を保ち、端末間で最新の設定を共有するため
 
@@ -26,27 +27,42 @@ export const useUserSettings = () => {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo',
       theme: 'system',
       weekStartsOn: 0,
+      boardLayout: 'horizontal',
       lastUpdated: 0
     };
   });
 
   const isLoaded = useRef(false);
 
-  // ローカルDBの設定を初回のみ即座に適用
+  // カスタムイベントをリッスンし、設定変更を全コンポーネントに即時反映
   useEffect(() => {
-    if (isLoaded.current) return;
-    const localData = localStorage.getItem(LOCAL_SETTINGS_KEY);
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData) as UserSettings;
-        if (parsed.language && parsed.language !== i18n.language) {
-          i18n.changeLanguage(parsed.language);
+    const handleStorageChange = () => {
+      const localData = localStorage.getItem(LOCAL_SETTINGS_KEY);
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData) as UserSettings;
+          setSettings(parsed);
+          if (parsed.language && parsed.language !== i18n.language) {
+            i18n.changeLanguage(parsed.language);
+          }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
+    };
+
+    window.addEventListener('user-settings-updated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
+
+    if (!isLoaded.current) {
+      handleStorageChange();
+      isLoaded.current = true;
     }
-    isLoaded.current = true;
+
+    return () => {
+      window.removeEventListener('user-settings-updated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [i18n]);
 
   // クラウドからの読み込みとマージ（クラウドが最新なら上書き）
@@ -71,9 +87,7 @@ export const useUserSettings = () => {
             if (cloudUpdated >= localUpdated) {
                const newSettings = { ...prev, ...cloudSettings };
                localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(newSettings));
-               if (newSettings.language && newSettings.language !== i18n.language) {
-                 i18n.changeLanguage(newSettings.language);
-               }
+               window.dispatchEvent(new Event('user-settings-updated'));
                return newSettings;
             }
             return prev;
@@ -85,15 +99,15 @@ export const useUserSettings = () => {
     };
 
     fetchCloudSettings();
-  }, [isSignedIn, getToken, i18n]);
+  }, [isSignedIn, getToken]);
 
   const updateSettings = async (newSettings: Omit<UserSettings, 'lastUpdated'>) => {
     const updatedSettings: UserSettings = { ...newSettings, lastUpdated: Date.now() };
     setSettings(updatedSettings);
     localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(updatedSettings));
-    if (updatedSettings.language && updatedSettings.language !== i18n.language) {
-      i18n.changeLanguage(updatedSettings.language);
-    }
+    
+    // イベントを発火して他のフックインスタンスにも反映
+    window.dispatchEvent(new Event('user-settings-updated'));
 
     if (isSignedIn) {
       try {
