@@ -24194,6 +24194,11 @@ var users = pgTable("users", {
   username: varchar("username", { length: 255 }).unique(),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   plan: varchar("plan", { length: 50 }).default("free").notNull(),
+  language: varchar("language", { length: 20 }).default("ja").notNull(),
+  timezone: varchar("timezone", { length: 100 }).default("Asia/Tokyo").notNull(),
+  theme: varchar("theme", { length: 20 }).default("system").notNull(),
+  weekStartsOn: integer("week_starts_on").default(0).notNull(),
+  // 0: 日曜日, 1: 月曜日
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 var projects = pgTable("projects", {
@@ -24258,6 +24263,45 @@ app.post("/user/sync", async (c) => {
       return c.json({ error: "Username is already taken" }, 400);
     }
     console.error("User sync error:", error);
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.get("/user/settings", async (c) => {
+  const auth = getAuth(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const db = getDb(c.env.DATABASE_URL);
+  try {
+    const userRecord = await db.select().from(users).where(eq(users.id, auth.userId));
+    if (userRecord.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const settings = {
+      language: userRecord[0].language,
+      timezone: userRecord[0].timezone,
+      theme: userRecord[0].theme,
+      weekStartsOn: userRecord[0].weekStartsOn
+    };
+    return c.json(settings);
+  } catch (error) {
+    console.error("Fetch settings error:", error);
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.put("/user/settings", async (c) => {
+  const auth = getAuth(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json();
+  const db = getDb(c.env.DATABASE_URL);
+  try {
+    await db.update(users).set({
+      language: body.language,
+      timezone: body.timezone,
+      theme: body.theme,
+      weekStartsOn: body.weekStartsOn
+    }).where(eq(users.id, auth.userId));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Update settings error:", error);
     return c.json({ error: "Database error" }, 500);
   }
 });
