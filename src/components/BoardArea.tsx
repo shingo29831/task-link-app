@@ -37,8 +37,6 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
                 const containerRect = container.getBoundingClientRect();
                 let found = false;
 
-                // なぜ: Sortableにより要素がtransformで視覚的に移動している場合があるため、
-                // 配列の順序ではなく実際の画面上の座標順でソートして挿入位置を判定する
                 if (boardLayout === 'vertical') {
                     const dropCenterY = activeRect.top + activeRect.height / 2;
                     const sortedElements = rootTasks.map((t: any) => {
@@ -120,7 +118,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: boardLayout === 'vertical' ? '400px' : '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('please_add_task')}</p> : children}
         
         {insertIndicator && isDragging && active && (
@@ -180,7 +178,7 @@ export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile,
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: boardLayout === 'vertical' ? '400px' : '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
         {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('no_tasks')}</p> : children}
       </div>
       {isMobile && (
