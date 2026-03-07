@@ -47,7 +47,7 @@ function App() {
   const { settings } = useUserSettings();
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
 
-  // 画面幅に応じて最適なレイアウトを決定する
+  // なぜ: レンダリング時の表示レイアウトとDnDの計算軸を一致させるため、ここでレイアウトを先に計算する
   const boardLayout = useMemo(() => {
     if (settings?.customBoardLayout) {
       if (windowWidth <= 480) return settings.boardLayoutMobile || 'vertical';
@@ -75,7 +75,7 @@ function App() {
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
-  } = useTaskOperations();
+  } = useTaskOperations(boardLayout); // DnDの座標計算にも使用するためフックに渡す
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null);
@@ -198,10 +198,10 @@ function App() {
     if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
 
     return {
-      p2: (counts[2] / total) * 100,
-      p1: (counts[1] / total) * 100,
-      p0: (counts[0] / total) * 100,
-      p3: (counts[3] / total) * 100
+      p2: (counts[2] / total) * 100, // 完了
+      p1: (counts[1] / total) * 100, // 進行中
+      p0: (counts[0] / total) * 100, // 未着手
+      p3: (counts[3] / total) * 100  // 休止
     };
   }, [data?.tasks]);
 

@@ -1,3 +1,4 @@
+// src/hooks/useTaskOperations.ts
 // 役割: 分割されたカスタムフック（設定、インポート、操作、計算）を統合し、Appコンポーネントに提供する Facade
 // なぜ: Appコンポーネントの肥大化を防ぎ、各機能の結合を整理するため
 
@@ -16,7 +17,7 @@ import { useProjectImport } from './useProjectImport';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-export const useTaskOperations = () => {
+export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'horizontal') => {
   const { getToken } = useAuth();
   
   // 1. 全体データ管理 (useAppData)
@@ -47,7 +48,6 @@ export const useTaskOperations = () => {
   const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar);
 
   // 3. タスクの更新処理 (useTaskMutations)
-  // ▼ updateTaskDetails を追加して受け取る
   const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand, updateTaskDetails } = useTaskMutations(
     data, setData, projectsRef, activeId, updateProject, activeTasks, menuOpenTaskId, setMenuOpenTaskId
   );
@@ -68,7 +68,7 @@ export const useTaskOperations = () => {
   );
 
   // ドラッグ&ドロップの処理
-  const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save);
+  const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save, boardLayout);
 
   // その他のUIハンドリング
   useEffect(() => {
@@ -122,7 +122,7 @@ export const useTaskOperations = () => {
     menuOpenTaskId, setMenuOpenTaskId, 
     addProject, importNewProject, switchProject, deleteProject, getShareUrl,
     deleteTask, renameTask, updateTaskStatus, updateTaskDeadline, updateParentStatus, moveTaskOrder,
-    updateTaskDetails, // ▼ 追加
+    updateTaskDetails,
     addTask: baseHandleAddTask,
     handleImportFromUrl, handleFileImport, handleAddTaskWrapper, handleTaskClick, handleBoardClick, handleProjectNameClick, toggleNodeExpansion, 
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
