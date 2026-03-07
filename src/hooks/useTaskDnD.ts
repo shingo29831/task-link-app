@@ -21,8 +21,26 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { droppableContainers, active, pointerCoordinates } = args;
     const pointerCollisions = pointerWithin(args);
-    const hitSortable = pointerCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
-    const hitNest = pointerCollisions.find(c => String(c.id).startsWith('nest-'));
+
+    // なぜ: ドラッグ中のタスク自身の子孫コンテナを衝突対象から除外し、不正な入れ子や並び替えのインジケーターが出ないようにするため
+    const validCollisions = pointerCollisions.filter(c => {
+        const cId = String(c.id);
+        if (cId === 'root-board') return true;
+        const targetId = cId.startsWith('nest-') ? cId.replace('nest-', '') : cId;
+        
+        if (targetId === active.id) return true; // 自分自身は残す（元の位置に戻れるように）
+
+        let currentCheckId: string | undefined = targetId;
+        while (currentCheckId) {
+            if (currentCheckId === active.id) return false; // 自身の子孫なので除外
+            const parentTask = data?.tasks.find(t => t.id === currentCheckId);
+            currentCheckId = parentTask?.parentId;
+        }
+        return true;
+    });
+
+    const hitSortable = validCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
+    const hitNest = validCollisions.find(c => String(c.id).startsWith('nest-'));
 
     if (hitSortable || hitNest) {
         const targetId = hitSortable?.id || (hitNest ? String(hitNest.id).replace('nest-', '') : null);
@@ -58,7 +76,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
         }
     }
 
-    const boardCollision = pointerCollisions.find(c => c.id === 'root-board');
+    const boardCollision = validCollisions.find(c => c.id === 'root-board');
     if (boardCollision) return [boardCollision];
 
     return [];
