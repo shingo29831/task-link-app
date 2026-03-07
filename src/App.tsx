@@ -9,10 +9,11 @@ import {
   SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/clerk-react";
-import { useTranslation } from 'react-i18next'; // ▼ 追加
+import { useTranslation } from 'react-i18next';
 
 import { useTaskOperations } from './hooks/useTaskOperations';
 import { useResponsive } from './hooks/useResponsive';
+import { useUserSettings } from './hooks/useUserSettings';
 import { TaskInput } from './components/TaskInput';
 import { TaskItem } from './components/TaskItem';
 import { ProjectControls } from './components/ProjectControls';
@@ -40,7 +41,10 @@ type TaskNode = Task & { children: TaskNode[] };
 function App() {
   const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
-  const { t } = useTranslation(); // ▼ 追加
+  const { t } = useTranslation();
+  
+  // ユーザー設定のローカル即時適用とクラウド同期
+  useUserSettings();
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,

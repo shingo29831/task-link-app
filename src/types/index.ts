@@ -38,3 +38,11 @@ export interface AppData {
   isCloudSync?: boolean; 
   role?: UserRole | string;
 }
+
+export interface UserSettings {
+  language: string;
+  timezone: string;
+  theme: string;
+  weekStartsOn: number;
+  lastUpdated?: number;
+}
