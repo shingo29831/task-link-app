@@ -1,6 +1,7 @@
 // 役割: ローカルデータとインポート（またはクラウド）データを比較・マージするためのモーダルUIコンポーネント
 import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import type { AppData, Task } from '../types';
 import { to185 } from '../utils/compression'; 
 import { IconEdit, IconX, IconWarning } from './Icons';
@@ -33,6 +34,7 @@ interface HierarchicalRow extends ComparisonRow {
 }
 
 export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm, onCancel, onCreateNew }) => {
+  const { t } = useTranslation();
   const { isMobile } = useResponsive();
 
   const [step, setStep] = useState<MergeStep>(
@@ -61,11 +63,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const StatusBadge = ({ status }: { status: number }) => {
     const config = {
-        0: { l: '未着手', c: 'var(--text-placeholder)' },
-        1: { l: '進行中', c: 'var(--color-info)' },
-        2: { l: '完了', c: 'var(--color-success)' },
-        3: { l: '休止', c: 'var(--color-suspend)' }
-    }[status as 0|1|2|3] || { l: '不明', c: 'var(--border-light)' };
+        0: { l: t('status_todo', '未着手'), c: 'var(--text-placeholder)' },
+        1: { l: t('status_doing', '進行中'), c: 'var(--color-info)' },
+        2: { l: t('status_done', '完了'), c: 'var(--color-success)' },
+        3: { l: t('status_suspend', '休止'), c: 'var(--color-suspend)' }
+    }[status as 0|1|2|3] || { l: t('status_unknown', '不明'), c: 'var(--border-light)' };
     return (
         <span style={{ backgroundColor: config.c, color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75em', marginRight: '6px', whiteSpace: 'nowrap', alignSelf: 'flex-start', marginTop: '2px' }}>{config.l}</span>
     );
@@ -212,7 +214,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
           setRenames(newRenames);
           setEditingId(null);
       } else {
-          alert('タスク名は空にできません');
+          alert(t('error_task_name_empty', 'タスク名は空にできません'));
       }
   };
 
@@ -223,7 +225,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
 
   const handleInitialMerge = () => {
     if (duplicateKeys.size > 0) {
-        alert('名前が重複しているタスクがあります。名前を変更するか、どちらか一方を削除してください。');
+        alert(t('error_duplicate_task_names', '名前が重複しているタスクがあります。名前を変更するか、どちらか一方を削除してください。'));
         return;
     }
 
@@ -327,7 +329,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     });
 
     if (duplicateNames.size > 0) {
-        alert(`以下のタスク名が同じ階層で重複しています。\nマージするには名前を変更してください。\n\n${Array.from(duplicateNames).join('\n')}`);
+        alert(t('error_duplicate_merge', `以下のタスク名が同じ階層で重複しています。\nマージするには名前を変更してください。\n\n${Array.from(duplicateNames).join('\n')}`));
         return;
     }
 
@@ -350,14 +352,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     return (
         <div style={overlayStyle}>
             <div style={{ ...modalStyle, width: isMobile ? '90vw' : '400px', padding: isMobile ? '16px' : '20px' }}>
-                <h3>プロジェクト名の競合</h3>
-                <p>このプロジェクト名はローカルデータにありません。</p>
-                <p>閲覧中: <strong>{localData.projectName}</strong></p>
-                <p>インポート: <strong>{incomingData.projectName}</strong></p>
+                <h3>{t('merge_conflict_project_name', 'プロジェクト名の競合')}</h3>
+                <p>{t('merge_conflict_project_name_desc', 'このプロジェクト名はローカルデータにありません。')}</p>
+                <p>{t('merge_viewing', '閲覧中')}: <strong>{localData.projectName}</strong></p>
+                <p>{t('merge_importing', 'インポート')}: <strong>{incomingData.projectName}</strong></p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                    <button onClick={() => setStep('NAME_CHOICE')} style={btnStyle}>このプロジェクトにマージ</button>
-                    {onCreateNew && <button onClick={() => onCreateNew(incomingData)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff' }}>新規プロジェクトとして作成</button>}
-                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>キャンセル</button>
+                    <button onClick={() => setStep('NAME_CHOICE')} style={btnStyle}>{t('merge_into_this_project', 'このプロジェクトにマージ')}</button>
+                    {onCreateNew && <button onClick={() => onCreateNew(incomingData)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff' }}>{t('create_as_new_project', '新規プロジェクトとして作成')}</button>}
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>{t('cancel')}</button>
                 </div>
             </div>
         </div>
@@ -368,12 +370,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     return (
         <div style={overlayStyle}>
             <div style={{ ...modalStyle, width: isMobile ? '90vw' : '400px', padding: isMobile ? '16px' : '20px' }}>
-                <h3>プロジェクト名の選択</h3>
-                <p>どちらのプロジェクト名を使用しますか？</p>
+                <h3>{t('merge_choose_project_name', 'プロジェクト名の選択')}</h3>
+                <p>{t('merge_choose_project_name_desc', 'どちらのプロジェクト名を使用しますか？')}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>ローカルを使用:<br/><strong>{localData.projectName}</strong></button>
-                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>リモートを使用:<br/><strong>{incomingData.projectName}</strong></button>
-                    <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>戻る</button>
+                    <button onClick={() => { setProjectNameChoice('LOCAL'); setStep('TASKS'); }} style={btnStyle}>{t('merge_use_local', 'ローカルを使用')}:<br/><strong>{localData.projectName}</strong></button>
+                    <button onClick={() => { setProjectNameChoice('REMOTE'); setStep('TASKS'); }} style={btnStyle}>{t('merge_use_remote', 'リモートを使用')}:<br/><strong>{incomingData.projectName}</strong></button>
+                    <button onClick={() => setStep('ACTION_CHOICE')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)' }}>{t('back', '戻る')}</button>
                 </div>
             </div>
         </div>
@@ -385,13 +387,13 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
     return (
         <div style={overlayStyle}>
             <div style={{ ...modalStyle, width: '600px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: isMobile ? '16px' : '20px' }}>
-                <h3 style={{ marginTop: 0, fontSize: isMobile ? '1.2em' : '1.5em' }}>競合タスクの追加確認</h3>
+                <h3 style={{ marginTop: 0, fontSize: isMobile ? '1.2em' : '1.5em' }}>{t('merge_confirm_conflict_tasks', '競合タスクの追加確認')}</h3>
                 <div style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
-                    以下のリモートタスクはローカル優先でマージされましたが、別タスクとして追加することも可能です。<br/>
-                    追加する場合、ローカルタスクのIDが変更され、リモートタスクが元のIDで追加されます。<br/>
+                    {t('merge_confirm_conflict_desc_1', '以下のリモートタスクはローカル優先でマージされましたが、別タスクとして追加することも可能です。')}<br/>
+                    {t('merge_confirm_conflict_desc_2', '追加する場合、ローカルタスクのIDが変更され、リモートタスクが元のIDで追加されます。')}<br/>
                     <div style={{color: 'var(--color-danger-text)', display: 'flex', alignItems: 'flex-start', gap: '4px', marginTop: '8px'}}>
                        <IconWarning size={14} />
-                       <span style={{ lineHeight: '1.4' }}>注意: 名前が重複する場合、この後のチェックでエラーになります。</span>
+                       <span style={{ lineHeight: '1.4' }}>{t('merge_confirm_conflict_warning', '注意: 名前が重複する場合、この後のチェックでエラーになります。')}</span>
                     </div>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', margin: '10px 0' }}>
@@ -406,8 +408,8 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                         style={{ transform: isMobile ? 'scale(1.2)' : 'scale(1)' }}
                                     />
                                 </th>
-                                <th style={{ padding: '8px' }}>リモート (追加対象)</th>
-                                <th style={{ padding: '8px', color: 'var(--text-secondary)' }}>ローカル (ID変更)</th>
+                                <th style={{ padding: '8px' }}>{t('merge_remote_add_target', 'リモート (追加対象)')}</th>
+                                <th style={{ padding: '8px', color: 'var(--text-secondary)' }}>{t('merge_local_id_change', 'ローカル (ID変更)')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -429,9 +431,9 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                     </table>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', flexDirection: isMobile ? 'column' : 'row' }}>
-                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)', width: isMobile ? '100%' : 'auto' }}>戻る</button>
+                    <button onClick={() => setStep('TASKS')} style={{ ...btnStyle, backgroundColor: 'var(--border-light)', width: isMobile ? '100%' : 'auto' }}>{t('back', '戻る')}</button>
                     <button onClick={() => finalizeMerge(selectedIgnoredIds)} style={{ ...btnStyle, backgroundColor: 'var(--color-info)', borderColor: 'var(--color-info)', color: '#fff', width: isMobile ? '100%' : 'auto' }}>
-                        決定してマージ
+                        {t('merge_confirm_execute', '決定してマージ')}
                     </button>
                 </div>
             </div>
@@ -446,21 +448,21 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
         <div style={{ ...modalStyle, width: '1200px', maxWidth: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', padding: isMobile ? '12px' : '20px' }}>
             <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '10px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '10px' : '0' }}>
                 <div>
-                    <h3 style={{ margin: '0 0 4px 0', fontSize: isMobile ? '1.2em' : '1.17em' }}>タスクのマージ (IDベース)</h3>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: isMobile ? '1.2em' : '1.17em' }}>{t('merge_tasks_id_based', 'タスクのマージ (IDベース)')}</h3>
                     <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>Remote: <strong style={{ color: 'var(--text-primary)' }}>{incomingData.projectName}</strong> {isMobile && <br/>}➔ Local: <strong style={{ color: 'var(--text-primary)' }}>{localData.projectName}</strong></div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
                     <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ padding: '5px', borderRadius: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', flex: isMobile ? '1 1 100%' : 'none', marginBottom: isMobile ? '4px' : '0' }}>
-                        <option value="LOCAL">Local優先</option><option value="REMOTE">Remote優先</option>
+                        <option value="LOCAL">{t('merge_priority_local', 'Local優先')}</option><option value="REMOTE">{t('merge_priority_remote', 'Remote優先')}</option>
                     </select>
-                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--color-danger)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>キャンセル</button>
-                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: 'var(--color-success)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>実行</button>
+                    <button onClick={onCancel} style={{ ...btnStyle, backgroundColor: 'var(--color-danger)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>{t('cancel')}</button>
+                    <button onClick={handleInitialMerge} style={{ ...btnStyle, backgroundColor: 'var(--color-success)', border: 'none', color: '#fff', flex: isMobile ? 1 : 'none', padding: isMobile ? '10px' : '8px 16px' }}>{t('execute', '実行')}</button>
                 </div>
             </div>
             
             <div style={{ flex: 1, overflowY: 'auto' }}>
                 {displayedRows.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-placeholder)' }}>差分はありません。すべてのタスクが一致しています。</div>
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-placeholder)' }}>{t('merge_no_diff', '差分はありません。すべてのタスクが一致しています。')}</div>
                 ) : isMobile ? (
                     // ==========================================
                     // モバイル向けカード型レイアウト
@@ -473,7 +475,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                             const isRenamed = renames.has(row.key);
 
                             const renderCardTask = (task: Task | undefined, isLocal: boolean) => {
-                                if (!task) return <div style={{ color: 'var(--text-placeholder)', fontSize: '0.9em' }}>(なし)</div>;
+                                if (!task) return <div style={{ color: 'var(--text-placeholder)', fontSize: '0.9em' }}>({t('none', 'なし')})</div>;
                                 const dateStr = getDeadlineDisplay(task);
                                 const isEditingThis = editingId === row.key && ((isLocal && row.local) || (!isLocal && !row.local));
                                 
@@ -481,7 +483,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                                         {isDuplicated && ((isLocal && row.local) || (!isLocal && !row.local)) && (
                                             <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <IconWarning size={12} /><span>名前重複</span>
+                                                <IconWarning size={12} /><span>{t('merge_name_duplicate', '名前重複')}</span>
                                             </div>
                                         )}
                                         <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
@@ -503,7 +505,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                 )}
                                             </div>
                                         </div>
-                                        {dateStr && <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginTop: '4px' }}>期限: {dateStr}</div>}
+                                        {dateStr && <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginTop: '4px' }}>{t('deadline')}: {dateStr}</div>}
                                     </div>
                                 );
                             };
@@ -513,7 +515,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                     
                                     {row.depth > 0 && (
                                         <div style={{ fontSize: '0.8em', color: 'var(--text-placeholder)', marginBottom: '4px' }}>
-                                            階層: {row.depth}
+                                            {t('merge_hierarchy', '階層')}: {row.depth}
                                         </div>
                                     )}
 
@@ -532,12 +534,12 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                     {/* Action */}
                                     <div style={{ paddingTop: '10px', borderTop: '1px dashed var(--border-light)' }}>
                                         {isContextRow ? (
-                                            <div style={{ color: 'var(--text-placeholder)', fontSize: '0.85em', textAlign: 'center' }}>（一致）</div>
+                                            <div style={{ color: 'var(--text-placeholder)', fontSize: '0.85em', textAlign: 'center' }}>（{t('merge_identical', '一致')}）</div>
                                         ) : (
                                             <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '10px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.95em' }}>
-                                                {row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}
-                                                {row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}
-                                                {!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}
+                                                {row.local && row.remote && (<><option value="USE_LOCAL">{t('merge_priority_local', 'Local優先')}</option><option value="USE_REMOTE">{t('merge_priority_remote', 'Remote優先')}</option><option value="DELETE">{t('delete', '削除')}</option></>)}
+                                                {row.local && !row.remote && (<><option value="USE_LOCAL">{t('merge_keep_local', 'Local維持')}</option><option value="DELETE">{t('delete', '削除')}</option></>)}
+                                                {!row.local && row.remote && (<><option value="ADD_REMOTE">{t('add', '追加')}</option><option value="DELETE">{t('merge_do_not_add', '追加しない')}</option></>)}
                                             </select>
                                         )}
                                     </div>
@@ -550,7 +552,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                     // PC向けテーブルレイアウト
                     // ==========================================
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
-                        <thead><tr style={{ borderBottom: '2px solid var(--border-light)', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>アクション</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
+                        <thead><tr style={{ borderBottom: '2px solid var(--border-light)', textAlign: 'left' }}><th style={{ padding: '8px' }}>Local</th><th style={{ padding: '8px', width: '150px' }}>{t('merge_action', 'アクション')}</th><th style={{ padding: '8px' }}>Remote</th></tr></thead>
                         <tbody>
                             {displayedRows.map((row) => {
                                 const localDate = row.local ? getDeadlineDisplay(row.local) : '';
@@ -574,21 +576,21 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                             {isDuplicated && row.local && (
                                                                 <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                     <IconWarning size={12} />
-                                                                    <span>名前重複</span>
+                                                                    <span>{t('merge_name_duplicate', '名前重複')}</span>
                                                                 </div>
                                                             )}
                                                             {editingId === row.key && row.local ? (
                                                                 <div style={{ display: 'flex', gap: '4px' }}>
                                                                     <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
                                                                     <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
-                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="キャンセル">
+                                                                    <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('cancel')}>
                                                                         <IconX size={12} />
                                                                     </button>
                                                                 </div>
                                                             ) : (
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                     <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.local.name)}</span>
-                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title="名前を変更">
+                                                                    <button onClick={() => handleStartRename(row.key, row.local!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title={t('rename', '名前を変更')}>
                                                                         <IconEdit size={14} />
                                                                     </button>
                                                                 </div>
@@ -597,11 +599,11 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                             <span style={{fontSize: '0.7em', color:'var(--text-placeholder)'}}>{row.key}</span>
                                                         </div>
                                                     </div>
-                                                ) : '(なし)'}
+                                                ) : `(${t('none', 'なし')})`}
                                             </div>
                                         </td>
                                         
-                                        <td style={{ padding: '8px', opacity: rowOpacity }}>{isContextRow ? <span style={{ color: 'var(--text-placeholder)', fontSize: '0.85em' }}>（一致）</span> : <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>{row.local && row.remote && (<><option value="USE_LOCAL">Local優先</option><option value="USE_REMOTE">Remote優先</option><option value="DELETE">削除</option></>)}{row.local && !row.remote && (<><option value="USE_LOCAL">Local維持</option><option value="DELETE">削除</option></>)}{!row.local && row.remote && (<><option value="ADD_REMOTE">追加</option><option value="DELETE">追加しない</option></>)}</select>}</td>
+                                        <td style={{ padding: '8px', opacity: rowOpacity }}>{isContextRow ? <span style={{ color: 'var(--text-placeholder)', fontSize: '0.85em' }}>（{t('merge_identical', '一致')}）</span> : <select value={row.action} onChange={(e) => handleRowActionChange(row.key, e.target.value as ResolveAction)} style={{ width: '100%', padding: '4px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>{row.local && row.remote && (<><option value="USE_LOCAL">{t('merge_priority_local', 'Local優先')}</option><option value="USE_REMOTE">{t('merge_priority_remote', 'Remote優先')}</option><option value="DELETE">{t('delete', '削除')}</option></>)}{row.local && !row.remote && (<><option value="USE_LOCAL">{t('merge_keep_local', 'Local維持')}</option><option value="DELETE">{t('delete', '削除')}</option></>)}{!row.local && row.remote && (<><option value="ADD_REMOTE">{t('add', '追加')}</option><option value="DELETE">{t('merge_do_not_add', '追加しない')}</option></>)}</select>}</td>
                                         
                                         <td style={{ padding: '8px', paddingLeft: `${8 + row.depth * 24}px`, color: row.remote ? 'var(--text-primary)' : 'var(--text-placeholder)', opacity: row.remote ? rowOpacity : 1 }}>
                                             {row.remote && (
@@ -614,14 +616,14 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                                 {isDuplicated && !row.local && (
                                                                     <div style={{ color: 'var(--color-danger-text)', fontSize: '0.75em', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                         <IconWarning size={12} />
-                                                                        <span>名前重複</span>
+                                                                        <span>{t('merge_name_duplicate', '名前重複')}</span>
                                                                     </div>
                                                                 )}
                                                                 {editingId === row.key && !row.local ? (
                                                                     <div style={{ display: 'flex', gap: '4px' }}>
                                                                         <input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ padding: '2px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
                                                                         <button onClick={handleSaveRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--color-info)', color: '#fff', border: 'none' }}>OK</button>
-                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="キャンセル">
+                                                                        <button onClick={handleCancelRename} style={{ padding: '0 4px', fontSize: '0.8em', background: 'var(--border-light)', color: 'var(--text-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('cancel')}>
                                                                             <IconX size={12} />
                                                                         </button>
                                                                     </div>
@@ -629,7 +631,7 @@ export const MergeModal: React.FC<Props> = ({ localData, incomingData, onConfirm
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                         <span style={{ color: isRenamed ? 'var(--color-warning)' : 'inherit' }}>{isRenamed ? currentName : breakText(row.remote.name)}</span>
                                                                         {!row.local && (
-                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title="名前を変更">
+                                                                            <button onClick={() => handleStartRename(row.key, row.remote!.name)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', padding: 0, display: 'flex', alignItems: 'center' }} title={t('rename', '名前を変更')}>
                                                                                 <IconEdit size={14} />
                                                                             </button>
                                                                         )}

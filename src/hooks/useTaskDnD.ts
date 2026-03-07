@@ -1,3 +1,4 @@
+// src/hooks/useTaskDnD.ts
 /**
  * @fileoverview タスクのドラッグ&ドロップ(DnD)に関する処理を提供するカスタムフック。
  * センサーの設定、衝突判定のカスタマイズ、ドラッグ終了時の並び替え・親子関係の更新ロジックを管理する。
@@ -10,7 +11,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, AppData } from '../types';
 
-export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => void) => {
+export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => void, boardLayout: 'horizontal' | 'vertical' = 'horizontal') => {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -20,8 +21,26 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const { droppableContainers, active, pointerCoordinates } = args;
     const pointerCollisions = pointerWithin(args);
-    const hitSortable = pointerCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
-    const hitNest = pointerCollisions.find(c => String(c.id).startsWith('nest-'));
+
+    // なぜ: ドラッグ中のタスク自身の子孫コンテナを衝突対象から除外し、不正な入れ子や並び替えのインジケーターが出ないようにするため
+    const validCollisions = pointerCollisions.filter(c => {
+        const cId = String(c.id);
+        if (cId === 'root-board') return true;
+        const targetId = cId.startsWith('nest-') ? cId.replace('nest-', '') : cId;
+        
+        if (targetId === active.id) return true; // 自分自身は残す（元の位置に戻れるように）
+
+        let currentCheckId: string | undefined = targetId;
+        while (currentCheckId) {
+            if (currentCheckId === active.id) return false; // 自身の子孫なので除外
+            const parentTask = data?.tasks.find(t => t.id === currentCheckId);
+            currentCheckId = parentTask?.parentId;
+        }
+        return true;
+    });
+
+    const hitSortable = validCollisions.find(c => !String(c.id).startsWith('nest-') && c.id !== 'root-board');
+    const hitNest = validCollisions.find(c => String(c.id).startsWith('nest-'));
 
     if (hitSortable || hitNest) {
         const targetId = hitSortable?.id || (hitNest ? String(hitNest.id).replace('nest-', '') : null);
@@ -57,7 +76,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
         }
     }
 
-    const boardCollision = pointerCollisions.find(c => c.id === 'root-board');
+    const boardCollision = validCollisions.find(c => c.id === 'root-board');
     if (boardCollision) return [boardCollision];
 
     return [];
@@ -79,15 +98,29 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
 
         const activeRect = active.rect.current.translated;
         if (activeRect) {
-            const dropCenterX = activeRect.left + activeRect.width / 2;
-            let insertIndex = rootTasks.length; 
+            // なぜ: transformにより視覚順序がデータの順序と異なる場合があるため、絶対座標で再ソートして挿入先を決定する
+            const sortedElements = rootTasks.map(t => {
+                const el = document.querySelector(`[data-task-id="${t.id}"]`);
+                return { id: t.id, rect: el ? el.getBoundingClientRect() : null };
+            }).filter(item => item.rect !== null);
 
-            for (let i = 0; i < rootTasks.length; i++) {
-                const task = rootTasks[i];
-                const el = document.querySelector(`[data-task-id="${task.id}"]`);
-                if (el) {
-                    const rect = el.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
+            let insertIndex = sortedElements.length;
+
+            if (boardLayout === 'vertical') {
+                sortedElements.sort((a, b) => a.rect!.top - b.rect!.top);
+                const dropCenterY = activeRect.top + activeRect.height / 2;
+                for (let i = 0; i < sortedElements.length; i++) {
+                    const centerY = sortedElements[i].rect!.top + sortedElements[i].rect!.height / 2;
+                    if (dropCenterY < centerY) {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+            } else {
+                sortedElements.sort((a, b) => a.rect!.left - b.rect!.left);
+                const dropCenterX = activeRect.left + activeRect.width / 2;
+                for (let i = 0; i < sortedElements.length; i++) {
+                    const centerX = sortedElements[i].rect!.left + sortedElements[i].rect!.width / 2;
                     if (dropCenterX < centerX) {
                         insertIndex = i;
                         break;
@@ -95,7 +128,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
                 }
             }
 
-            const newRootIds = rootTasks.map(t => t.id);
+            const newRootIds = sortedElements.map(item => item.id);
             newRootIds.splice(insertIndex, 0, activeTask.id);
 
             const newTasks = data.tasks.map(t => {
@@ -140,13 +173,11 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
     
     const newTasks = [...data.tasks];
     
-    // nextParentId を持つタスク群から自分自身を除外し、順序通りに並べたものを siblings とする
     const siblings = newTasks
       .filter(t => !t.isDeleted && t.parentId === nextParentId && t.id !== active.id)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     
     if (!isNestDrop) {
-      // 兄弟として並び替える場合
       let insertIndex = siblings.findIndex(t => t.id === targetIdRaw);
       if (insertIndex === -1) insertIndex = siblings.length;
       
@@ -154,7 +185,6 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
       const activeRect = active.rect.current.translated;
       if (targetElement && activeRect) {
           const rect = targetElement.getBoundingClientRect();
-          // activeRect の中心Y座標が、ターゲットの半分より下なら、下に挿入
           const activeCenterY = activeRect.top + activeRect.height / 2;
           const targetCenterY = rect.top + rect.height / 2;
           if (activeCenterY > targetCenterY) {
@@ -164,17 +194,14 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
       
       siblings.splice(insertIndex, 0, { ...activeTask, parentId: nextParentId });
     } else {
-      // ネストの場合、末尾に追加する
       siblings.push({ ...activeTask, parentId: nextParentId });
     }
     
-    // global な newTasks に対して order と parentId を適用
     siblings.forEach((t, index) => {
       const globalIndex = newTasks.findIndex(nt => nt.id === t.id);
       if (globalIndex !== -1) {
         const newOrder = index + 1;
         const newParentId = t.id === active.id ? nextParentId : newTasks[globalIndex].parentId;
-        // orderやparentIdが変更された場合はlastUpdatedを更新する
         const isChanged = newTasks[globalIndex].order !== newOrder || newTasks[globalIndex].parentId !== newParentId;
 
         newTasks[globalIndex] = { 
@@ -187,7 +214,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
     });
     
     save(newTasks);
-  }, [data, save]);
+  }, [data, save, boardLayout]);
 
   return { sensors, customCollisionDetection, handleDragEnd };
 };

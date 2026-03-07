@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { ja, enUS } from 'date-fns/locale'; // ▼ 英語ロケールを追加
+import { useTranslation } from 'react-i18next'; // ▼ 追加
 import type { Task } from '../types';
 import { IconX, IconPlus } from './Icons';
 import { FormattedTaskName } from './FormattedTaskName';
@@ -17,17 +18,14 @@ interface Props {
 }
 
 export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onClose, onStatusChange, onParentStatusChange, onAddTask }) => {
+  const { t, i18n } = useTranslation(); // ▼ 追加
   const [statusModalTargetId, setStatusModalTargetId] = useState<string | null>(null);
 
-  // 新規タスク追加用の状態
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDateStr, setNewTaskDateStr] = useState('');
 
   const handleStatusClick = (task: Task) => {
-      // 編集制限を解除: どのプロジェクトのタスクでも変更可能にする
-      
-      // task.hasChildren は useTaskOperations の calendarTasks で付与済み
       if (task.hasChildren) {
           setStatusModalTargetId(task.id);
       } else {
@@ -48,11 +46,14 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
   };
 
   const getConfig = (status: number) => ({ 
-    0: { l: '未着手', c: 'var(--text-placeholder)' }, 
-    1: { l: '進行中', c: 'var(--color-info)' }, 
-    2: { l: '完了', c: 'var(--color-success)' }, 
-    3: { l: '休止', c: 'var(--color-suspend)' } 
+    0: { l: t('status_todo'), c: 'var(--text-placeholder)' }, 
+    1: { l: t('status_doing'), c: 'var(--color-info)' }, 
+    2: { l: t('status_done'), c: 'var(--color-success)' }, 
+    3: { l: t('status_suspend'), c: 'var(--color-suspend)' } 
   }[status] as any);
+
+  const isEnglish = i18n.language === 'en';
+  const formattedDate = format(date, isEnglish ? 'MMM d' : 'M月d日', { locale: isEnglish ? enUS : ja });
 
   return (
     <>
@@ -78,7 +79,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
           <div style={{ padding: '30px', overflowY: 'auto', flex: 1, paddingBottom: '80px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1.5em' }}>
-                {format(date, 'M月d日のタスク', { locale: ja })}
+                {t('task_for_date', { date: formattedDate })}
               </h3>
               <button 
                 onClick={onClose} 
@@ -94,7 +95,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
-                title="閉じる"
+                title={t('close')}
               >
                 <IconX size={20} />
               </button>
@@ -103,15 +104,15 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tasks.length === 0 ? (
                 <p style={{ color: 'var(--text-placeholder)', fontSize: '1.1em', textAlign: 'center', margin: '20px 0' }}>
-                  タスクはありません
+                  {t('no_tasks')}
                 </p>
               ) : (
-                tasks.map(t => {
-                  const config = getConfig(t.status);
-                  const hasChildren = !!t.hasChildren;
+                tasks.map(tData => {
+                  const config = getConfig(tData.status);
+                  const hasChildren = !!tData.hasChildren;
 
                   return (
-                    <div key={t.id} style={{
+                    <div key={tData.id} style={{
                       padding: '16px', 
                       borderRadius: '6px', 
                       backgroundColor: 'var(--bg-input)',
@@ -119,7 +120,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
                       display: 'flex', alignItems: 'center', gap: '12px'
                     }}>
                       <button 
-                        onClick={(e) => { e.stopPropagation(); handleStatusClick(t); }}
+                        onClick={(e) => { e.stopPropagation(); handleStatusClick(tData); }}
                         style={{ 
                           backgroundColor: config.c, 
                           color: '#fff', 
@@ -131,24 +132,24 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
                           padding: '6px 12px',
                           flexShrink: 0
                         }}
-                        title={hasChildren ? "親タスクの状態変更 (子タスクも更新)" : "状態を変更"}
+                        title={hasChildren ? t('change_parent_status_title') : t('change_status_title')}
                       >
                         {config.l}
                       </button>
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        {t.sourceProjectName && (
+                        {tData.sourceProjectName && (
                             <div style={{ fontSize: '0.85em', opacity: 0.7, fontWeight: 'bold', marginBottom: '2px', color: 'var(--text-secondary)' }}>
-                                [{t.sourceProjectName}]
+                                [{tData.sourceProjectName}]
                             </div>
                         )}
                         <div style={{ 
                           fontSize: '1.1em', 
                           color: 'var(--text-primary)', 
-                          textDecoration: t.status === 2 ? 'line-through' : 'none',
+                          textDecoration: tData.status === 2 ? 'line-through' : 'none',
                           wordBreak: 'break-all'
                         }}>
-                          <FormattedTaskName name={t.name} />
+                          <FormattedTaskName name={tData.name} />
                         </div>
                       </div>
                     </div>
@@ -178,7 +179,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
               cursor: 'pointer',
               zIndex: 100
             }}
-            title="タスクを追加"
+            title={t('add_task_title')}
           >
             <IconPlus size={28} />
           </button>
@@ -191,20 +192,20 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
           backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000
         }} onClick={(e) => { e.stopPropagation(); setStatusModalTargetId(null); }}>
           <div style={{ backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid var(--border-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>状態を一括変更</h4>
-            <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: '15px' }}>親タスクの状態を変更すると、子タスクにも影響します。</p>
+            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>{t('batch_change_status')}</h4>
+            <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: '15px' }}>{t('parent_status_warning')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 0); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>未着手 (Todo)</button>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 1); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>進行中 (Doing)</button>
+              <button onClick={() => { onParentStatusChange(statusModalTargetId, 0); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
+              <button onClick={() => { onParentStatusChange(statusModalTargetId, 1); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
               <button onClick={() => { 
-                if(confirm('すべての子タスクを「完了」にします。\nよろしいですか？')) {
+                if(confirm(t('confirm_complete_all_children'))) {
                   onParentStatusChange(statusModalTargetId, 2); 
                   setStatusModalTargetId(null); 
                 }
-              }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>完了 (Done)</button>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 3); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>休止 (Suspend)</button>
+              }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
+              <button onClick={() => { onParentStatusChange(statusModalTargetId, 3); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
             </div>
-            <button onClick={() => setStatusModalTargetId(null)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>キャンセル</button>
+            <button onClick={() => setStatusModalTargetId(null)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{t('cancel')}</button>
           </div>
         </div>
       )}

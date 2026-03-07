@@ -1,4 +1,7 @@
-// src/components/Icons.tsx
+// shingo29831/task-link-app/task-link-app-feature-backend/src/components/Icons.tsx
+// 役割: アプリケーション全体で使用するSVGアイコンコンポーネントの定義
+// なぜ: アイコンのスタイルやサイズを統一的に管理し、再利用性を高めるため
+
 import React from 'react';
 
 interface IconProps {
@@ -73,11 +76,13 @@ export const IconRedo: React.FC<IconProps> = ({ size = 20, color = 'currentColor
 
 // 入出力 (Input / Output)
 export const IconInputOutput: React.FC<IconProps> = ({ size = 20, color = 'currentColor', style, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style} className={className}>
-    <line x1="8" y1="4" x2="8" y2="20" />
-    <polyline points="4 16 8 20 12 16" />
-    <line x1="16" y1="20" x2="16" y2="4" />
-    <polyline points="12 8 16 4 20 8" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style} className={className}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <path d="M8 13h8" />
+    <polyline points="13 10 16 13 13 16" />
+    <path d="M16 17H8" />
+    <polyline points="11 14 8 17 11 20" />
   </svg>
 );
 

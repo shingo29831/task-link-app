@@ -1,3 +1,4 @@
+// src/types/index.ts
 // 役割: アプリケーション全体で利用する共通の型定義
 // なぜ: 各コンポーネント間でデータの整合性を保つため
 
@@ -37,4 +38,17 @@ export interface AppData {
   members?: ProjectMember[];
   isCloudSync?: boolean; 
   role?: UserRole | string;
+}
+
+export interface UserSettings {
+  language: string;
+  timezone: string;
+  theme: string;
+  weekStartsOn: number;
+  boardLayout?: 'horizontal' | 'vertical'; 
+  customBoardLayout?: boolean; // なぜ: デバイスごとにレイアウト設定を分けられるようにするため
+  boardLayoutDesktop?: 'horizontal' | 'vertical';
+  boardLayoutTablet?: 'horizontal' | 'vertical';
+  boardLayoutMobile?: 'horizontal' | 'vertical';
+  lastUpdated?: number;
 }
