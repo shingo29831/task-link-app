@@ -144,5 +144,8 @@
   "import_file": "Import File",
   "import_from_url": "Import from Shared URL",
   "import": "Import",
-  "import_url_desc": "Imports data included in the shared link into the current environment."
+  "import_url_desc": "Imports data included in the shared link into the current environment.",
+  "board_layout": "Root Task Layout",
+  "layout_horizontal": "Horizontal",
+  "layout_vertical": "Vertical"
 }

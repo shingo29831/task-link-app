@@ -1,3 +1,4 @@
+// src/types/index.ts
 // 役割: アプリケーション全体で利用する共通の型定義
 // なぜ: 各コンポーネント間でデータの整合性を保つため
 
@@ -44,5 +45,6 @@ export interface UserSettings {
   timezone: string;
   theme: string;
   weekStartsOn: number;
+  boardLayout?: 'horizontal' | 'vertical'; // なぜ: ユーザーの端末幅に応じた最適なレイアウトを提供するため
   lastUpdated?: number;
 }

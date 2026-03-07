@@ -1,3 +1,4 @@
+// src/App.tsx
 // 役割: アプリケーションのメインエントリーおよび全体のUIレイアウト・状態管理
 // なぜ: ドラッグ＆ドロップや認証、メインボードの描画など主要機能を集約するため
 
@@ -43,8 +44,9 @@ function App() {
   const { user } = useUser();
   const { t } = useTranslation();
   
-  // ユーザー設定のローカル即時適用とクラウド同期
-  useUserSettings();
+  // ユーザー設定のローカル即時適用とクラウド同期を統合管理
+  const { settings } = useUserSettings();
+  const boardLayout = settings?.boardLayout || 'horizontal';
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
@@ -188,10 +190,10 @@ function App() {
     if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
 
     return {
-      p2: (counts[2] / total) * 100, // 完了
-      p1: (counts[1] / total) * 100, // 進行中
-      p0: (counts[0] / total) * 100, // 未着手
-      p3: (counts[3] / total) * 100  // 休止
+      p2: (counts[2] / total) * 100,
+      p1: (counts[1] / total) * 100,
+      p0: (counts[0] / total) * 100,
+      p3: (counts[3] / total) * 100
     };
   }, [data?.tasks]);
 
@@ -280,7 +282,10 @@ function App() {
     return (
       <SortableTaskItem key={root.id} id={root.id} depth={0} disabled={isViewer}>
         <div style={{ 
-            minWidth: `${colWidth}px`, maxWidth: `${colWidth}px`, 
+            minWidth: boardLayout === 'vertical' ? (isMobile ? '100%' : `${colWidth}px`) : `${colWidth}px`, 
+            maxWidth: boardLayout === 'vertical' ? '100%' : `${colWidth}px`, 
+            width: boardLayout === 'vertical' ? (isMobile ? '100%' : 'auto') : 'auto',
+            boxSizing: 'border-box',
             backgroundColor: 'var(--bg-task)', borderRadius: '8px', 
             border: isTargetParent ? '2px dashed var(--color-primary)' : '1px solid var(--border-color)',
             padding: '10px', display: 'flex', flexDirection: 'column', height: 'fit-content', cursor: isViewer ? 'default' : 'grab',
@@ -514,12 +519,12 @@ function App() {
           {!isMobile && !isViewer && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
           
           {isViewer ? (
-            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
+            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout}>
               <>{rootNodesContent}</>
             </StaticBoardArea>
           ) : (
-            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}>
-              <SortableContext items={rootNodes.map(r => r.id)} strategy={horizontalListSortingStrategy}>
+            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout}>
+              <SortableContext items={rootNodes.map(r => r.id)} strategy={boardLayout === 'vertical' ? verticalListSortingStrategy : horizontalListSortingStrategy}>
                   {rootNodesContent}
               </SortableContext>
             </InteractiveBoardArea>
