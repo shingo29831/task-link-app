@@ -118,8 +118,31 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: boardLayout === 'vertical' ? '400px' : '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
-        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('please_add_task')}</p> : children}
+      <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} 
+           style={{ 
+             flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', 
+             flexDirection: boardLayout === 'vertical' ? 'column' : 'row', 
+             position: 'relative', 
+             gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), 
+             alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', 
+             paddingTop: isMobile ? '8px' : '16px', 
+             paddingBottom: boardLayout === 'vertical' ? '400px' : '240px',
+             // 横並びの時に左右の余白を少し増やす
+             paddingLeft: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
+             paddingRight: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
+             cursor: isPanning ? 'grabbing' : 'grab', 
+             userSelect: isPanning ? 'none' : 'auto' 
+           }}>
+        
+        {activeTasks.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('please_add_task')}</p>
+        ) : (
+          <>
+            {children}
+            {/* Flexboxの右余白無視バグを回避するため、一番右に透明なスペーサーを置く */}
+            {boardLayout === 'horizontal' && <div style={{ minWidth: isMobile ? '32px' : '64px', height: '1px', flexShrink: 0, pointerEvents: 'none' }} />}
+          </>
+        )}
         
         {insertIndicator && isDragging && active && (
           insertIndicator.left !== undefined ? (
@@ -178,8 +201,29 @@ export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile,
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
-      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', flexDirection: boardLayout === 'vertical' ? 'column' : 'row', position: 'relative', gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', padding: isMobile ? '8px' : '16px', paddingBottom: boardLayout === 'vertical' ? '400px' : '240px', cursor: isPanning ? 'grabbing' : 'grab', userSelect: isPanning ? 'none' : 'auto' }}>
-        {activeTasks.length === 0 ? <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('no_tasks')}</p> : children}
+      <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} 
+           style={{ 
+             flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', 
+             flexDirection: boardLayout === 'vertical' ? 'column' : 'row', 
+             position: 'relative', 
+             gap: boardLayout === 'vertical' ? '32px' : (isMobile ? '8px' : '16px'), 
+             alignItems: boardLayout === 'vertical' ? (isMobile ? 'stretch' : 'flex-start') : 'flex-start', 
+             paddingTop: isMobile ? '8px' : '16px', 
+             paddingBottom: boardLayout === 'vertical' ? '400px' : '240px',
+             paddingLeft: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
+             paddingRight: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
+             cursor: isPanning ? 'grabbing' : 'grab', 
+             userSelect: isPanning ? 'none' : 'auto' 
+           }}>
+           
+        {activeTasks.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', margin: 'auto' }}>{t('no_tasks')}</p>
+        ) : (
+          <>
+            {children}
+            {boardLayout === 'horizontal' && <div style={{ minWidth: isMobile ? '32px' : '64px', height: '1px', flexShrink: 0, pointerEvents: 'none' }} />}
+          </>
+        )}
       </div>
       {isMobile && (
         <>
