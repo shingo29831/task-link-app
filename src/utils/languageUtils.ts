@@ -6,9 +6,9 @@ export const getBrowserLanguage = (): 'ja' | 'en' => {
 
   const browserLang = navigator.language;
   
-  if (browserLang && browserLang.toLowerCase().startsWith('en')) {
-    return 'en';
+  if (browserLang && browserLang.toLowerCase().startsWith('ja')) {
+    return 'ja';
   }
   
-  return 'ja';
+  return 'en';
 };
