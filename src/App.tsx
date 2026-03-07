@@ -47,7 +47,6 @@ function App() {
   const { settings } = useUserSettings();
   const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
 
-  // なぜ: レンダリング時の表示レイアウトとDnDの計算軸を一致させるため、ここでレイアウトを先に計算する
   const boardLayout = useMemo(() => {
     if (settings?.customBoardLayout) {
       if (windowWidth <= 480) return settings.boardLayoutMobile || 'vertical';
@@ -75,7 +74,7 @@ function App() {
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
-  } = useTaskOperations(boardLayout); // DnDの座標計算にも使用するためフックに渡す
+  } = useTaskOperations(boardLayout);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null);
@@ -134,7 +133,7 @@ function App() {
   };
   
   const handleDragMove = (event: DragOverEvent) => {
-    const { over } = event;
+    const { active, over } = event;
     if (!over) {
       if (activeDropParentId !== null) setActiveDropParentId(null);
       return;
@@ -154,6 +153,24 @@ function App() {
     }
 
     const nextParentId = isNestDrop ? overTask.id : overTask.parentId;
+    
+    // なぜ: ドラッグ中のタスク自身、またはその子孫タスクへのドロップは不正であるため、青い枠を出さないようにする
+    let currentCheckId = nextParentId;
+    let isInvalidDropTarget = false;
+    while (currentCheckId) {
+      if (currentCheckId === active.id) {
+        isInvalidDropTarget = true;
+        break;
+      }
+      const parentTask = data?.tasks?.find((t: Task) => t.id === currentCheckId);
+      currentCheckId = parentTask?.parentId;
+    }
+
+    if (isInvalidDropTarget) {
+      if (activeDropParentId !== null) setActiveDropParentId(null);
+      return;
+    }
+
     if (activeDropParentId !== (nextParentId || null)) {
       setActiveDropParentId(nextParentId || null);
     }
