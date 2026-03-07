@@ -80,40 +80,37 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
 
         const activeRect = active.rect.current.translated;
         if (activeRect) {
-            let insertIndex = rootTasks.length; 
+            // なぜ: transformにより視覚順序がデータの順序と異なる場合があるため、絶対座標で再ソートして挿入先を決定する
+            const sortedElements = rootTasks.map(t => {
+                const el = document.querySelector(`[data-task-id="${t.id}"]`);
+                return { id: t.id, rect: el ? el.getBoundingClientRect() : null };
+            }).filter(item => item.rect !== null);
 
-            // なぜ: 設定されたレイアウトに応じて、挿入位置の計算に使う軸(X軸/Y軸)を切り替えるため
+            let insertIndex = sortedElements.length;
+
             if (boardLayout === 'vertical') {
+                sortedElements.sort((a, b) => a.rect!.top - b.rect!.top);
                 const dropCenterY = activeRect.top + activeRect.height / 2;
-                for (let i = 0; i < rootTasks.length; i++) {
-                    const task = rootTasks[i];
-                    const el = document.querySelector(`[data-task-id="${task.id}"]`);
-                    if (el) {
-                        const rect = el.getBoundingClientRect();
-                        const centerY = rect.top + rect.height / 2;
-                        if (dropCenterY < centerY) {
-                            insertIndex = i;
-                            break;
-                        }
+                for (let i = 0; i < sortedElements.length; i++) {
+                    const centerY = sortedElements[i].rect!.top + sortedElements[i].rect!.height / 2;
+                    if (dropCenterY < centerY) {
+                        insertIndex = i;
+                        break;
                     }
                 }
             } else {
+                sortedElements.sort((a, b) => a.rect!.left - b.rect!.left);
                 const dropCenterX = activeRect.left + activeRect.width / 2;
-                for (let i = 0; i < rootTasks.length; i++) {
-                    const task = rootTasks[i];
-                    const el = document.querySelector(`[data-task-id="${task.id}"]`);
-                    if (el) {
-                        const rect = el.getBoundingClientRect();
-                        const centerX = rect.left + rect.width / 2;
-                        if (dropCenterX < centerX) {
-                            insertIndex = i;
-                            break;
-                        }
+                for (let i = 0; i < sortedElements.length; i++) {
+                    const centerX = sortedElements[i].rect!.left + sortedElements[i].rect!.width / 2;
+                    if (dropCenterX < centerX) {
+                        insertIndex = i;
+                        break;
                     }
                 }
             }
 
-            const newRootIds = rootTasks.map(t => t.id);
+            const newRootIds = sortedElements.map(item => item.id);
             newRootIds.splice(insertIndex, 0, activeTask.id);
 
             const newTasks = data.tasks.map(t => {

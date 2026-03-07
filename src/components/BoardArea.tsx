@@ -31,59 +31,56 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
             const activeIdStr = String(active.id);
             const rootTasks = activeTasks.filter((t: any) => t.id !== activeIdStr);
             const activeRect = active.rect.current.translated;
-            if (activeRect && scrollRef.current) {
-                let insertIndex = rootTasks.length;
+            const container = scrollRef.current;
 
+            if (activeRect && container) {
+                const containerRect = container.getBoundingClientRect();
+                let found = false;
+
+                // なぜ: Sortableにより要素がtransformで視覚的に移動している場合があるため、
+                // 配列の順序ではなく実際の画面上の座標順でソートして挿入位置を判定する
                 if (boardLayout === 'vertical') {
                     const dropCenterY = activeRect.top + activeRect.height / 2;
-                    for (let i = 0; i < rootTasks.length; i++) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[i].id}"]`) as HTMLElement;
-                        if (el) {
-                            const rect = el.getBoundingClientRect();
-                            const centerY = rect.top + rect.height / 2;
-                            if (dropCenterY < centerY) {
-                                insertIndex = i;
-                                break;
-                            }
+                    const sortedElements = rootTasks.map((t: any) => {
+                        const el = document.querySelector(`[data-task-id="${t.id}"]`) as HTMLElement;
+                        return { id: t.id, rect: el ? el.getBoundingClientRect() : null };
+                    }).filter((item: any) => item.rect !== null).sort((a: any, b: any) => a.rect.top - b.rect.top);
+
+                    let targetTop = isMobile ? 8 : 16;
+                    for (let i = 0; i < sortedElements.length; i++) {
+                        const item = sortedElements[i];
+                        const centerY = item.rect.top + item.rect.height / 2;
+                        if (dropCenterY < centerY) {
+                            targetTop = item.rect.top - containerRect.top + container.scrollTop - 16;
+                            found = true;
+                            break;
                         }
                     }
-                    let targetTop = isMobile ? 8 : 16;
-                    if (insertIndex < rootTasks.length) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[insertIndex].id}"]`) as HTMLElement;
-                        if (el) {
-                            targetTop = el.offsetTop - (isMobile ? 4 : 8);
-                        }
-                    } else if (rootTasks.length > 0) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[rootTasks.length - 1].id}"]`) as HTMLElement;
-                        if (el) {
-                            targetTop = el.offsetTop + el.offsetHeight + (isMobile ? 4 : 8);
-                        }
+                    if (!found && sortedElements.length > 0) {
+                        const lastItem = sortedElements[sortedElements.length - 1];
+                        targetTop = lastItem.rect.bottom - containerRect.top + container.scrollTop + 16;
                     }
                     setInsertIndicator({ top: targetTop });
                 } else {
                     const dropCenterX = activeRect.left + activeRect.width / 2;
-                    for (let i = 0; i < rootTasks.length; i++) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[i].id}"]`) as HTMLElement;
-                        if (el) {
-                            const rect = el.getBoundingClientRect();
-                            const centerX = rect.left + rect.width / 2;
-                            if (dropCenterX < centerX) {
-                                insertIndex = i;
-                                break;
-                            }
+                    const sortedElements = rootTasks.map((t: any) => {
+                        const el = document.querySelector(`[data-task-id="${t.id}"]`) as HTMLElement;
+                        return { id: t.id, rect: el ? el.getBoundingClientRect() : null };
+                    }).filter((item: any) => item.rect !== null).sort((a: any, b: any) => a.rect.left - b.rect.left);
+
+                    let targetLeft = isMobile ? 8 : 16;
+                    for (let i = 0; i < sortedElements.length; i++) {
+                        const item = sortedElements[i];
+                        const centerX = item.rect.left + item.rect.width / 2;
+                        if (dropCenterX < centerX) {
+                            targetLeft = item.rect.left - containerRect.left + container.scrollLeft - (isMobile ? 4 : 8);
+                            found = true;
+                            break;
                         }
                     }
-                    let targetLeft = isMobile ? 8 : 16;
-                    if (insertIndex < rootTasks.length) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[insertIndex].id}"]`) as HTMLElement;
-                        if (el) {
-                            targetLeft = el.offsetLeft - (isMobile ? 4 : 8);
-                        }
-                    } else if (rootTasks.length > 0) {
-                        const el = document.querySelector(`[data-task-id="${rootTasks[rootTasks.length - 1].id}"]`) as HTMLElement;
-                        if (el) {
-                            targetLeft = el.offsetLeft + el.offsetWidth + (isMobile ? 4 : 8);
-                        }
+                    if (!found && sortedElements.length > 0) {
+                        const lastItem = sortedElements[sortedElements.length - 1];
+                        targetLeft = lastItem.rect.right - containerRect.left + container.scrollLeft + (isMobile ? 4 : 8);
                     }
                     setInsertIndicator({ left: targetLeft });
                 }
