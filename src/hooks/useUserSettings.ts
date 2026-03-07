@@ -28,6 +28,10 @@ export const useUserSettings = () => {
       theme: 'system',
       weekStartsOn: 0,
       boardLayout: 'horizontal',
+      customBoardLayout: false,
+      boardLayoutDesktop: 'horizontal',
+      boardLayoutTablet: 'horizontal',
+      boardLayoutMobile: 'vertical',
       lastUpdated: 0
     };
   });

@@ -44,9 +44,18 @@ function App() {
   const { user } = useUser();
   const { t } = useTranslation();
   
-  // ユーザー設定のローカル即時適用とクラウド同期を統合管理
   const { settings } = useUserSettings();
-  const boardLayout = settings?.boardLayout || 'horizontal';
+  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
+
+  // 画面幅に応じて最適なレイアウトを決定する
+  const boardLayout = useMemo(() => {
+    if (settings?.customBoardLayout) {
+      if (windowWidth <= 480) return settings.boardLayoutMobile || 'vertical';
+      if (windowWidth <= 1024) return settings.boardLayoutTablet || 'horizontal';
+      return settings.boardLayoutDesktop || 'horizontal';
+    }
+    return settings?.boardLayout || 'horizontal';
+  }, [settings, windowWidth]);
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,
@@ -68,7 +77,6 @@ function App() {
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
   } = useTaskOperations();
 
-  const { windowWidth, isMobile, isNarrowLayout } = useResponsive();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDropParentId, setActiveDropParentId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);

@@ -77,10 +77,43 @@ export const UserSettingsModal: React.FC<Props> = ({ onClose }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('board_layout')}</label>
-            <select value={settings.boardLayout || 'horizontal'} onChange={e => setSettings({...settings, boardLayout: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value="horizontal">{t('layout_horizontal')}</option>
-              <option value="vertical">{t('layout_vertical')}</option>
-            </select>
+            {!settings.customBoardLayout && (
+              <select value={settings.boardLayout || 'horizontal'} onChange={e => setSettings({...settings, boardLayout: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                <option value="horizontal">{t('layout_horizontal')}</option>
+                <option value="vertical">{t('layout_vertical')}</option>
+              </select>
+            )}
+            
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9em', marginTop: '4px' }}>
+              <input type="checkbox" checked={!!settings.customBoardLayout} onChange={e => setSettings({...settings, customBoardLayout: e.target.checked})} />
+              {t('custom_board_layout')}
+            </label>
+
+            {settings.customBoardLayout && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9em' }}>{t('layout_desktop')}</span>
+                  <select value={settings.boardLayoutDesktop || 'horizontal'} onChange={e => setSettings({...settings, boardLayoutDesktop: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                    <option value="horizontal">{t('layout_horizontal')}</option>
+                    <option value="vertical">{t('layout_vertical')}</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9em' }}>{t('layout_tablet')}</span>
+                  <select value={settings.boardLayoutTablet || 'horizontal'} onChange={e => setSettings({...settings, boardLayoutTablet: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                    <option value="horizontal">{t('layout_horizontal')}</option>
+                    <option value="vertical">{t('layout_vertical')}</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9em' }}>{t('layout_mobile')}</span>
+                  <select value={settings.boardLayoutMobile || 'vertical'} onChange={e => setSettings({...settings, boardLayoutMobile: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                    <option value="horizontal">{t('layout_horizontal')}</option>
+                    <option value="vertical">{t('layout_vertical')}</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
