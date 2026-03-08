@@ -2,12 +2,12 @@
 // なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
 
 import React, { useState, useMemo } from 'react';
-import { format, differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core'; 
 import { useTranslation } from 'react-i18next';
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
-import { IconCalendar, IconX, IconChevronDown, IconChevronRight } from './Icons';
+import { IconChevronDown, IconChevronRight } from './Icons';
 import { FormattedTaskName } from './FormattedTaskName';
 
 type TaskNode = Task & { children: TaskNode[] };
@@ -62,7 +62,7 @@ const NestDroppableInner: React.FC<{ task: Task, tasks: Task[], depth: number }>
 
 export const TaskItem: React.FC<Props> = ({ 
   task, tasks, depth, hasChildren, 
-  onStatusChange, onParentStatusChange, onDelete, onDeadlineChange,
+  onStatusChange, onParentStatusChange,
   isExpanded, onToggleExpand, onClick,
   isMenuOpen, onToggleMenu,
   isActiveParent = false,
@@ -70,14 +70,10 @@ export const TaskItem: React.FC<Props> = ({
   onEditModalOpen
 }) => {
   const { t } = useTranslation(); 
-  const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [insertPosition, setInsertPosition] = useState<'top' | 'bottom' | null>(null);
 
   const { windowWidth, isMobile } = useResponsive();
-  const { active } = useDndContext();
-  const isDraggingAny = !!active;
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
@@ -118,7 +114,6 @@ export const TaskItem: React.FC<Props> = ({
     3: { l: t('status_suspend'), c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
-  const currentDeadlineStr = task.deadline !== undefined ? format(task.deadline, 'yyyy-MM-dd') : '';
   const daysRemaining = task.deadline !== undefined ? differenceInCalendarDays(task.deadline, new Date()) : null;
     
   const isUrgent = useMemo(() => {
@@ -203,7 +198,6 @@ export const TaskItem: React.FC<Props> = ({
   const progress = hasChildren ? calculateProgress() : null;
 
   const handleItemClick = () => {
-      if (isEditingDeadline) return;
       onClick();
       if (!isMenuOpen) { onToggleMenu(); }
   };
@@ -213,8 +207,6 @@ export const TaskItem: React.FC<Props> = ({
   return (
     <>
       <div 
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         onClick={(e) => { e.stopPropagation(); handleItemClick(); }}
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -226,7 +218,7 @@ export const TaskItem: React.FC<Props> = ({
           display: 'flex', alignItems: 'center', padding: itemPadding,
           borderBottom: '1px solid var(--border-color)', marginLeft: `${depth * indentWidth}px`,
           position: 'relative', cursor: 'pointer',
-          backgroundColor: (isMenuOpen || isHovered || isActiveParent || isEditingDeadline) ? 'var(--bg-item-hover)' : 'transparent',
+          backgroundColor: (isMenuOpen || isActiveParent) ? 'var(--bg-item-hover)' : 'transparent',
           borderRadius: '4px', transition: 'background-color 0.2s, box-shadow 0.2s',
           fontSize: fontSize, boxShadow: isActiveParent ? '0 0 0 2px var(--color-primary) inset' : 'none'
         }}
@@ -262,25 +254,13 @@ export const TaskItem: React.FC<Props> = ({
           </button>
         )}
         
-        {/* ▼ minWidth: 0 と overflowWrap: 'anywhere' を追加して横幅はみ出しを防止 */}
-        <div style={{ flex: 1, minWidth: 0, textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: isMobile ? '0' : '2px', paddingRight: isMobile ? '0' : '4px' }}>
-          <>
-            <span title={isViewer ? "" : t('double_click_to_edit')} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
-              <FormattedTaskName name={task.name} />
-            </span>
-            {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal', zIndex: 21, position: 'relative' }}>({progress}%)</span>}
-            {isEditingDeadline && !isViewer && !isMobile ? (
-                <input type="date" defaultValue={currentDeadlineStr} onChange={(e) => { onDeadlineChange(e.target.value); setIsEditingDeadline(false); }} onBlur={() => setIsEditingDeadline(false)} autoFocus onClick={(e) => e.stopPropagation()} onPointerDown={stopPropagation} style={{ marginLeft: '6px', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', colorScheme: 'dark', fontSize: 'inherit', zIndex: 21, position: 'relative' }} />
-            ) : ( getDeadline() )}
-          </>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: isMobile ? '0' : '2px', paddingRight: '4px' }}>
+          <span title={isViewer ? "" : t('double_click_to_edit')} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
+            <FormattedTaskName name={task.name} />
+          </span>
+          {progress !== null && <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginLeft: '6px', fontWeight: 'normal', zIndex: 21, position: 'relative' }}>({progress}%)</span>}
+          {getDeadline()}
         </div>
-        
-        {!isViewer && !isMobile && !isDraggingAny && (
-          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21, flexShrink: 0 }}>
-            <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title={t('set_deadline')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title={t('delete')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
-          </div>
-        )}
 
         {hasChildren && (() => {
           const { p0, p1, p2, p3 } = getProgressData();
@@ -331,10 +311,10 @@ export const TaskItem: React.FC<Props> = ({
           <div style={{ backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', width: '280px', border: '1px solid var(--border-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>{t('batch_change_status')}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => { onParentStatusChange(task.id, 0); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
-              <button onClick={() => { onParentStatusChange(task.id, 1); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
-              <button onClick={() => { if(confirm(t('confirm_complete_all_children'))) { onParentStatusChange(task.id, 2); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
-              <button onClick={() => { onParentStatusChange(task.id, 3); setShowStatusModal(false); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_todo_label') }))) { onParentStatusChange(task.id, 0); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_doing_label') }))) { onParentStatusChange(task.id, 1); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_done_label') }))) { onParentStatusChange(task.id, 2); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_suspend_label') }))) { onParentStatusChange(task.id, 3); setShowStatusModal(false); } }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
             </div>
             <button onClick={() => setShowStatusModal(false)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{t('cancel')}</button>
           </div>
