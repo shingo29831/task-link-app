@@ -1,22 +1,56 @@
+// src/types/index.ts
+// 役割: アプリケーション全体で利用する共通の型定義
+// なぜ: 各コンポーネント間でデータの整合性を保つため
+
 export interface Task {
   id: string;
-  name: string;      
-  status: 0 | 1 | 2 | 3; // 0:未着手, 1:進行中, 2:完了, 3:休止
-  deadline?: number; 
-  lastUpdated: number; 
-  parentId?: string;   
-  isDeleted?: boolean;
+  name: string;
+  status: 0 | 1 | 2 | 3;
+  deadline?: number;
+  lastUpdated: number;
+  parentId?: string;
   order?: number;
+  isDeleted?: boolean;
+  
+  isExpanded?: boolean;
 
-  // カレンダー/統合表示用プロパティ
-  sourceProjectName?: string; // 表示用プロジェクト名
-  sourceProjectId?: string;   // 更新用プロジェクトID
-  hasChildren?: boolean;      // UI制御用
+  hasChildren?: boolean;
+  sourceProjectName?: string;
+  sourceProjectId?: string;
+}
+
+export type UserRole = 'viewer' | 'editor' | 'admin' | 'owner';
+
+export interface ProjectMember {
+  id: string;
+  username: string;
+  role: UserRole;
 }
 
 export interface AppData {
   id: string;
-  projectName: string; 
+  shortId?: string;
+  projectName: string;
   tasks: Task[];
   lastSynced: number;
+  isPublic?: boolean;
+  publicRole?: UserRole;
+  members?: ProjectMember[];
+  isCloudSync?: boolean; 
+  role?: UserRole | string;
+  isSnapshot?: boolean; 
+  includeDataInLink?: boolean; // なぜ: リンクにデータを含める設定の状態を型安全に管理するため
+}
+
+export interface UserSettings {
+  language: string;
+  timezone: string;
+  theme: string;
+  weekStartsOn: number;
+  boardLayout?: 'horizontal' | 'vertical'; 
+  customBoardLayout?: boolean;
+  boardLayoutDesktop?: 'horizontal' | 'vertical';
+  boardLayoutTablet?: 'horizontal' | 'vertical';
+  boardLayoutMobile?: 'horizontal' | 'vertical';
+  lastUpdated?: number;
 }

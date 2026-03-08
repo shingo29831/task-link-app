@@ -1,3 +1,10 @@
+.env
+.env.local
+.env.*.local
+.dev.vars
+node_modules/
+
+
 # Logs
 logs
 *.log

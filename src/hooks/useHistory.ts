@@ -46,6 +46,11 @@ export function useHistory<T>(initialState: T) {
     });
   }, []);
 
+  // 履歴全体を外部から直接改変・マージするための関数（クラウド同期用）
+  const modifyHistory = useCallback((modifier: (curr: { past: T[]; present: T; future: T[] }) => { past: T[]; present: T; future: T[] }) => {
+    setHistory(curr => modifier(curr));
+  }, []);
+
   // 元に戻す (Undo)
   const undo = useCallback(() => {
     setHistory(curr => {
@@ -62,7 +67,7 @@ export function useHistory<T>(initialState: T) {
     });
   }, []);
 
-  // やり直す (Redo) - 必要であれば
+  // やり直す (Redo)
   const redo = useCallback(() => {
     setHistory(curr => {
       if (curr.future.length === 0) return curr;
@@ -82,9 +87,11 @@ export function useHistory<T>(initialState: T) {
     state: history.present,
     setState,
     resetState,
+    modifyHistory,
     undo,
     redo,
     canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0
+    canRedo: history.future.length > 0,
+    history // 現在の履歴全体を参照するためにエクスポート
   };
 }

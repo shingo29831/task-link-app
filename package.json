@@ -4,20 +4,30 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "vite",
+    "dev:backend": "npx wrangler pages dev ./ --port 8788 --compatibility-date=2026-02-25",
     "build": "tsc -b && vite build",
+    "deploy-prepare": "cd functions && npx drizzle-kit push && cd .. && npm run build && cp dist/index.html dist/404.html",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@hono/clerk-auth": "^3.1.0",
+    "@neondatabase/serverless": "^1.0.2",
     "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.3",
+    "i18next": "^25.8.14",
     "lz-string": "^1.5.0",
     "react": "^19.2.0",
     "react-big-calendar": "^1.19.4",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-i18next": "^16.5.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -27,10 +37,14 @@
     "@types/react-big-calendar": "^1.16.3",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.1.0",
+    "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.9",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"

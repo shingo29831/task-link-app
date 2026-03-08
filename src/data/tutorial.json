@@ -1,0 +1,107 @@
+{
+  "id": "local_tutorial_project_id",
+  "projectName": "ようこそMeldTaskへ！！",
+  "tasks": [
+    {
+      "id": "tut_1",
+      "name": "🎉 MeldTaskの特徴",
+      "status": 0,
+      "order": 1
+    },
+    {
+      "id": "tut_1_1",
+      "name": "階層構造でタスクを管理できます。大きなタスクを細かく分解しましょう！",
+      "status": 1,
+      "parentId": "tut_1",
+      "order": 1
+    },
+    {
+      "id": "tut_1_2",
+      "name": "クラウド同期や共有機能（URL共有）で、チームや友達とタスクを共有できます。",
+      "status": 1,
+      "parentId": "tut_1",
+      "order": 2
+    },
+    {
+      "id": "tut_2",
+      "name": "📖 基本操作：タスクの設定",
+      "status": 0,
+      "order": 2
+    },
+    {
+      "id": "tut_2_1",
+      "name": "タスクをダブルクリックするとタスク設定画面を開きます。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 1
+    },
+    {
+      "id": "tut_2_2",
+      "name": "タスク設定画面では、名前、期限、状態、順番の設定と削除が行えます。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 2
+    },
+    {
+      "id": "tut_2_3",
+      "name": "PC版でもモバイル版と同様に、すべての操作がタスク設定画面に集約されています。",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 3
+    },
+    {
+      "id": "tut_3",
+      "name": "📊 進捗の管理",
+      "status": 0,
+      "order": 3
+    },
+    {
+      "id": "tut_3_1",
+      "name": "子を持つタスクには、下部に状態の割合を示す進捗ゲージが表示されます。",
+      "status": 0,
+      "parentId": "tut_3",
+      "order": 1
+    },
+    {
+      "id": "tut_3_2",
+      "name": "カレンダーの日付を選択して開く詳細画面から、すべての子タスクの状態を一括で変更できます。",
+      "status": 1,
+      "parentId": "tut_3",
+      "order": 2
+    },
+    {
+      "id": "tut_3_3",
+      "name": "画面上部の「全進捗」の下には、プロジェクト全体の状況を示すゲージがあります。",
+      "status": 0,
+      "parentId": "tut_3",
+      "order": 3
+    },
+    {
+      "id": "tut_4",
+      "name": "☁️ クラウド同期と共有",
+      "status": 0,
+      "order": 4
+    },
+    {
+      "id": "tut_4_1",
+      "name": "ログインするとプロジェクトをクラウドに保存し、複数端末で同期できます。",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 1
+    },
+    {
+      "id": "tut_4_2",
+      "name": "プロジェクト設定から他のユーザーを招待したり、共有URLを発行できます。",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 2
+    },
+    {
+      "id": "tut_4_3",
+      "name": "画面上部のメニューからプロジェクトのエクスポートやインポートが行えます。",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 3
+    }
+  ]
+}

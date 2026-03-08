@@ -1,246 +1,190 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { AppData, Task } from '../types';
+// src/hooks/useAppData.ts
+// 役割: アプリケーション全体のデータ管理（ローカル状態、クラウド同期、ストレージ永続化）の統合Facade
+
+import { useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { useProjectState } from './useProjectState';
+import { useCloudSync } from './useCloudSync';
 import { compressData, decompressData } from '../utils/compression';
-import { useHistory } from './useHistory';
+import tutorialData from '../data/tutorial.json';
+import { calculateHashAsync, generateProjectId, isEffectivelyIdentical, isUUID, createDefaultProject } from '../utils/projectUtils';
+import type { AppData } from '../types';
 
 const STORAGE_KEY = 'progress_app_v2';
 
-// ID生成
-const generateProjectId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-
-// デフォルトプロジェクト作成
-const createDefaultProject = (): AppData => ({
-  id: generateProjectId(),
-  projectName: 'マイプロジェクト',
-  tasks: [],
-  lastSynced: Date.now()
-});
-
-// 比較関数
-const isTaskEqual = (local: Task, incoming: Task): boolean => {
-  if (local.id !== incoming.id) return false;
-  if (local.name !== incoming.name) return false;
-  if (local.status !== incoming.status) return false;
-  if (local.parentId !== incoming.parentId) return false;
-  if (local.deadline !== incoming.deadline) return false;
-  if (local.isDeleted !== incoming.isDeleted) return false;
-  if ((local.order ?? 0) !== (incoming.order ?? 0)) return false;
-
-  const localMin = Math.floor(local.lastUpdated / 60000);
-  const incomingMin = Math.floor(incoming.lastUpdated / 60000);
-  
-  return localMin === incomingMin;
-};
-
 export const useAppData = () => {
-  const { 
-    state: projects, 
-    setState: setProjects, 
-    resetState: resetProjects, 
-    undo, 
-    redo,
-    canUndo, // 追加
-    canRedo  // 追加
-  } = useHistory<AppData[]>([]);
+  const { getToken } = useAuth();
 
-  const [activeId, setActiveId] = useState<string>('');
-  
-  const activeData = projects.find(p => p.id === activeId) || null;
-  const [incomingData, setIncomingData] = useState<AppData | null>(null);
+  // 1. ローカル状態の管理
+  const projectState = useProjectState();
+  const { projects, setProjects, resetProjects, projectsRef, activeId, setActiveId, activeData, setIncomingData } = projectState;
+
+  const lastSyncedHashMap = useRef<Record<string, number>>({});
   const isLoaded = useRef(false);
+  const initialUrlGuardRef = useRef(true);
 
-  // 1. 初期ロード処理
+  // 2. クラウド同期ロジックの統合
+  const cloudSync = useCloudSync(activeData, activeId, projectsRef, setProjects, setActiveId, lastSyncedHashMap);
+
+  // 3. Storageからの初期ロードと URL パラメータの処理
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
 
-    const load = () => {
+    const load = async () => {
       const localJson = localStorage.getItem(STORAGE_KEY);
       let loadedProjects: AppData[] = [];
-      let initialActiveId = '';
 
       if (localJson) {
         try {
           const parsed = JSON.parse(localJson);
           if (Array.isArray(parsed)) {
-            loadedProjects = parsed;
+            loadedProjects = parsed.map((p: any) => ({ ...p, id: (isUUID(p.id) || String(p.id).startsWith('local_')) ? p.id : generateProjectId() }));
           } else {
-            const migrated = { ...parsed, id: parsed.id || generateProjectId() };
-            loadedProjects = [migrated];
+            loadedProjects = [{ ...parsed, id: generateProjectId() }];
           }
-        } catch (e) {
-          console.error("Failed to parse local storage", e);
-        }
+        } catch (e) { console.error("Failed to parse local storage", e); }
       }
 
-      if (loadedProjects.length === 0) {
-        const def = createDefaultProject();
-        loadedProjects = [def];
+      const now = Date.now();
+      const tutorialProject: AppData = {
+        id: tutorialData.id, projectName: tutorialData.projectName,
+        tasks: tutorialData.tasks.map((t: any) => ({ ...t, lastUpdated: now })) as any,
+        lastSynced: now, isCloudSync: false, role: 'owner'
+      };
+
+      const existingTutorialIdx = loadedProjects.findIndex(p => p.id === tutorialProject.id);
+      if (existingTutorialIdx >= 0) loadedProjects[existingTutorialIdx] = tutorialProject;
+      else loadedProjects.unshift(tutorialProject);
+
+      if (loadedProjects.length === 1 && loadedProjects[0].id === tutorialProject.id) {
+         loadedProjects.push(createDefaultProject());
       }
 
-      initialActiveId = loadedProjects[0].id;
+      let initialActiveId = loadedProjects[0].id;
       
-      const params = new URLSearchParams(window.location.search);
-      const compressed = params.get('d');
-      
-      let newIncoming: AppData | null = null;
-      let shouldAutoApply = false;
-      let isIdenticalToExisting = false; 
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isSharedLink = pathParts.length === 1 || (pathParts.length === 2 && pathParts[1] === 'snapshot');
 
-      if (compressed) {
-        const incoming = decompressData(compressed);
-        if (incoming) {
-          incoming.id = generateProjectId();
-          const sameNameProject = loadedProjects.find(p => p.projectName === incoming.projectName);
-
-          if (sameNameProject) {
-            initialActiveId = sameNameProject.id;
-            const isSameNameEmpty = sameNameProject.tasks.every(t => t.isDeleted);
-            
-            if (isSameNameEmpty) {
-                incoming.id = sameNameProject.id;
-                newIncoming = incoming;
-                shouldAutoApply = true;
-            } else {
-                newIncoming = incoming;
-                const localActive = sameNameProject.tasks.filter(t => !t.isDeleted);
-                const incomingActive = incoming.tasks.filter(t => !t.isDeleted);
-
-                if (localActive.length === incomingActive.length) {
-                    const allMatch = localActive.every((localTask, index) => {
-                        const incomingTask = incomingActive[index];
-                        return isTaskEqual(localTask, incomingTask);
-                    });
-                    if (allMatch) {
-                        isIdenticalToExisting = true;
-                    }
-                }
-            }
-          } else {
-            const currentTarget = loadedProjects.find(p => p.id === initialActiveId);
-            const hasActiveTasks = currentTarget && currentTarget.tasks.some(t => !t.isDeleted);
-
-            if (!hasActiveTasks && currentTarget) {
-              incoming.id = currentTarget.id;
-              newIncoming = incoming;
-              shouldAutoApply = true;
-            } else {
-              newIncoming = incoming;
-            }
+      if (isSharedLink) {
+        const shortId = pathParts[0];
+        const existingProj = loadedProjects.find(p => p.shortId === shortId);
+        if (existingProj) {
+          const params = new URLSearchParams(window.location.search);
+          if (params.has('d')) {
+             existingProj.includeDataInLink = true; // なぜ: URLに?d=がある場合は消えないように有効化しておく
           }
+          initialActiveId = existingProj.id;
         }
-      }
-
-      if (shouldAutoApply && newIncoming) {
-        loadedProjects = loadedProjects.map(p => 
-            p.id === newIncoming!.id ? newIncoming! : p
-        );
-        initialActiveId = newIncoming.id;
-        window.history.replaceState(null, '', window.location.pathname);
-        alert(`プロジェクト名：${newIncoming.projectName} を読み込みました。`);
-
-      } else if (newIncoming && !isIdenticalToExisting) {
-        setIncomingData(newIncoming);
-        window.history.replaceState(null, '', window.location.pathname);
       } else {
-        window.history.replaceState(null, '', window.location.pathname);
+        const params = new URLSearchParams(window.location.search);
+        const compressed = params.get('d');
+        if (compressed) {
+          const incoming = decompressData(compressed);
+          if (incoming) {
+            const isIdentical = loadedProjects.some(p => isEffectivelyIdentical(p, incoming));
+            if (!isIdentical) {
+              incoming.id = generateProjectId();
+              setIncomingData(incoming);
+            }
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
       }
 
+      for (const p of loadedProjects) { lastSyncedHashMap.current[p.id] = await calculateHashAsync(p); }
+      
       resetProjects(loadedProjects);
       setActiveId(initialActiveId);
     };
     load();
-  }, []);
+  }, [resetProjects, setIncomingData, setActiveId]);
 
+  // 4. StorageとURLへの永続化 (副作用)
   useEffect(() => {
-    if (projects.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    }
+    if (projects.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   }, [projects]);
 
   useEffect(() => {
     if (activeData) {
-      const compressed = compressData(activeData);
-      const newUrl = `${window.location.origin}${window.location.pathname}?d=${compressed}`;
-      window.history.replaceState(null, '', newUrl);
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isSharedOrSnapshot = pathParts.length === 1 || (pathParts.length === 2 && pathParts[1] === 'snapshot');
+
+      if (initialUrlGuardRef.current) {
+        if (isSharedOrSnapshot) {
+          if (activeData.shortId === pathParts[0]) {
+            const params = new URLSearchParams(window.location.search);
+            // なぜ: APIで検証が終わる前にURLの?d=を消してしまわないようにガードを維持する
+            if (params.has('d') && !activeData.includeDataInLink) {
+               return; 
+            }
+            initialUrlGuardRef.current = false;
+          } else {
+            return;
+          }
+        } else {
+          initialUrlGuardRef.current = false;
+        }
+      }
+
+      const isLocal = String(activeData.id).startsWith('local_') || (!activeData.shortId && activeData.isCloudSync === false);
+      const isSnapshot = !!activeData.isSnapshot;
+      const includeData = isLocal || !!(activeData as any).includeDataInLink;
+      
+      let basePath = '/';
+      if (!isLocal && activeData.shortId) {
+          basePath = isSnapshot ? `/${activeData.shortId}/snapshot/` : `/${activeData.shortId}/`;
+      }
+      
+      if (!includeData) {
+        window.history.replaceState(null, '', `${window.location.origin}${basePath}`);
+      } else {
+        const compressed = compressData(activeData);
+        window.history.replaceState(null, '', `${window.location.origin}${basePath}?d=${compressed}`);
+      }
     }
   }, [activeData]);
 
-  const setActiveData = (newData: AppData) => {
-    setProjects(prev => prev.map(p => p.id === newData.id ? newData : p));
-  };
-
-  const updateProject = useCallback((updatedProject: AppData) => {
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
-  }, [setProjects]);
-
-  const addProject = () => {
-    const newProject = createDefaultProject();
-    let nameCandidate = 'マイプロジェクト';
-    let counter = 1;
-    const existingNames = new Set(projects.map(p => p.projectName));
-    while (existingNames.has(nameCandidate)) {
-      counter++;
-      nameCandidate = `マイプロジェクト ${counter}`;
+  const deleteProject = useCallback(async (id: string, deleteFromCloud: boolean = true) => {
+    if (projectsRef.current.length <= 1) { alert("最後のプロジェクトは削除できません。"); return; }
+    
+    const targetProject = projectsRef.current.find((p: AppData) => p.id === id);
+    if (deleteFromCloud && targetProject && !String(targetProject.id).startsWith('local_') && targetProject.isCloudSync !== false) {
+       try {
+          const token = await getToken();
+          await fetch(`/api/projects/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+       } catch (e) { console.error("Failed to delete from cloud", e); }
     }
-    newProject.projectName = nameCandidate;
-    setProjects(prev => [...prev, newProject]);
-    setActiveId(newProject.id);
-  };
 
-  const importNewProject = (data: AppData) => {
-    let name = data.projectName;
-    let suffix = 1;
-    while(projects.some(p => p.projectName === name)) {
-       name = `${data.projectName} (${suffix++})`;
-    }
-    const newProject = { ...data, id: generateProjectId(), projectName: name };
-    setProjects(prev => [...prev, newProject]);
-    setActiveId(newProject.id);
-    setIncomingData(null);
-  };
-
-  const switchProject = (id: string) => {
-    if (projects.some(p => p.id === id)) {
-      setActiveId(id);
-    }
-  };
-
-  const deleteProject = (id: string) => {
-    if (projects.length <= 1) {
-      alert("最後のプロジェクトは削除できません。");
-      return;
-    }
-    if (!confirm("このプロジェクトを削除しますか？")) return;
-    const newProjects = projects.filter(p => p.id !== id);
+    const newProjects = projectsRef.current.filter((p: AppData) => p.id !== id);
     setProjects(newProjects);
-    if (id === activeId) {
-      setActiveId(newProjects[0].id);
-    }
-  };
+    if (id === activeId) setActiveId(newProjects[0].id);
+  }, [projectsRef, getToken, setProjects, activeId, setActiveId]);
 
-  const getShareUrl = () => {
+  const getShareUrl = useCallback(() => {
     if (!activeData) return '';
+    const isLocal = String(activeData.id).startsWith('local_') || (!activeData.shortId && activeData.isCloudSync === false);
+    const includeData = isLocal || !!(activeData as any).includeDataInLink;
+    const isSnapshot = !!activeData.isSnapshot;
+    
+    let basePath = '/';
+    if (!isLocal && activeData.shortId) {
+        basePath = isSnapshot ? `/${activeData.shortId}/snapshot/` : `/${activeData.shortId}/`;
+    }
+    
+    if (!includeData && activeData.shortId) {
+      return `${window.location.origin}${basePath}`;
+    }
+    
     const compressed = compressData(activeData);
-    return `${window.location.origin}${window.location.pathname}?d=${compressed}`;
-  };
+    return `${window.location.origin}${basePath}?d=${compressed}`;
+  }, [activeData]);
 
-  return { 
-    data: activeData, 
-    setData: setActiveData,
-    updateProject, 
-    incomingData, 
-    setIncomingData, 
-    getShareUrl,
-    projects,
-    activeId,
-    addProject,
-    importNewProject,
-    switchProject,
+  return {
+    ...projectState,
+    ...cloudSync,
     deleteProject,
-    undo,
-    redo,
-    canUndo, // 追加
-    canRedo  // 追加
+    getShareUrl,
+    data: activeData
   };
 };
