@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AppData } from '../types';
+import type { AppData, Task } from '../types';
 import { decompressData } from '../utils/compression';
 
 type Props = {
@@ -19,26 +19,36 @@ type Props = {
   onMergeProject: (data: AppData) => void;
 };
 
+const areTasksIdentical = (tasks1: Task[], tasks2: Task[]) => {
+  const active1 = tasks1.filter(t => !t.isDeleted);
+  const active2 = tasks2.filter(t => !t.isDeleted);
+  if (active1.length !== active2.length) return false;
+  
+  const map2 = new Map(active2.map(t => [t.id, t]));
+  for (const t1 of active1) {
+    const t2 = map2.get(t1.id);
+    if (!t2) return false;
+    if (t1.name !== t2.name) return false;
+    if (t1.status !== t2.status) return false;
+    if (t1.deadline !== t2.deadline) return false;
+    if (t1.parentId !== t2.parentId) return false;
+    if ((t1.order || 0) !== (t2.order || 0)) return false;
+  }
+  return true;
+};
+
 export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOpenAsProject, onMergeProject }) => {
   const { t } = useTranslation();
   const { shortId, projectData, role, compressedData } = sharedState;
   
-  const [step, setStep] = useState<1 | 2>(compressedData ? 1 : 2);
-  const [selectedDataMode, setSelectedDataMode] = useState<'latest' | 'link'>('latest');
+  const [step, setStep] = useState<0 | 1 | 2>(0); 
   
   const autoOpenedRef = useRef(false);
 
-  useEffect(() => {
-    if (!projectData || role === 'none' || role === 'error') {
-      window.history.replaceState(null, '', '/');
-      onClose();
-    }
-  }, [projectData, role, step, onClose]);
-
-  const handleActionSelect = useCallback((action: 'open' | 'merge') => {
+  const handleActionSelect = useCallback((action: 'open' | 'merge', mode: 'latest' | 'link', forceSyncOn = false) => {
     let targetTasks = projectData.data?.tasks || projectData.tasks || [];
     
-    if (selectedDataMode === 'link' && compressedData) {
+    if (mode === 'link' && compressedData) {
       const decompressed = decompressData(compressedData);
       if (decompressed && decompressed.tasks) {
         targetTasks = decompressed.tasks;
@@ -47,7 +57,9 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       }
     }
 
-    const isLinkData = selectedDataMode === 'link' && !!compressedData;
+    const isLinkData = mode === 'link' && !!compressedData;
+    // なぜ: 最新データと一致した場合は、?d= を保持しつつ同期機能はONのままにするため
+    const shouldDisableSync = isLinkData && !forceSyncOn;
 
     const sharedData: AppData = {
       id: projectData.id,
@@ -55,38 +67,67 @@ export const SharedProjectModal: React.FC<Props> = ({ sharedState, onClose, onOp
       projectName: projectData.projectName,
       tasks: targetTasks,
       lastSynced: Date.now(),
-      isCloudSync: !isLinkData, // なぜ: 過去のスナップショットを展開した際に誤ってクラウドを上書きしないよう同期をオフにするため
+      isCloudSync: !shouldDisableSync, 
       isPublic: projectData.isPublic,
       publicRole: projectData.publicRole || role,
       role: role, 
-      isSnapshot: isLinkData, // なぜ: スナップショットであることをアイコン表示等で判定できるようにするため
+      isSnapshot: shouldDisableSync, 
+      includeDataInLink: !!compressedData, 
     };
-
-    window.history.replaceState(null, '', `/${shortId}`);
 
     if (action === 'merge') {
       window.history.replaceState(null, '', `/`);
       onMergeProject(sharedData);
     } else {
+      if (shouldDisableSync) {
+         window.history.replaceState(null, '', `/${shortId}/snapshot/${window.location.search}`);
+      } else {
+         window.history.replaceState(null, '', `/${shortId}${window.location.search}`);
+      }
       onOpenAsProject(sharedData);
     }
     onClose();
-  }, [projectData, selectedDataMode, compressedData, shortId, role, onMergeProject, onOpenAsProject, onClose, t]);
+  }, [projectData, compressedData, shortId, role, onMergeProject, onOpenAsProject, onClose, t]);
 
   useEffect(() => {
-    if (step === 2 && projectData && !autoOpenedRef.current) {
-      autoOpenedRef.current = true;
-      handleActionSelect('open');
+    if (!projectData || role === 'none' || role === 'error') {
+      window.history.replaceState(null, '', '/');
+      onClose();
+      return;
     }
-  }, [step, projectData, handleActionSelect]);
 
-  if (!projectData || role === 'none' || role === 'error' || step === 2) {
+    if (step === 0 && !autoOpenedRef.current) {
+      if (compressedData) {
+        const decompressed = decompressData(compressedData);
+        const linkTasks = decompressed?.tasks || [];
+        const cloudTasks = projectData.data?.tasks || projectData.tasks || [];
+        
+        const areIdentical = areTasksIdentical(linkTasks, cloudTasks);
+        
+        if (areIdentical) {
+          autoOpenedRef.current = true;
+          // なぜ: データが一致した場合は、同期ONのままURLの?d=設定を有効化して開く
+          handleActionSelect('open', 'link', true);
+        } else {
+          const params = new URLSearchParams(window.location.search);
+          if (!window.location.pathname.includes('/snapshot')) {
+              window.history.replaceState(null, '', `/${shortId}/snapshot/?${params.toString()}`);
+          }
+          setStep(1);
+        }
+      } else {
+        autoOpenedRef.current = true;
+        handleActionSelect('open', 'latest');
+      }
+    }
+  }, [projectData, role, step, compressedData, shortId, handleActionSelect, onClose]);
+
+  if (!projectData || role === 'none' || role === 'error' || step === 0 || step === 2) {
     return null; 
   }
 
   const handleDataSelect = (mode: 'latest' | 'link') => {
-    setSelectedDataMode(mode);
-    setStep(2);
+    handleActionSelect('open', mode);
   };
 
   if (step === 1) {

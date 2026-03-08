@@ -38,7 +38,8 @@ export interface AppData {
   members?: ProjectMember[];
   isCloudSync?: boolean; 
   role?: UserRole | string;
-  isSnapshot?: boolean; // なぜ: リンクから展開したスナップショットデータであることを識別するため
+  isSnapshot?: boolean; 
+  includeDataInLink?: boolean; // なぜ: リンクにデータを含める設定の状態を型安全に管理するため
 }
 
 export interface UserSettings {

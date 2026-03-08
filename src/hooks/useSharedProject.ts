@@ -1,3 +1,4 @@
+// src/hooks/useSharedProject.ts
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -22,18 +23,17 @@ export const useSharedProject = () => {
       const path = window.location.pathname;
       const pathParts = path.split('/').filter(Boolean);
       
-      if (pathParts.length === 1) {
+      // なぜ: /shortId だけでなく /shortId/snapshot のパスパターンも許容し、正しくshortIdを抽出するため
+      if (pathParts.length === 1 || (pathParts.length === 2 && pathParts[1] === 'snapshot')) {
         const shortId = pathParts[0];
 
         hasCheckedRef.current = true;
 
-        // リファラー（遷移元）のチェック:
-        // 遷移元のURLのパスが現在のshortIdと同じ場合（リロードやプロジェクト内遷移）はモーダル展開処理をスキップ
         try {
           if (document.referrer) {
             const referrerUrl = new URL(document.referrer);
             const referrerPathParts = referrerUrl.pathname.split('/').filter(Boolean);
-            if (referrerPathParts.length === 1 && referrerPathParts[0] === shortId) {
+            if (referrerPathParts.length >= 1 && referrerPathParts[0] === shortId) {
               console.log(`[useSharedProject] Referrer matches shortId: ${shortId}. Skipping modal.`);
               return;
             }
@@ -65,7 +65,6 @@ export const useSharedProject = () => {
 
           if (!response.ok || !result.success) {
             console.warn(`[useSharedProject] Access denied or error:`, result?.error);
-            // 権限エラーや存在しない場合でも、URL圧縮データがあればマージできるように compressedData は残す
             setSharedProjectState({
               shortId,
               projectData: null,
