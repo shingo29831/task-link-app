@@ -1,4 +1,3 @@
-// src/components/BoardArea.tsx
 // 役割: タスクを配置するメインのボードエリアのレンダリングとドラッグ時のスクロール・位置計算
 // なぜ: タスクのドラッグ＆ドロップ時に視覚的なフィードバックと挿入位置の表示を提供するため
 
@@ -28,7 +27,7 @@ const SortMenu = ({ sortConfig, onSortChange }: { sortConfig: { type: string, di
         style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer' }}
         title="並び替え"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="15" y1="18" x2="15" y2="6"></line><polyline points="11 10 15 6 19 10"></polyline><line x1="9" y1="6" x2="9" y2="18"></line><polyline points="5 14 9 18 13 14"></polyline></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
       </button>
       {isOpen && (
         <div style={{ position: 'absolute', top: '48px', right: '0', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', width: '160px' }}>
@@ -47,12 +46,27 @@ const SortMenu = ({ sortConfig, onSortChange }: { sortConfig: { type: string, di
           {[
             { id: 'asc', label: '昇順' },
             { id: 'desc', label: '降順' }
-          ].map(opt => (
-            <div key={opt.id} onClick={() => { onSortChange(sortConfig.type, opt.id); setIsOpen(false); }} style={{ padding: '8px', cursor: 'pointer', backgroundColor: sortConfig.direction === opt.id ? 'var(--bg-surface-hover)' : 'transparent', borderRadius: '4px', fontSize: '0.9em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{opt.label}</span>
-              {sortConfig.direction === opt.id && <span style={{ color: 'var(--color-primary)' }}>✓</span>}
-            </div>
-          ))}
+          ].map(opt => {
+            const isCustom = sortConfig.type === 'custom';
+            return (
+              <div key={opt.id} 
+                   onClick={() => { if (!isCustom) { onSortChange(sortConfig.type, opt.id); setIsOpen(false); } }} 
+                   style={{ 
+                     padding: '8px', 
+                     cursor: isCustom ? 'not-allowed' : 'pointer', 
+                     backgroundColor: !isCustom && sortConfig.direction === opt.id ? 'var(--bg-surface-hover)' : 'transparent', 
+                     borderRadius: '4px', 
+                     fontSize: '0.9em', 
+                     display: 'flex', 
+                     justifyContent: 'space-between', 
+                     alignItems: 'center',
+                     opacity: isCustom ? 0.4 : 1
+                   }}>
+                <span>{opt.label}</span>
+                {!isCustom && sortConfig.direction === opt.id && <span style={{ color: 'var(--color-primary)' }}>✓</span>}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
