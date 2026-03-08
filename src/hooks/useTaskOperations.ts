@@ -41,11 +41,45 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
+  // 追加: ソート関連のステート
+  const [sortConfig, setSortConfig] = useState<{ type: string, direction: string }>({ type: 'custom', direction: 'asc' });
+  const [tempOrderMap, setTempOrderMap] = useState<Record<string, number>>({});
+
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
 
-  // 2. 派生データの計算 (useTaskView)
-  const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar);
+  // 追加: ソートの適用ロジック
+  const applySort = useCallback((type: string, direction: string) => {
+    setSortConfig({ type, direction });
+    if (type === 'custom' || !data) return;
+
+    const newMap: Record<string, number> = {};
+    const rootTasks = data.tasks.filter((t: Task) => !t.isDeleted && !t.parentId);
+
+    const sortGroup = (tasks: Task[]) => {
+        tasks.sort((a, b) => {
+            let diff = 0;
+            if (type === 'progress') {
+                diff = (a.status || 0) - (b.status || 0);
+            } else if (type === 'updated') {
+                diff = (a.lastUpdated || 0) - (b.lastUpdated || 0);
+            }
+            return direction === 'asc' ? diff : -diff;
+        });
+        tasks.forEach((t, i) => {
+            newMap[t.id] = i + 1;
+        });
+        tasks.forEach(t => {
+            const children = data.tasks.filter((nt: Task) => !nt.isDeleted && nt.parentId === t.id);
+            if (children.length > 0) sortGroup(children);
+        });
+    };
+    sortGroup(rootTasks);
+    setTempOrderMap(newMap);
+  }, [data]);
+
+  // 2. 派生データの計算 (useTaskView) にソート情報を渡す
+  const { activeTasks, calendarTasks, rootNodes, projectProgress, debugInfo } = useTaskView(data, projects, showAllProjectsInCalendar, sortConfig, tempOrderMap);
 
   // 3. タスクの更新処理 (useTaskMutations)
   const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand, updateTaskDetails } = useTaskMutations(
@@ -67,8 +101,8 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     data, projectsRef, activeId, addOrUpdateProject, switchProject, deleteProject, setIncomingData, incomingData, getToken
   );
 
-  // ドラッグ&ドロップの処理
-  const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save, boardLayout);
+  // ドラッグ&ドロップの処理 にソート情報を渡す
+  const { sensors, customCollisionDetection, handleDragEnd } = useTaskDnD(data, save, boardLayout, sortConfig, tempOrderMap, setTempOrderMap);
 
   // その他のUIハンドリング
   useEffect(() => {
@@ -130,6 +164,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     sensors, handleDragEnd, customCollisionDetection,
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
-    addOrUpdateProject, importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
+    addOrUpdateProject, importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync,
+    sortConfig, applySort // 追加
   };
 };

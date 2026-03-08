@@ -73,7 +73,8 @@ function App() {
     handleToggleSync, handleTogglePublic, handleInviteUser, handleChangeRole, handleRemoveMember, handleToggleIncludeDataInLink,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
-    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync
+    importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync,
+    sortConfig, applySort // 追加: ソート設定と適用関数を取得
   } = useTaskOperations(boardLayout);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -560,11 +561,11 @@ function App() {
           {!isMobile && !isViewer && <div style={{ marginBottom: '0px', flexShrink: 0 }}><TaskInput taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} onSubmit={() => handleAddTaskWrapper()} /></div>}
           
           {isViewer ? (
-            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout}>
+            <StaticBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout} sortConfig={sortConfig} applySort={applySort}>
               <>{rootNodesContent}</>
             </StaticBoardArea>
           ) : (
-            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout}>
+            <InteractiveBoardArea activeTasks={activeTasks} onBoardClick={handleBoardClick} isMobile={isMobile} isNarrowLayout={isNarrowLayout} onShowAddModal={() => setShowAddModal(true)} onShowIOModal={() => setShowIOModal(true)} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} boardLayout={boardLayout} sortConfig={sortConfig} applySort={applySort}>
               <SortableContext items={rootNodes.map(r => r.id)} strategy={boardLayout === 'vertical' ? verticalListSortingStrategy : horizontalListSortingStrategy}>
                   {rootNodesContent}
               </SortableContext>
