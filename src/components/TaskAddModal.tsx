@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconPlus, IconCalendar, IconX } from './Icons';
 import type { Task, AppData } from '../types';
@@ -25,6 +25,8 @@ export const TaskAddModal: React.FC<Props> = ({
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || (projects?.[0]?.id ?? ''));
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [showProjectSelect, setShowProjectSelect] = useState(false);
+
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialParentId) {
@@ -98,6 +100,21 @@ export const TaskAddModal: React.FC<Props> = ({
         .slice(0, 10);
   }, [searchWord, activeTasksForSelect]);
 
+  const handleDateClick = () => {
+    const input = dateInputRef.current as any;
+    if (input) {
+      try {
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+        } else {
+          input.focus();
+        }
+      } catch (e) {
+        input.focus();
+      }
+    }
+  };
+
   const selectedProject = projects?.find(p => p.id === selectedProjectId);
   const projectName = selectedProject?.projectName || t('project');
 
@@ -161,6 +178,7 @@ export const TaskAddModal: React.FC<Props> = ({
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <button 
               type="button"
+              onClick={handleDateClick}
               style={{ 
                 flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
                 background: 'var(--bg-input)', border: '2px solid var(--border-light)', 
@@ -172,12 +190,12 @@ export const TaskAddModal: React.FC<Props> = ({
               <span>{dateStr || t('no_deadline')}</span>
             </button>
             <input 
+              ref={dateInputRef}
               type="date" 
               value={dateStr}
               onChange={(e) => setDateStr(e.target.value)} 
               style={{ 
-                position: 'absolute', top: 0, left: 0, width: '100%', 
-                height: '100%', opacity: 0, cursor: 'pointer'
+                position: 'absolute', top: 0, left: 0, width: 0, height: 0, opacity: 0, pointerEvents: 'none'
               }} 
             />
           </div>

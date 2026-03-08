@@ -161,7 +161,6 @@ export const useCloudSync = (
   const triggerSyncFlow = useCallback(async (projectId: string, forceFetch: boolean, abortSignal: AbortSignal) => {
       setSyncState('waiting');
       try {
-          // 初期状態のハッシュ計算のために取得
           const initialTargetProject = projectsRef.current.find(p => p.id === projectId);
           if (!initialTargetProject) return;
 
@@ -174,13 +173,11 @@ export const useCloudSync = (
           ]);
           if (abortSignal.aborted) return;
           
-          // ★待機中に発生したローカルの変更を反映させるため、必ず最新のデータを再取得する
           const targetProject = projectsRef.current.find(p => p.id === projectId);
           if (!targetProject) return;
 
           if (!forceFetch) {
               const currentHash = await calculateHashAsync(targetProject);
-              // 待機中に変更がなければ終了、変更があれば続行
               if (lastSyncedHashMap.current[projectId] === currentHash) { 
                   setSyncState('synced'); return; 
               }
@@ -388,6 +385,10 @@ export const useCloudSync = (
   };
 
   const uploadProject = async (localId: string) => {
+    if (localId === 'local_tutorial_project_id') {
+      alert('チュートリアルプロジェクトはクラウドに同期できません。');
+      return;
+    }
     const target = projectsRef.current.find((p: AppData) => p.id === localId);
     if (!target) return;
     const cloudCount = projectsRef.current.filter((p: AppData) => !String(p.id).startsWith('local_') && p.isCloudSync !== false).length;
