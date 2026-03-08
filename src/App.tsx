@@ -37,12 +37,20 @@ import { FormattedProjectName } from './components/FormattedProjectName';
 import { SyncLimitModal } from './components/SyncLimitModal';
 import { InteractiveBoardArea, StaticBoardArea } from './components/BoardArea';
 
+// --- 新しく作成したモーダルをインポート ---
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { TermsOfServiceModal } from './components/TermsOfServiceModal';
+
 type TaskNode = Task & { children: TaskNode[] };
 
 function App() {
   const [hasAgreedPolicy, setHasAgreedPolicy] = useState(() => {
     return localStorage.getItem('tasklink_policy_agreed') === 'true';
   });
+
+  // --- 規約詳細モーダルの表示状態を管理するState ---
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfService, setShowTermsOfService] = useState(false);
 
   const handleAgreePolicy = () => {
     localStorage.setItem('tasklink_policy_agreed', 'true');
@@ -607,6 +615,10 @@ function App() {
         .spin { animation: spin 1s linear infinite; }
       `}</style>
 
+      {/* --- 新しく作成したモーダルの呼び出し --- */}
+      {showPrivacyPolicy && <PrivacyPolicyModal onClose={() => setShowPrivacyPolicy(false)} />}
+      {showTermsOfService && <TermsOfServiceModal onClose={() => setShowTermsOfService(false)} />}
+
       {!hasAgreedPolicy && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
@@ -615,9 +627,19 @@ function App() {
               {t('privacy_policy_desc')}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center', marginBottom: '8px' }}>
-              {/* NOTE: 以下の href のURLを実際のプライバシーポリシー/利用規約のURLに変更してください */}
-              <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{t('privacy_policy_link')}</a>
-              <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{t('terms_of_service_link')}</a>
+              {/* --- URLリンクをボタンに変更し、モーダルを開くように修正 --- */}
+              <button 
+                onClick={() => setShowPrivacyPolicy(true)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', textDecoration: 'underline', cursor: 'pointer', padding: '4px' }}
+              >
+                {t('privacy_policy_link')}
+              </button>
+              <button 
+                onClick={() => setShowTermsOfService(true)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', textDecoration: 'underline', cursor: 'pointer', padding: '4px' }}
+              >
+                {t('terms_of_service_link')}
+              </button>
             </div>
             <button onClick={handleAgreePolicy} style={{ padding: '10px 24px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>
               {t('agree_and_start')}
