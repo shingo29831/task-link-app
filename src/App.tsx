@@ -271,7 +271,7 @@ function App() {
     else if (windowWidth <= 768) { BASE_WIDTH = 170; INDENT_WIDTH = 16; CHAR_WIDTH_PX = 9; DEADLINE_WIDTH = 60; }
     else if (windowWidth < 1280) { BASE_WIDTH = 200; INDENT_WIDTH = 20; CHAR_WIDTH_PX = 10; DEADLINE_WIDTH = 70; }
     let len = 0; for (let i = 0; i < node.name.length; i++) len += (node.name.charCodeAt(i) < 256) ? 1 : 2;
-    let max = BASE_WIDTH + (depth * INDENT_WIDTH) + Math.min(len, 20) * CHAR_WIDTH_PX + (node.deadline !== undefined ? DEADLINE_WIDTH : 0);
+    let max = BASE_WIDTH + (depth * INDENT_WIDTH) + Math.min(len, 25) * CHAR_WIDTH_PX + (node.deadline !== undefined ? DEADLINE_WIDTH : 0);
     if (node.children) { for (const child of node.children) max = Math.max(max, calculateColumnWidth(child, depth + 1)); }
     return max;
   };
