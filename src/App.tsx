@@ -473,7 +473,7 @@ function App() {
                                     <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title={t('sync_error')}><IconError size={16} /></button>
                                   ) : isSignedIn && data?.isSnapshot ? (
                                     <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} title={t('sync_disabled')}><IconCloudOff size={16} /></div>
-                                  ) : isSignedIn && !isCloudProject ? (
+                                  ) : isSignedIn && !isCloudProject && data.id !== 'local_tutorial_project_id' ? (
                                     <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /></button>
                                   ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
                                     <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--color-primary)', padding: 0 }} title={t('synced')}><IconCheckCircle size={16} /></button>
@@ -512,7 +512,7 @@ function App() {
                             <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', padding: 0 }} title={t('sync_error')}><IconError size={18} /></button>
                           ) : isSignedIn && data?.isSnapshot ? (
                             <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--text-secondary)' }} title={t('sync_disabled')}><IconCloudOff size={18} /></div>
-                          ) : isSignedIn && !isCloudProject ? (
+                          ) : isSignedIn && !isCloudProject && data.id !== 'local_tutorial_project_id' ? (
                             <button onClick={() => uploadProject(data.id)} style={{ background: 'var(--bg-button)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.85em', fontWeight: 'bold' }} title={t('save_to_cloud')}><IconCloudUpload size={16} /> {t('save')}</button>
                           ) : isSignedIn && isCloudProject && syncState === 'synced' ? (
                             <button onClick={(e) => { e.stopPropagation(); forceSync(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px', color: 'var(--color-primary)', padding: 0 }} title={t('synced')}><IconCheckCircle size={18} /></button>

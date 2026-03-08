@@ -75,6 +75,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({
   const [showIncludeDataModal, setShowIncludeDataModal] = useState(false);
   const [confirmName, setConfirmName] = useState('');
 
+  const isTutorial = currentId === 'local_tutorial_project_id';
+
   useEffect(() => {
     const convertedValue = nameValue.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
       return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
@@ -244,7 +246,9 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1em', margin: 0, color: 'var(--text-secondary)' }}>{t('cloud_sync')}</h3>
-              {isSyncEnabled ? (
+              {isTutorial ? (
+                <span style={{ fontSize: '0.85em', color: 'var(--color-danger)' }}>{t('tutorial_no_sync')}</span>
+              ) : isSyncEnabled ? (
                 <button 
                   onClick={() => setShowSyncDisableModal(true)}
                   style={{ backgroundColor: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9em', fontWeight: 'bold' }}
@@ -263,7 +267,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({
           </section>
         )}
 
-        {isAdmin && isSyncEnabled && (
+        {isAdmin && isSyncEnabled && !isTutorial && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: 'var(--bg-panel)', padding: '16px', borderRadius: '6px' }}>
             
             <section>
