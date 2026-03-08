@@ -12,7 +12,7 @@ interface Props {
   tasks: Task[];
   activeTasks: Task[];
   projects?: AppData[]; 
-  activeProjectId?: string; // ▼ 追加
+  activeProjectId?: string; 
   onClose: () => void;
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
@@ -40,7 +40,6 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, pro
 
   const handleOpenAddModal = (parentId?: string, projectId?: string) => {
     setNewTaskName('');
-    // 初期値としてカレンダーで選択した日付をセット
     setNewTaskDateStr(format(date, 'yyyy-MM-dd'));
     setAddModalParentId(parentId || null);
     setAddModalProjectId(projectId || null);
@@ -206,15 +205,10 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, pro
             <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>{t('batch_change_status')}</h4>
             <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: '15px' }}>{t('parent_status_warning')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 0); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 1); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
-              <button onClick={() => { 
-                if(confirm(t('confirm_complete_all_children'))) {
-                  onParentStatusChange(statusModalTargetId, 2); 
-                  setStatusModalTargetId(null); 
-                }
-              }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
-              <button onClick={() => { onParentStatusChange(statusModalTargetId, 3); setStatusModalTargetId(null); }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_todo_label') }))) { onParentStatusChange(statusModalTargetId, 0); setStatusModalTargetId(null); } }} style={{ backgroundColor: 'var(--text-placeholder)', color: '#fff', textAlign: 'left' }}>{t('status_todo_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_doing_label') }))) { onParentStatusChange(statusModalTargetId, 1); setStatusModalTargetId(null); } }} style={{ backgroundColor: 'var(--color-info)', color: '#fff', textAlign: 'left' }}>{t('status_doing_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_done_label') }))) { onParentStatusChange(statusModalTargetId, 2); setStatusModalTargetId(null); } }} style={{ backgroundColor: 'var(--color-success)', color: '#fff', textAlign: 'left' }}>{t('status_done_label')}</button>
+              <button onClick={() => { if(confirm(t('confirm_batch_change_status', { status: t('status_suspend_label') }))) { onParentStatusChange(statusModalTargetId, 3); setStatusModalTargetId(null); } }} style={{ backgroundColor: 'var(--color-suspend)', color: '#fff', textAlign: 'left' }}>{t('status_suspend_label')}</button>
             </div>
             <button onClick={() => setStatusModalTargetId(null)} style={{ marginTop: '15px', width: '100%', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{t('cancel')}</button>
           </div>
@@ -229,7 +223,7 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, pro
           setDateStr={setNewTaskDateStr}
           activeTasks={activeTasks}
           projects={projects}
-          initialProjectId={addModalProjectId || activeProjectId} // ▼ 修正
+          initialProjectId={addModalProjectId || activeProjectId}
           initialParentId={addModalParentId}
           onSubmit={handleAddTask}
           onClose={() => setIsAddModalOpen(false)}

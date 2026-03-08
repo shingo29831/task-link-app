@@ -40,6 +40,7 @@
   "save_to_cloud": "クラウドに保存",
   "synced": "クラウド同期済み。クリックで手動同期",
   "sync_disabled": "同期オフ (スナップショット表示中)",
+  "tutorial_no_sync": "チュートリアルプロジェクトは同期機能が利用できません",
   "total_progress": "全進捗",
   "hide_debug": "デバッグを隠す",
   "show_debug": "デバッグを表示",

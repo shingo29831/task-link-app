@@ -39,7 +39,6 @@ export const useTaskMutations = (
       if (targetProjId === activeId && data) {
           setData(newProjectData);
       } else {
-          // 同期処理が最新のデータを参照できるように、即座にRefを更新する
           const pIndex = projectsRef.current.findIndex(p => p.id === targetProjId);
           if (pIndex !== -1) {
               const newProjects = [...projectsRef.current];
@@ -71,14 +70,25 @@ export const useTaskMutations = (
     applyCloudSyncForStatusChange(targetProjId, (tasks) => {
         let nextTasks = [...tasks];
         const now = Date.now();
-        if (newStatus === 2) { 
-          nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: now } : t);
-        } else if (newStatus === 0) { 
-          nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: now } : t);
-        } else if (newStatus === 1) { 
-          nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: now } : t);
+
+        // 対象タスクの全ての子孫タスクを再帰的に取得
+        const descendantIds = new Set<string>();
+        const stack = [realTaskId];
+        while (stack.length > 0) {
+            const currentId = stack.pop()!;
+            const children = tasks.filter(t => t.parentId === currentId && !t.isDeleted);
+            for (const child of children) {
+                descendantIds.add(child.id);
+                stack.push(child.id);
+            }
         }
-        return nextTasks.map((t: Task) => t.id === realTaskId ? { ...t, status: newStatus, lastUpdated: now } : t);
+
+        return nextTasks.map((t: Task) => {
+            if (t.id === realTaskId || descendantIds.has(t.id)) {
+                return { ...t, status: newStatus, lastUpdated: now };
+            }
+            return t;
+        });
     });
   }, [data, applyCloudSyncForStatusChange]);
 
@@ -180,13 +190,18 @@ export const useTaskMutations = (
         const now = Date.now();
 
         if (newStatus !== undefined && updateChildrenStatus) {
-            if (newStatus === 2) { 
-                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted) ? { ...t, status: 2, lastUpdated: now } : t);
-            } else if (newStatus === 0) { 
-                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 0, lastUpdated: now } : t);
-            } else if (newStatus === 1) { 
-                nextTasks = nextTasks.map((t: Task) => (t.parentId === realTaskId && !t.isDeleted && t.status !== 2) ? { ...t, status: 1, lastUpdated: now } : t);
+            // 対象タスクの全ての子孫タスクを再帰的に取得
+            const descendantIds = new Set<string>();
+            const stack = [realTaskId];
+            while (stack.length > 0) {
+                const currentId = stack.pop()!;
+                const children = tasks.filter(t => t.parentId === currentId && !t.isDeleted);
+                for (const child of children) {
+                    descendantIds.add(child.id);
+                    stack.push(child.id);
+                }
             }
+            nextTasks = nextTasks.map((t: Task) => descendantIds.has(t.id) ? { ...t, status: newStatus, lastUpdated: now } : t);
         }
 
         return nextTasks.map((t: Task) => {
@@ -247,7 +262,6 @@ export const useTaskMutations = (
         const recalculatedTasks = recalculateStatus(newTasks);
         const updatedProject = { ...targetProject, tasks: recalculatedTasks, lastSynced: Date.now() };
         
-        // 同期処理が最新のデータを参照できるように、即座にRefを更新する
         const pIndex = projectsRef.current.findIndex(p => p.id === projId);
         if (pIndex !== -1) {
             const newProjects = [...projectsRef.current];
