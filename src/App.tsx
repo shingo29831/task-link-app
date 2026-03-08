@@ -37,7 +37,6 @@ import { FormattedProjectName } from './components/FormattedProjectName';
 import { SyncLimitModal } from './components/SyncLimitModal';
 import { InteractiveBoardArea, StaticBoardArea } from './components/BoardArea';
 
-// --- 新しく作成したモーダルをインポート ---
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 
@@ -48,7 +47,6 @@ function App() {
     return localStorage.getItem('tasklink_policy_agreed') === 'true';
   });
 
-  // --- 規約詳細モーダルの表示状態を管理するState ---
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfService, setShowTermsOfService] = useState(false);
 
@@ -615,7 +613,6 @@ function App() {
         .spin { animation: spin 1s linear infinite; }
       `}</style>
 
-      {/* --- 新しく作成したモーダルの呼び出し --- */}
       {showPrivacyPolicy && <PrivacyPolicyModal onClose={() => setShowPrivacyPolicy(false)} />}
       {showTermsOfService && <TermsOfServiceModal onClose={() => setShowTermsOfService(false)} />}
 
@@ -627,7 +624,6 @@ function App() {
               {t('privacy_policy_desc')}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center', marginBottom: '8px' }}>
-              {/* --- URLリンクをボタンに変更し、モーダルを開くように修正 --- */}
               <button 
                 onClick={() => setShowPrivacyPolicy(true)} 
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', textDecoration: 'underline', cursor: 'pointer', padding: '4px' }}
