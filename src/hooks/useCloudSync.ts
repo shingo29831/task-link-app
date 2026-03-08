@@ -165,13 +165,12 @@ export const useCloudSync = (
           const initialTargetProject = projectsRef.current.find(p => p.id === projectId);
           if (!initialTargetProject) return;
 
-          let calculatedHash = 0;
           await Promise.all([
               new Promise<void>((resolve, reject) => {
                   const timer = setTimeout(resolve, getWaitTime());
                   abortSignal.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); });
               }),
-              calculateHashAsync(initialTargetProject).then(h => { calculatedHash = h; })
+              calculateHashAsync(initialTargetProject)
           ]);
           if (abortSignal.aborted) return;
           
