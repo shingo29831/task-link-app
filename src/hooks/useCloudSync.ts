@@ -90,12 +90,15 @@ export const useCloudSync = (
                 const isTargetCleanProject = isCleanUrlAccess && cp.shortId === targetShortId;
 
                 if (exIdx === -1 || isTargetCleanProject) {
+                    const existingP = next[exIdx];
                     mergedProject = {
                         id: cp.id, shortId: cp.shortId, projectName: cp.projectName,
                         tasks: recalculateStatus(cp.data?.tasks || cp.tasks || []),
                         lastSynced: cp.data?.lastSynced || Date.now(),
                         isCloudSync: true, role: cp.role || 'owner',
-                        isPublic: cp.isPublic, members: cp.members || []
+                        isPublic: cp.isPublic, members: cp.members || [],
+                        // なぜ: URLパラメータに基づくフラグをクラウドデータで上書きして消さないため
+                        includeDataInLink: existingP?.includeDataInLink
                     };
                     if (exIdx === -1) next.push(mergedProject);
                     else next[exIdx] = mergedProject;
@@ -112,7 +115,9 @@ export const useCloudSync = (
                         projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
                         tasks: recalculateStatus(Array.from(tMap.values())),
                         isCloudSync: true, role: cp.role || 'owner',
-                        isPublic: cp.isPublic ?? localP.isPublic, members: cp.members ?? localP.members
+                        isPublic: cp.isPublic ?? localP.isPublic, members: cp.members ?? localP.members,
+                        // なぜ: URLパラメータに基づくフラグをクラウドデータで上書きして消さないため
+                        includeDataInLink: localP.includeDataInLink
                     };
                     next[exIdx] = mergedProject;
                 }
@@ -220,7 +225,9 @@ export const useCloudSync = (
                           });
                           next[exIdx] = {
                               ...cp, projectName: localP.lastSynced > (cp.data?.lastSynced || 0) ? localP.projectName : cp.projectName,
-                              tasks: recalculateStatus(Array.from(tMap.values())), isCloudSync: true, role: cp.role || 'owner'
+                              tasks: recalculateStatus(Array.from(tMap.values())), isCloudSync: true, role: cp.role || 'owner',
+                              // なぜ: 同期時に他プロジェクトのフラグが消えないようにするため
+                              includeDataInLink: localP.includeDataInLink
                           };
                       }
                   }
