@@ -25,7 +25,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject, forceSync, syncSpecificProject // ▼ 追加
+    addOrUpdateProject, forceSync, syncSpecificProject
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -155,7 +155,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
 
   // 3. タスクの更新処理 (useTaskMutations)
   const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand, updateTaskDetails } = useTaskMutations(
-    data, setData, projectsRef, activeId, updateProject, menuOpenTaskId, setMenuOpenTaskId, syncSpecificProject // ▼ 変更
+    data, setData, projectsRef, activeId, updateProject, menuOpenTaskId, setMenuOpenTaskId, syncSpecificProject
   );
 
   const handleAddTaskWrapper = useCallback((targetParentId?: string, targetProjectId?: string) => {
@@ -170,7 +170,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
 
   // 5. プロジェクトのインポート処理 (useProjectImport)
   const { targetLocalData, importCloudCheck, handleCloudImportChoice, handleImportFromUrl, handleFileImport } = useProjectImport(
-    data, projectsRef, activeId, addOrUpdateProject, switchProject, deleteProject, setIncomingData, incomingData, getToken
+    data, projectsRef, activeId, addOrUpdateProject, switchProject, deleteProject, setIncomingData, incomingData, getToken // ▼ 修正
   );
 
   // ドラッグ&ドロップの処理 にソート情報を渡す
