@@ -56,11 +56,62 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     const newMap: Record<string, number> = {};
     const rootTasks = data.tasks.filter((t: Task) => !t.isDeleted && !t.parentId);
 
+    // なぜ: 各タスクの進捗度や子タスクの有無、ステータスソート値を事前に取得するため
+    const getTaskProgress = (taskId: string, allTasks: Task[]) => {
+        const children = allTasks.filter(t => !t.isDeleted && t.parentId === taskId);
+        const hasChildren = children.length > 0;
+        
+        const task = allTasks.find(t => t.id === taskId);
+        const status = task?.status ?? 0;
+        let statusSortValue = 0;
+        if (status === 0) statusSortValue = 0; // 未着手
+        else if (status === 1) statusSortValue = 1; // 進行中
+        else if (status === 3) statusSortValue = 2; // 休止
+        else if (status === 2) statusSortValue = 3; // 完了
+
+        if (!hasChildren) {
+            return { hasChildren: false, progress: 0, statusSortValue };
+        }
+
+        const getLeafTasks = (id: string): Task[] => {
+            const childs = allTasks.filter(t => !t.isDeleted && t.parentId === id);
+            if (childs.length === 0) {
+                const t = allTasks.find(t => t.id === id);
+                return t ? [t] : [];
+            }
+            let leaves: Task[] = [];
+            for (const c of childs) {
+                leaves = leaves.concat(getLeafTasks(c.id));
+            }
+            return leaves;
+        };
+
+        const leaves = getLeafTasks(taskId);
+        let total = 0;
+        let count = 0;
+        leaves.forEach(l => {
+            total += l.status === 2 ? 100 : l.status === 1 ? 50 : 0;
+            count++;
+        });
+        const progress = count === 0 ? 0 : total / count;
+
+        return { hasChildren: true, progress, statusSortValue };
+    };
+
     const sortGroup = (tasks: Task[]) => {
         tasks.sort((a, b) => {
             let diff = 0;
             if (type === 'progress') {
-                diff = (a.status || 0) - (b.status || 0);
+                const aInfo = getTaskProgress(a.id, data.tasks);
+                const bInfo = getTaskProgress(b.id, data.tasks);
+                
+                if (aInfo.hasChildren !== bInfo.hasChildren) {
+                    diff = aInfo.hasChildren ? 1 : -1;
+                } else if (!aInfo.hasChildren) {
+                    diff = aInfo.statusSortValue - bInfo.statusSortValue;
+                } else {
+                    diff = aInfo.progress - bInfo.progress;
+                }
             } else if (type === 'updated') {
                 diff = (a.lastUpdated || 0) - (b.lastUpdated || 0);
             }
@@ -165,6 +216,6 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject, importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync,
-    sortConfig, applySort // 追加
+    sortConfig, applySort
   };
 };
