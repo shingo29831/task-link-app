@@ -41,22 +41,26 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   const [inputDateStr, setInputDateStr] = useState('');
   const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
 
-  // 追加: ソート関連のステート
+  // ソート関連のステート
   const [sortConfig, setSortConfig] = useState<{ type: string, direction: string }>({ type: 'custom', direction: 'asc' });
   const [tempOrderMap, setTempOrderMap] = useState<Record<string, number>>({});
+  // 追加: 一時的なタスク開閉フラグ
+  const [tempCollapsedNodeIds, setTempCollapsedNodeIds] = useState<Set<string> | null>(null);
 
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
 
-  // 追加: ソートの適用ロジック
+  // ソートの適用ロジック
   const applySort = useCallback((type: string, direction: string) => {
     setSortConfig({ type, direction });
-    if (type === 'custom' || !data) return;
+    if (type === 'custom' || !data) {
+        setTempCollapsedNodeIds(null);
+        return;
+    }
 
     const newMap: Record<string, number> = {};
     const rootTasks = data.tasks.filter((t: Task) => !t.isDeleted && !t.parentId);
 
-    // なぜ: 各タスクの進捗度や子タスクの有無、ステータスソート値を事前に取得するため
     const getTaskProgress = (taskId: string, allTasks: Task[]) => {
         const children = allTasks.filter(t => !t.isDeleted && t.parentId === taskId);
         const hasChildren = children.length > 0;
@@ -70,7 +74,8 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
         else if (status === 2) statusSortValue = 3; // 完了
 
         if (!hasChildren) {
-            return { hasChildren: false, progress: 0, statusSortValue };
+            const progress = status === 2 ? 100 : status === 1 ? 50 : 0;
+            return { hasChildren: false, progress, statusSortValue };
         }
 
         const getLeafTasks = (id: string): Task[] => {
@@ -93,10 +98,26 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
             total += l.status === 2 ? 100 : l.status === 1 ? 50 : 0;
             count++;
         });
-        const progress = count === 0 ? 0 : total / count;
+        const progress = count === 0 ? (status === 2 ? 100 : 0) : total / count;
 
         return { hasChildren: true, progress, statusSortValue };
     };
+
+    // 進捗度順の場合は一時的な開閉フラグを生成
+    if (type === 'progress') {
+        const newCollapsedIds = new Set<string>();
+        data.tasks.forEach((t: Task) => {
+            if (!t.isDeleted) {
+                const info = getTaskProgress(t.id, data.tasks);
+                if (info.progress === 100) {
+                    newCollapsedIds.add(t.id);
+                }
+            }
+        });
+        setTempCollapsedNodeIds(newCollapsedIds);
+    } else {
+        setTempCollapsedNodeIds(null);
+    }
 
     const sortGroup = (tasks: Task[]) => {
         tasks.sort((a, b) => {
@@ -182,6 +203,8 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   }, [undo, redo, canUndo, canRedo]);
 
   const collapsedNodeIds = useMemo(() => {
+    // なぜ: 一時的なソート開閉フラグが存在する場合はそれを優先し、なければ元の状態を使用する
+    if (tempCollapsedNodeIds) return tempCollapsedNodeIds;
     const set = new Set<string>();
     if (data?.tasks) {
       data.tasks.forEach(t => {
@@ -191,11 +214,22 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
       });
     }
     return set;
-  }, [data]);
+  }, [data, tempCollapsedNodeIds]);
 
   const toggleNodeExpansion = useCallback((nodeId: string) => { 
-    toggleTaskExpand(nodeId);
-  }, [toggleTaskExpand]);
+    // なぜ: ソート中は手動開閉時に一時フラグだけを更新し、元のデータは汚染しない
+    if (tempCollapsedNodeIds) {
+      setTempCollapsedNodeIds(prev => {
+        if (!prev) return prev;
+        const next = new Set(prev);
+        if (next.has(nodeId)) next.delete(nodeId);
+        else next.add(nodeId);
+        return next;
+      });
+    } else {
+      toggleTaskExpand(nodeId);
+    }
+  }, [toggleTaskExpand, tempCollapsedNodeIds]);
 
   const handleTaskClick = useCallback((node: TaskNode) => { setActiveParentId(node.id); }, []);
   const handleBoardClick = useCallback(() => { setActiveParentId(null); setMenuOpenTaskId(null); }, []);
