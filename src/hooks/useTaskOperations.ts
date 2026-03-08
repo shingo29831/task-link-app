@@ -25,7 +25,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
     data, setData, updateProject, incomingData, setIncomingData, getShareUrl,
     projects, activeId, addProject, importNewProject, switchProject, deleteProject,
     undo, redo, canUndo, canRedo, uploadProject, syncLimitState, resolveSyncLimit, currentLimit, syncState,
-    addOrUpdateProject, forceSync
+    addOrUpdateProject, forceSync, syncSpecificProject // ▼ 追加
   } = useAppData();
 
   const { isCheckingShared, sharedProjectState, setSharedProjectState } = useSharedProject();
@@ -44,7 +44,7 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   // ソート関連のステート
   const [sortConfig, setSortConfig] = useState<{ type: string, direction: string }>({ type: 'custom', direction: 'asc' });
   const [tempOrderMap, setTempOrderMap] = useState<Record<string, number>>({});
-  // 追加: 一時的なタスク開閉フラグ
+  // 一時的なタスク開閉フラグ
   const [tempCollapsedNodeIds, setTempCollapsedNodeIds] = useState<Set<string> | null>(null);
 
   const projectsRef = useRef(projects);
@@ -155,11 +155,11 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
 
   // 3. タスクの更新処理 (useTaskMutations)
   const { save, updateParentStatus, updateTaskStatus, deleteTask, renameTask, updateTaskDeadline, handleAddTaskWrapper: baseHandleAddTask, moveTaskOrder, toggleTaskExpand, updateTaskDetails } = useTaskMutations(
-    data, setData, projectsRef, activeId, updateProject, activeTasks, menuOpenTaskId, setMenuOpenTaskId
+    data, setData, projectsRef, activeId, updateProject, menuOpenTaskId, setMenuOpenTaskId, syncSpecificProject // ▼ 変更
   );
 
-  const handleAddTaskWrapper = useCallback((targetParentId?: string) => {
-    baseHandleAddTask(inputTaskName, inputDateStr, activeParentId, targetParentId);
+  const handleAddTaskWrapper = useCallback((targetParentId?: string, targetProjectId?: string) => {
+    baseHandleAddTask(inputTaskName, inputDateStr, activeParentId, targetParentId, targetProjectId); 
     setInputTaskName(''); setInputDateStr('');
   }, [baseHandleAddTask, inputTaskName, inputDateStr, activeParentId]);
 
@@ -203,7 +203,6 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   }, [undo, redo, canUndo, canRedo]);
 
   const collapsedNodeIds = useMemo(() => {
-    // なぜ: 一時的なソート開閉フラグが存在する場合はそれを優先し、なければ元の状態を使用する
     if (tempCollapsedNodeIds) return tempCollapsedNodeIds;
     const set = new Set<string>();
     if (data?.tasks) {
@@ -217,7 +216,6 @@ export const useTaskOperations = (boardLayout: 'horizontal' | 'vertical' = 'hori
   }, [data, tempCollapsedNodeIds]);
 
   const toggleNodeExpansion = useCallback((nodeId: string) => { 
-    // なぜ: ソート中は手動開閉時に一時フラグだけを更新し、元のデータは汚染しない
     if (tempCollapsedNodeIds) {
       setTempCollapsedNodeIds(prev => {
         if (!prev) return prev;

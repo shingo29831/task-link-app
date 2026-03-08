@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
-import { ja, enUS } from 'date-fns/locale'; // ▼ 英語ロケールを追加
-import { useTranslation } from 'react-i18next'; // ▼ 追加
-import type { Task } from '../types';
+import { ja, enUS } from 'date-fns/locale'; 
+import { useTranslation } from 'react-i18next'; 
+import type { Task, AppData } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { IconChevronLeft, IconChevronRight } from './Icons';
 import { useResponsive } from '../hooks/useResponsive';
@@ -10,26 +10,25 @@ import { useResponsive } from '../hooks/useResponsive';
 interface Props {
   tasks: Task[];
   activeTasks: Task[];
+  projects?: AppData[];
+  activeProjectId?: string; // ▼ 追加
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
-  onAddTask: (name: string, dateStr: string, parentId?: string) => void;
+  onAddTask: (name: string, dateStr: string, parentId?: string, projectId?: string) => void; 
 }
 
-export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChange, onParentStatusChange, onAddTask }) => {
+export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, activeProjectId, onStatusChange, onParentStatusChange, onAddTask }) => {
   const { isMobile } = useResponsive();
-  const { t, i18n } = useTranslation(); // ▼ 追加
+  const { t, i18n } = useTranslation(); 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
-  // 日曜日始まり(weekStartsOn: 0)として月初めの週の最初の日を取得
   const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
-  // 6週間（42日）固定にするため、開始日から41日後を終了日とする
   const endDate = addDays(startDate, 41);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
   
-  // ▼ i18nの言語設定に応じて曜日やフォーマットを切り替え
   const isEnglish = i18n.language === 'en';
   const dateLocale = isEnglish ? enUS : ja;
   const monthYearFormat = isEnglish ? 'MMMM yyyy' : 'yyyy年 M月';
@@ -134,6 +133,8 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, onStatusChan
                 date={selectedDate} 
                 tasks={getDayTasks(selectedDate)} 
                 activeTasks={activeTasks}
+                projects={projects}
+                activeProjectId={activeProjectId} // ▼ 追加
                 onStatusChange={onStatusChange}
                 onParentStatusChange={onParentStatusChange}
                 onAddTask={onAddTask}
