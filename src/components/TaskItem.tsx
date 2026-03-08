@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core'; 
-import { useTranslation } from 'react-i18next'; // ▼ 追加
+import { useTranslation } from 'react-i18next';
 import { useResponsive } from '../hooks/useResponsive';
 import type { Task } from '../types';
 import { IconCalendar, IconX, IconChevronDown, IconChevronRight } from './Icons';
@@ -69,7 +69,7 @@ export const TaskItem: React.FC<Props> = ({
   isViewer = false,
   onEditModalOpen
 }) => {
-  const { t } = useTranslation(); // ▼ 追加
+  const { t } = useTranslation(); 
   const [isHovered, setIsHovered] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -81,9 +81,9 @@ export const TaskItem: React.FC<Props> = ({
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
-        return { fontSize: '13px', indentWidth: 12, itemPadding: '8px 0', buttonPadding: '4px 8px', buttonFontSize: '0.8em' };
+        return { fontSize: '13.5px', indentWidth: 8, itemPadding: '6px 0', buttonPadding: '4px 4px', buttonFontSize: '0.75em' };
     } else if (windowWidth <= 768) {
-        return { fontSize: '14px', indentWidth: 16, itemPadding: '8px 0', buttonPadding: '4px 10px', buttonFontSize: '0.85em' };
+        return { fontSize: '14px', indentWidth: 12, itemPadding: '8px 0', buttonPadding: '4px 6px', buttonFontSize: '0.8em' };
     } else if (windowWidth < 1280) {
         return { fontSize: '15px', indentWidth: 20, itemPadding: '8px 0', buttonPadding: '4px 10px', buttonFontSize: '0.85em' };
     }
@@ -111,7 +111,6 @@ export const TaskItem: React.FC<Props> = ({
     onDragCancel: () => setInsertPosition(null),
   });
 
-  // ▼ t() を使って多言語化
   const config = { 
     0: { l: t('status_todo'), c: 'var(--text-placeholder)' },
     1: { l: t('status_doing'), c: 'var(--color-info)' }, 
@@ -143,7 +142,6 @@ export const TaskItem: React.FC<Props> = ({
       else if (daysRemaining === 0) color = 'var(--color-warning)';
     }
 
-    // ▼ t() を使って多言語化（引数付き）
     let label = daysRemaining < 0 
       ? t('overdue_days', { days: Math.abs(daysRemaining) }) 
       : daysRemaining === 0 
@@ -241,10 +239,10 @@ export const TaskItem: React.FC<Props> = ({
             onDoubleClick={stopPropagation}
             style={{
                 background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: isMobile ? '4px' : '0', marginRight: '2px', color: 'var(--text-placeholder)', 
-                width: isMobile ? '32px' : '1.2em', height: isMobile ? '32px' : 'auto', zIndex: 21
+                padding: isMobile ? '2px' : '0', marginRight: isMobile ? '2px' : '4px', color: 'var(--text-placeholder)', 
+                width: isMobile ? '28px' : '1.2em', height: isMobile ? '28px' : 'auto', zIndex: 21, flexShrink: 0
             }}
-            title={isExpanded ? t('collapse') : t('expand')} /* ▼ 多言語化 */
+            title={isExpanded ? t('collapse') : t('expand')} 
           >
             {isExpanded ? <IconChevronDown size={isMobile ? 20 : 14} /> : <IconChevronRight size={isMobile ? 20 : 14} />}
           </button>
@@ -258,13 +256,14 @@ export const TaskItem: React.FC<Props> = ({
               onStatusChange(((task.status + 1) % 4) as 0|1|2|3); 
             }}
             onDoubleClick={stopPropagation}
-            style={{ marginRight: '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? '68px' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', border: 'none', borderRadius: '4px', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap', textAlign: 'center', zIndex: 21 }}
+            style={{ marginRight: isMobile ? '4px' : '6px', backgroundColor: config.c, color: '#fff', minWidth: isMobile ? '56px' : '80px', fontSize: buttonFontSize, cursor: isViewer ? 'default' : 'pointer', border: 'none', borderRadius: '4px', padding: buttonPadding, lineHeight: '1.2', whiteSpace: 'nowrap', textAlign: 'center', zIndex: 21, flexShrink: 0 }}
           >
             {config.l}
           </button>
         )}
         
-        <div style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: '2px' }}>
+        {/* ▼ minWidth: 0 と overflowWrap: 'anywhere' を追加して横幅はみ出しを防止 */}
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', position: 'relative', backgroundColor: 'transparent', borderRadius: '4px', padding: isMobile ? '0' : '2px', paddingRight: isMobile ? '0' : '4px' }}>
           <>
             <span title={isViewer ? "" : t('double_click_to_edit')} style={{ color: isUrgent ? 'var(--color-danger-text)' : 'inherit', fontWeight: hasChildren ? 'bold' : 'normal', textDecoration: task.status === 2 ? 'line-through' : 'none', opacity: (task.status === 2 || task.status === 3) ? 0.6 : 1, cursor: isViewer ? 'default' : 'pointer', fontSize: 'inherit', lineHeight: '1.4', zIndex: 21, position: 'relative' }}>
               <FormattedTaskName name={task.name} />
@@ -277,7 +276,7 @@ export const TaskItem: React.FC<Props> = ({
         </div>
         
         {!isViewer && !isMobile && !isDraggingAny && (
-          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21 }}>
+          <div style={{ display: 'flex', gap: '4px', opacity: (isHovered || isMenuOpen || isEditingDeadline) ? 1 : 0, pointerEvents: (isHovered || isMenuOpen || isEditingDeadline) ? 'auto' : 'none', transition: 'opacity 0.2s', marginLeft: '4px', zIndex: 21, flexShrink: 0 }}>
             <button onClick={(e) => { e.stopPropagation(); setIsEditingDeadline(!isEditingDeadline); }} onDoubleClick={stopPropagation} title={t('set_deadline')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconCalendar size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} onDoubleClick={stopPropagation} title={t('delete')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-placeholder)', padding: buttonPadding }}><IconX size={16} /></button>
           </div>
