@@ -153,5 +153,10 @@
   "custom_board_layout": "デバイスごとにカスタマイズする",
   "layout_desktop": "PC",
   "layout_tablet": "タブレット",
-  "layout_mobile": "スマホ"
+  "layout_mobile": "スマホ",
+  "privacy_policy_title": "プライバシーポリシーと利用規約",
+  "privacy_policy_desc": "本アプリをご利用いただくには、プライバシーポリシーおよび利用規約への同意が必要です。",
+  "privacy_policy_link": "プライバシーポリシーを確認する",
+  "terms_of_service_link": "利用規約を確認する",
+  "agree_and_start": "同意してはじめる"
 }

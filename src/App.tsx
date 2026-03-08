@@ -40,6 +40,15 @@ import { InteractiveBoardArea, StaticBoardArea } from './components/BoardArea';
 type TaskNode = Task & { children: TaskNode[] };
 
 function App() {
+  const [hasAgreedPolicy, setHasAgreedPolicy] = useState(() => {
+    return localStorage.getItem('tasklink_policy_agreed') === 'true';
+  });
+
+  const handleAgreePolicy = () => {
+    localStorage.setItem('tasklink_policy_agreed', 'true');
+    setHasAgreedPolicy(true);
+  };
+
   const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const { t } = useTranslation();
@@ -597,6 +606,25 @@ function App() {
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
       `}</style>
+
+      {!hasAgreedPolicy && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, textAlign: 'center' }}>{t('privacy_policy_title')}</h3>
+            <p style={{ fontSize: '0.95em', lineHeight: 1.5, margin: 0, textAlign: 'center' }}>
+              {t('privacy_policy_desc')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center', marginBottom: '8px' }}>
+              {/* NOTE: 以下の href のURLを実際のプライバシーポリシー/利用規約のURLに変更してください */}
+              <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{t('privacy_policy_link')}</a>
+              <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{t('terms_of_service_link')}</a>
+            </div>
+            <button onClick={handleAgreePolicy} style={{ padding: '10px 24px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>
+              {t('agree_and_start')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {sharedProjectState && (
         <SharedProjectModal 

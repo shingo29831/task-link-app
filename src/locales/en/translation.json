@@ -153,5 +153,10 @@
   "custom_board_layout": "Customize by device",
   "layout_desktop": "Desktop",
   "layout_tablet": "Tablet",
-  "layout_mobile": "Mobile"
+  "layout_mobile": "Mobile",
+  "privacy_policy_title": "Privacy Policy & Terms of Service",
+  "privacy_policy_desc": "To use this app, you must agree to our Privacy Policy and Terms of Service.",
+  "privacy_policy_link": "View Privacy Policy",
+  "terms_of_service_link": "View Terms of Service",
+  "agree_and_start": "Agree and Start"
 }
