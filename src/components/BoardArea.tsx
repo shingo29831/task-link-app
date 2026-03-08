@@ -24,13 +24,13 @@ const SortMenu = ({ sortConfig, onSortChange }: { sortConfig: { type: string, di
     <div ref={menuRef} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 100 }}>
       <button 
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
-        style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer' }}
+        style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer' }}
         title="並び替え"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
       </button>
       {isOpen && (
-        <div style={{ position: 'absolute', top: '48px', right: '0', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', width: '160px' }}>
+        <div style={{ position: 'absolute', top: '52px', right: '0', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', width: '160px' }}>
           <div style={{ marginBottom: '8px', fontSize: '0.8em', fontWeight: 'bold', color: 'var(--text-secondary)' }}>並び順</div>
           {[
             { id: 'custom', label: 'カスタム' },
@@ -266,7 +266,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
           </div>
           <div style={{ position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom))', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
             {isNarrowLayout && (
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
             )}
             <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
           </div>
@@ -315,7 +315,7 @@ export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile,
           </div>
           {isNarrowLayout && (
             <div style={{ position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom))', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
             </div>
           )}
         </>
