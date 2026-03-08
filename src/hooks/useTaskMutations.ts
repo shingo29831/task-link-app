@@ -11,9 +11,9 @@ export const useTaskMutations = (
   projectsRef: React.MutableRefObject<AppData[]>,
   activeId: string,
   updateProject: (p: AppData) => void,
-  activeTasks: Task[],
   menuOpenTaskId: string | null,
-  setMenuOpenTaskId: React.Dispatch<React.SetStateAction<string | null>>
+  setMenuOpenTaskId: React.Dispatch<React.SetStateAction<string | null>>,
+  syncSpecificProject: (id: string) => void 
 ) => {
 
   const save = useCallback((newTasks: Task[]) => {
@@ -39,9 +39,20 @@ export const useTaskMutations = (
       if (targetProjId === activeId && data) {
           setData(newProjectData);
       } else {
+          // 同期処理が最新のデータを参照できるように、即座にRefを更新する
+          const pIndex = projectsRef.current.findIndex(p => p.id === targetProjId);
+          if (pIndex !== -1) {
+              const newProjects = [...projectsRef.current];
+              newProjects[pIndex] = newProjectData;
+              projectsRef.current = newProjects;
+          }
+          
           updateProject(newProjectData);
+          if (!String(targetProjId).startsWith('local_') && targetProject.isCloudSync !== false) {
+              syncSpecificProject(targetProjId); 
+          }
       }
-  }, [activeId, data, setData, updateProject, projectsRef]);
+  }, [activeId, data, setData, updateProject, projectsRef, syncSpecificProject]);
 
   const updateParentStatus = useCallback((id: string, newStatus: 0 | 1 | 2 | 3) => {
     let targetProjId = data?.id;
@@ -90,7 +101,6 @@ export const useTaskMutations = (
     });
   }, [data, applyCloudSyncForStatusChange]);
 
-  // ▼ 子タスクの有無で確認メッセージを切り替えるように修正
   const deleteTask = useCallback((taskId: string) => {
     if (!data) return;
     const targetTask = (data.tasks || []).find((t: Task) => t.id === taskId);
@@ -189,34 +199,68 @@ export const useTaskMutations = (
     });
   }, [data, applyCloudSyncForStatusChange]);
 
-  const handleAddTaskWrapper = useCallback((taskName: string, dateStr: string, activeParentId: string | null, targetParentId?: string) => {
+  const handleAddTaskWrapper = useCallback((taskName: string, dateStr: string, activeParentId: string | null, targetParentId?: string, targetProjectId?: string) => {
     if (!taskName.trim() || !data) return;
+    
+    const projId = targetProjectId || data.id;
+    const isCurrent = projId === activeId;
+    const targetProject = isCurrent ? data : projectsRef.current.find(p => p.id === projId);
+    if (!targetProject) return;
+
     let deadline: number | undefined;
     if (dateStr) { const [y, m, d] = dateStr.split('-').map(Number); deadline = new Date(y, m - 1, d).getTime(); }
     
     let targetId = targetParentId ?? activeParentId ?? undefined;
     if (targetId) {
-        const parentExists = (data.tasks || []).some((t: Task) => t.id === targetId && !t.isDeleted);
+        if (targetId.includes('_')) {
+             const parts = targetId.split('_');
+             if (parts[0] === projId) targetId = parts[1];
+        }
+        const parentExists = (targetProject.tasks || []).some((t: Task) => t.id === targetId && !t.isDeleted);
         if (!parentExists) targetId = undefined;
     }
     
-    const isDuplicate = (data.tasks || []).some((t: Task) => !t.isDeleted && t.parentId === targetId && t.name === taskName);
+    const isDuplicate = (targetProject.tasks || []).some((t: Task) => !t.isDeleted && t.parentId === targetId && t.name === taskName);
     if (isDuplicate) { alert('同じ階層に同名のタスクが既に存在します。'); return; }
     
-    const existingIds = new Set((data.tasks || []).map((t: Task) => t.id));
-    let candidateNum = activeTasks.length === 0 ? 1 : (data.tasks || []).length + 1;
+    const existingIds = new Set((targetProject.tasks || []).map((t: Task) => t.id));
+    let candidateNum = (targetProject.tasks || []).length + 1;
     let newId = candidateNum.toString(36);
     while (existingIds.has(newId)) { candidateNum++; newId = candidateNum.toString(36); }
     
-    const siblings = (data.tasks || []).filter((t: Task) => !t.isDeleted && t.parentId === targetId);
+    const siblings = (targetProject.tasks || []).filter((t: Task) => !t.isDeleted && t.parentId === targetId);
     const maxOrder = siblings.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
     const nextOrder = siblings.length === 0 ? 1 : maxOrder + 1;
+    
+    const targetActiveTasks = (targetProject.tasks || []).filter(t => !t.isDeleted);
+
     const newTask: Task = {
         id: newId, name: taskName, status: 0, deadline: deadline, lastUpdated: Date.now(),
-        parentId: activeTasks.length === 0 ? undefined : targetId, order: activeTasks.length === 0 ? 1 : nextOrder
+        parentId: targetActiveTasks.length === 0 ? undefined : targetId, order: targetActiveTasks.length === 0 ? 1 : nextOrder
     };
-    save([...(data.tasks || []), newTask]);
-  }, [data, activeTasks, save]);
+    
+    const newTasks = [...(targetProject.tasks || []), newTask];
+
+    if (isCurrent) {
+        save(newTasks);
+    } else {
+        const recalculatedTasks = recalculateStatus(newTasks);
+        const updatedProject = { ...targetProject, tasks: recalculatedTasks, lastSynced: Date.now() };
+        
+        // 同期処理が最新のデータを参照できるように、即座にRefを更新する
+        const pIndex = projectsRef.current.findIndex(p => p.id === projId);
+        if (pIndex !== -1) {
+            const newProjects = [...projectsRef.current];
+            newProjects[pIndex] = updatedProject;
+            projectsRef.current = newProjects;
+        }
+
+        updateProject(updatedProject);
+        if (!String(projId).startsWith('local_') && targetProject.isCloudSync !== false) {
+            syncSpecificProject(projId); 
+        }
+    }
+  }, [data, save, projectsRef, updateProject, syncSpecificProject, activeId]);
 
   const moveTaskOrder = useCallback((taskId: string, direction: 'up' | 'down') => {
     if (!data || !data.tasks) return;

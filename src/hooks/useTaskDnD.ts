@@ -11,7 +11,14 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, AppData } from '../types';
 
-export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => void, boardLayout: 'horizontal' | 'vertical' = 'horizontal') => {
+export const useTaskDnD = (
+  data: AppData | null, 
+  save: (newTasks: Task[]) => void, 
+  boardLayout: 'horizontal' | 'vertical' = 'horizontal',
+  sortConfig: { type: string, direction: string } = { type: 'custom', direction: 'asc' },
+  tempOrderMap: Record<string, number> = {},
+  setTempOrderMap: React.Dispatch<React.SetStateAction<Record<string, number>>> = () => {}
+) => {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -87,6 +94,9 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
     const { active, over } = event;
     if (!over) return;
 
+    const isCustom = sortConfig.type === 'custom';
+    let hasDataChange = false;
+
     if (over.id === 'root-board') {
         const activeIdStr = String(active.id);
         const activeTask = data.tasks.find(t => t.id === activeIdStr);
@@ -94,7 +104,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
 
         const rootTasks = data.tasks
             .filter(t => !t.isDeleted && !t.parentId && t.id !== activeIdStr)
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            .sort((a, b) => isCustom ? ((a.order ?? 0) - (b.order ?? 0)) : ((tempOrderMap[a.id] ?? 0) - (tempOrderMap[b.id] ?? 0)));
 
         const activeRect = active.rect.current.translated;
         if (activeRect) {
@@ -135,20 +145,40 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
                 const rootIdx = newRootIds.indexOf(t.id);
                 if (rootIdx !== -1) {
                     const newOrder = rootIdx + 1;
-                    const isChanged = t.parentId !== undefined || t.order !== newOrder;
-                    return { ...t, parentId: undefined, order: newOrder, lastUpdated: isChanged ? Date.now() : t.lastUpdated };
+                    if (isCustom) {
+                        const isChanged = t.parentId !== undefined || t.order !== newOrder;
+                        if (isChanged) hasDataChange = true;
+                        return { ...t, parentId: undefined, order: newOrder, lastUpdated: isChanged ? Date.now() : t.lastUpdated };
+                    } else {
+                        const isChanged = t.parentId !== undefined;
+                        if (isChanged) hasDataChange = true;
+                        return { ...t, parentId: undefined, lastUpdated: isChanged ? Date.now() : t.lastUpdated };
+                    }
                 }
                 return t;
             });
-            save(newTasks);
+            
+            if (!isCustom) {
+                const nextTempMap = { ...tempOrderMap };
+                newRootIds.forEach((id, idx) => { nextTempMap[id] = idx + 1; });
+                setTempOrderMap(nextTempMap);
+            }
+            if (hasDataChange || isCustom) save(newTasks);
             return;
         }
 
-        const maxOrder = rootTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
-        const newTasks = data.tasks.map(t => 
-             t.id === activeIdStr ? { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() } : t
-        );
-        save(newTasks);
+        const maxOrder = rootTasks.reduce((max, t) => Math.max(max, isCustom ? (t.order ?? 0) : (tempOrderMap[t.id] ?? 0)), 0);
+        const newTasks = data.tasks.map(t => {
+            if (t.id === activeIdStr) {
+                 if (isCustom) return { ...t, parentId: undefined, order: maxOrder + 1, lastUpdated: Date.now() };
+                 return { ...t, parentId: undefined, lastUpdated: Date.now() };
+            }
+            return t;
+        });
+        if (!isCustom) {
+            setTempOrderMap(prev => ({ ...prev, [activeIdStr]: maxOrder + 1 }));
+        }
+        save(newTasks); // parentIdが消えるので保存は必要
         return;
     }
 
@@ -175,7 +205,7 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
     
     const siblings = newTasks
       .filter(t => !t.isDeleted && t.parentId === nextParentId && t.id !== active.id)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      .sort((a, b) => isCustom ? ((a.order ?? 0) - (b.order ?? 0)) : ((tempOrderMap[a.id] ?? 0) - (tempOrderMap[b.id] ?? 0)));
     
     if (!isNestDrop) {
       let insertIndex = siblings.findIndex(t => t.id === targetIdRaw);
@@ -202,19 +232,36 @@ export const useTaskDnD = (data: AppData | null, save: (newTasks: Task[]) => voi
       if (globalIndex !== -1) {
         const newOrder = index + 1;
         const newParentId = t.id === active.id ? nextParentId : newTasks[globalIndex].parentId;
-        const isChanged = newTasks[globalIndex].order !== newOrder || newTasks[globalIndex].parentId !== newParentId;
-
-        newTasks[globalIndex] = { 
-            ...newTasks[globalIndex], 
-            parentId: newParentId, 
-            order: newOrder, 
-            lastUpdated: isChanged ? Date.now() : newTasks[globalIndex].lastUpdated 
-        };
+        
+        if (isCustom) {
+            const isChanged = newTasks[globalIndex].order !== newOrder || newTasks[globalIndex].parentId !== newParentId;
+            if (isChanged) hasDataChange = true;
+            newTasks[globalIndex] = { 
+                ...newTasks[globalIndex], 
+                parentId: newParentId, 
+                order: newOrder, 
+                lastUpdated: isChanged ? Date.now() : newTasks[globalIndex].lastUpdated 
+            };
+        } else {
+            const isChanged = newTasks[globalIndex].parentId !== newParentId;
+            if (isChanged) hasDataChange = true;
+            newTasks[globalIndex] = { 
+                ...newTasks[globalIndex], 
+                parentId: newParentId, 
+                lastUpdated: isChanged ? Date.now() : newTasks[globalIndex].lastUpdated 
+            };
+        }
       }
     });
+
+    if (!isCustom) {
+        const nextTempMap = { ...tempOrderMap };
+        siblings.forEach((t, idx) => { nextTempMap[t.id] = idx + 1; });
+        setTempOrderMap(nextTempMap);
+    }
     
-    save(newTasks);
-  }, [data, save, boardLayout]);
+    if (hasDataChange || isCustom) save(newTasks);
+  }, [data, save, boardLayout, sortConfig, tempOrderMap, setTempOrderMap]);
 
   return { sensors, customCollisionDetection, handleDragEnd };
 };

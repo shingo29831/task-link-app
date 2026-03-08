@@ -1,4 +1,3 @@
-// src/components/BoardArea.tsx
 // 役割: タスクを配置するメインのボードエリアのレンダリングとドラッグ時のスクロール・位置計算
 // なぜ: タスクのドラッグ＆ドロップ時に視覚的なフィードバックと挿入位置の表示を提供するため
 
@@ -8,7 +7,73 @@ import { useTranslation } from 'react-i18next';
 import { IconUndo, IconRedo, IconInputOutput, IconPlus } from './Icons';
 import { usePanning } from '../hooks/usePanning';
 
-export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal' }: any) => { 
+// ソート用の共通コンポーネント
+const SortMenu = ({ sortConfig, onSortChange }: { sortConfig: { type: string, direction: string }, onSortChange: (type: string, dir: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={menuRef} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 100 }}>
+      <button 
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
+        style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(4px)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', cursor: 'pointer' }}
+        title="並び替え"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+      </button>
+      {isOpen && (
+        <div style={{ position: 'absolute', top: '52px', right: '0', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', width: '160px' }}>
+          <div style={{ marginBottom: '8px', fontSize: '0.8em', fontWeight: 'bold', color: 'var(--text-secondary)' }}>並び順</div>
+          {[
+            { id: 'custom', label: 'カスタム' },
+            { id: 'progress', label: '進捗度順' },
+            { id: 'updated', label: '更新順' }
+          ].map(opt => (
+            <div key={opt.id} onClick={() => { onSortChange(opt.id, sortConfig.direction); setIsOpen(false); }} style={{ padding: '8px', cursor: 'pointer', backgroundColor: sortConfig.type === opt.id ? 'var(--bg-surface-hover)' : 'transparent', borderRadius: '4px', fontSize: '0.9em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{opt.label}</span>
+              {sortConfig.type === opt.id && <span style={{ color: 'var(--color-primary)' }}>✓</span>}
+            </div>
+          ))}
+          <hr style={{ margin: '8px 0', borderColor: 'var(--border-color)' }} />
+          {[
+            { id: 'asc', label: '昇順' },
+            { id: 'desc', label: '降順' }
+          ].map(opt => {
+            const isCustom = sortConfig.type === 'custom';
+            return (
+              <div key={opt.id} 
+                   onClick={() => { if (!isCustom) { onSortChange(sortConfig.type, opt.id); setIsOpen(false); } }} 
+                   style={{ 
+                     padding: '8px', 
+                     cursor: isCustom ? 'not-allowed' : 'pointer', 
+                     backgroundColor: !isCustom && sortConfig.direction === opt.id ? 'var(--bg-surface-hover)' : 'transparent', 
+                     borderRadius: '4px', 
+                     fontSize: '0.9em', 
+                     display: 'flex', 
+                     justifyContent: 'space-between', 
+                     alignItems: 'center',
+                     opacity: isCustom ? 0.4 : 1
+                   }}>
+                <span>{opt.label}</span>
+                {!isCustom && sortConfig.direction === opt.id && <span style={{ color: 'var(--color-primary)' }}>✓</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowAddModal, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal', sortConfig, applySort }: any) => { 
   const { t } = useTranslation();
   const { setNodeRef } = useDroppable({ id: 'root-board' });
   const { active } = useDndContext();
@@ -135,6 +200,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <SortMenu sortConfig={sortConfig} onSortChange={applySort} />
       <div ref={setRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} 
            style={{ 
              flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', 
@@ -200,7 +266,7 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
           </div>
           <div style={{ position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom))', right: '16px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 100 }}>
             {isNarrowLayout && (
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
             )}
             <button onClick={(e) => { e.stopPropagation(); onShowAddModal(); }} style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconPlus size={28} /></button>
           </div>
@@ -210,12 +276,13 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
   );
 };
 
-export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal' }: any) => { 
+export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile, isNarrowLayout, onShowIOModal, onUndo, onRedo, canUndo, canRedo, boardLayout = 'horizontal', sortConfig, applySort }: any) => { 
   const { t } = useTranslation();
   const { scrollRef, isPanning, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleClick } = usePanning(false, onBoardClick);
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-surface)', transition: 'border 0.2s', overflow: 'hidden' }}>
+      <SortMenu sortConfig={sortConfig} onSortChange={applySort} />
       <div ref={scrollRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onClick={handleClick} 
            style={{ 
              flex: 1, overflowX: 'auto', overflowY: 'auto', display: 'flex', 
@@ -248,7 +315,7 @@ export const StaticBoardArea = ({ children, activeTasks, onBoardClick, isMobile,
           </div>
           {isNarrowLayout && (
             <div style={{ position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom))', right: '16px', display: 'flex', alignItems: 'center', zIndex: 100 }}>
-              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={20} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onShowIOModal(); }} style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.85, cursor: 'pointer' }}><IconInputOutput size={24} /></button>
             </div>
           )}
         </>
