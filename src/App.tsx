@@ -74,7 +74,7 @@ function App() {
     isCheckingShared, sharedProjectState, setSharedProjectState,
     addOrUpdateProject,
     importCloudCheck, handleCloudImportChoice, handleUpdateProjectName, forceSync,
-    sortConfig, applySort // 追加: ソート設定と適用関数を取得
+    sortConfig, applySort
   } = useTaskOperations(boardLayout);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -228,10 +228,10 @@ function App() {
     if (total === 0) return { p0: 0, p1: 0, p2: 0, p3: 0 };
 
     return {
-      p2: (counts[2] / total) * 100, // 完了
-      p1: (counts[1] / total) * 100, // 進行中
-      p0: (counts[0] / total) * 100, // 未着手
-      p3: (counts[3] / total) * 100  // 休止
+      p2: (counts[2] / total) * 100, 
+      p1: (counts[1] / total) * 100, 
+      p0: (counts[0] / total) * 100, 
+      p3: (counts[3] / total) * 100  
     };
   }, [data?.tasks]);
 
@@ -452,7 +452,7 @@ function App() {
         />
       )}
       
-      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} activeTasks={activeTasks} initialParentId={activeParentId} onSubmit={(parentId) => handleAddTaskWrapper(parentId)} onClose={() => setShowAddModal(false)} />}
+      {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} projects={projects} initialProjectId={activeId} activeTasks={activeTasks} initialParentId={activeParentId} onSubmit={(parentId, projectId) => handleAddTaskWrapper(parentId, projectId)} onClose={() => setShowAddModal(false)} />}
 
       <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
           {isMobile ? (
@@ -550,9 +550,11 @@ function App() {
               <TaskCalendar 
                 tasks={calendarTasks} 
                 activeTasks={activeTasks}
+                projects={projects}
+                activeProjectId={activeId}
                 onStatusChange={isViewer ? () => {} : updateTaskStatus} 
                 onParentStatusChange={isViewer ? () => {} : updateParentStatus} 
-                onAddTask={(name, dateStr, parentId) => addTask(name, dateStr, null, parentId)}
+                onAddTask={(name, dateStr, parentId, projectId) => addTask(name, dateStr, null, parentId, projectId)}
               />
             </div>
         </div>

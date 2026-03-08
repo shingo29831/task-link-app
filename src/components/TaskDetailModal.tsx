@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { ja, enUS } from 'date-fns/locale'; // ▼ 英語ロケールを追加
-import { useTranslation } from 'react-i18next'; // ▼ 追加
-import type { Task } from '../types';
+import { ja, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
+import type { Task, AppData } from '../types';
 import { IconX, IconPlus } from './Icons';
 import { FormattedTaskName } from './FormattedTaskName';
 import { TaskAddModal } from './TaskAddModal';
@@ -11,19 +11,23 @@ interface Props {
   date: Date;
   tasks: Task[];
   activeTasks: Task[];
+  projects?: AppData[]; 
+  activeProjectId?: string; // ▼ 追加
   onClose: () => void;
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
-  onAddTask: (name: string, dateStr: string, parentId?: string) => void;
+  onAddTask: (name: string, dateStr: string, parentId?: string, projectId?: string) => void; 
 }
 
-export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onClose, onStatusChange, onParentStatusChange, onAddTask }) => {
-  const { t, i18n } = useTranslation(); // ▼ 追加
+export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, projects, activeProjectId, onClose, onStatusChange, onParentStatusChange, onAddTask }) => {
+  const { t, i18n } = useTranslation();
   const [statusModalTargetId, setStatusModalTargetId] = useState<string | null>(null);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDateStr, setNewTaskDateStr] = useState('');
+  const [addModalParentId, setAddModalParentId] = useState<string | null>(null);
+  const [addModalProjectId, setAddModalProjectId] = useState<string | null>(null);
 
   const handleStatusClick = (task: Task) => {
       if (task.hasChildren) {
@@ -34,14 +38,17 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
       }
   };
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (parentId?: string, projectId?: string) => {
     setNewTaskName('');
+    // 初期値としてカレンダーで選択した日付をセット
     setNewTaskDateStr(format(date, 'yyyy-MM-dd'));
+    setAddModalParentId(parentId || null);
+    setAddModalProjectId(projectId || null);
     setIsAddModalOpen(true);
   };
 
-  const handleAddTask = (parentId?: string) => {
-    onAddTask(newTaskName, newTaskDateStr, parentId);
+  const handleAddTask = (parentId?: string, projectId?: string) => {
+    onAddTask(newTaskName, newTaskDateStr, parentId, projectId);
     setIsAddModalOpen(false);
   };
 
@@ -137,7 +144,11 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
                         {config.l}
                       </button>
 
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div 
+                        style={{ flex: 1, overflow: 'hidden', cursor: 'pointer', padding: '4px' }} 
+                        onClick={(e) => { e.stopPropagation(); handleOpenAddModal(tData.id, tData.sourceProjectId); }}
+                        title={t('add_subtask_title', { defaultValue: 'サブタスクを追加' })}
+                      >
                         {tData.sourceProjectName && (
                             <div style={{ fontSize: '0.85em', opacity: 0.7, fontWeight: 'bold', marginBottom: '2px', color: 'var(--text-secondary)' }}>
                                 [{tData.sourceProjectName}]
@@ -217,6 +228,9 @@ export const TaskDetailModal: React.FC<Props> = ({ date, tasks, activeTasks, onC
           dateStr={newTaskDateStr}
           setDateStr={setNewTaskDateStr}
           activeTasks={activeTasks}
+          projects={projects}
+          initialProjectId={addModalProjectId || activeProjectId} // ▼ 修正
+          initialParentId={addModalParentId}
           onSubmit={handleAddTask}
           onClose={() => setIsAddModalOpen(false)}
         />
