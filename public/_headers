@@ -5,5 +5,5 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  # エラーでブロックされたスクリプトのハッシュ値をHTTPヘッダレベルでも許可
-  Content-Security-Policy: script-src 'self' 'unsafe-inline' 'unsafe-eval' 'sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU=' https://*.clerk.accounts.dev https://clerk.com https://challenges.cloudflare.com;
+  # script-src に clerk.meld-task.com と static.cloudflareinsights.com を追加
+  Content-Security-Policy: script-src 'self' 'unsafe-inline' 'unsafe-eval' 'sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU=' https://*.clerk.accounts.dev https://clerk.com https://challenges.cloudflare.com https://clerk.meld-task.com https://static.cloudflareinsights.com;
