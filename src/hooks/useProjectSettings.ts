@@ -1,7 +1,8 @@
+// src/hooks/useProjectSettings.ts
 // 役割: プロジェクト名、同期、公開範囲、メンバー権限などの設定変更API通信を管理する
 // なぜ: プロジェクト単位の設定ロジックをタスク操作から分離し、保守性を高めるため
 
-import { useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { AppData, UserRole } from '../types';
 
 export const useProjectSettings = (
@@ -9,7 +10,55 @@ export const useProjectSettings = (
   setData: (data: AppData) => void,
   getToken: () => Promise<string | null>,
   uploadProject: (id: string) => void,
+  projectsRef: React.MutableRefObject<AppData[]>,
+  showSettingsModal: boolean
 ) => {
+  const [retryFetchTrigger, setRetryFetchTrigger] = useState(0);
+  const fetchMembersRef = useRef<string | null>(null);
+  const fetchMembersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (showSettingsModal && data && !String(data.id).startsWith('local_') && data.isCloudSync !== false) {
+        if (fetchMembersRef.current === data.id) return;
+        fetchMembersRef.current = data.id;
+
+        const fetchMembers = async () => {
+            try {
+                const token = await getToken();
+                const res = await fetch(`/api/projects/${data.id}/members`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const resData = await res.json();
+                    const currentData = projectsRef.current.find(p => p.id === data.id);
+                    if (currentData) {
+                        setData({ 
+                           ...currentData, 
+                           members: resData.members, 
+                           isPublic: resData.isPublic, 
+                           publicRole: resData.publicRole 
+                        });
+                    }
+                } else {
+                    throw new Error('Failed to fetch members');
+                }
+            } catch (e) { 
+                console.error("メンバー情報の取得に失敗しました:", e); 
+                fetchMembersTimeoutRef.current = setTimeout(() => {
+                    fetchMembersRef.current = null;
+                    setRetryFetchTrigger(prev => prev + 1);
+                }, 10000);
+            }
+        };
+        fetchMembers();
+    } else if (!showSettingsModal) {
+        fetchMembersRef.current = null;
+        if (fetchMembersTimeoutRef.current) {
+            clearTimeout(fetchMembersTimeoutRef.current);
+            fetchMembersTimeoutRef.current = null;
+        }
+    }
+  }, [showSettingsModal, data?.id, data?.isCloudSync, getToken, setData, retryFetchTrigger, projectsRef]);
 
   const handleUpdateProjectName = useCallback(async (newName: string) => {
     if (!data) return;
