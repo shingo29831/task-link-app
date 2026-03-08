@@ -8,7 +8,8 @@ import { MAPPING_GROUPS_V0 as MAPPING_GROUPS } from '../utils/versions/v0';
 
 type TaskNode = Task & { children: TaskNode[] };
 
-export const useTaskView = (data: AppData | null, projects: AppData[], showAllProjectsInCalendar: boolean) => {
+// 引数に sortConfig と tempOrderMap を追加
+export const useTaskView = (data: AppData | null, projects: AppData[], showAllProjectsInCalendar: boolean, sortConfig: { type: string, direction: string }, tempOrderMap: Record<string, number>) => {
   const activeTasks = useMemo(() => {
     return data ? (data.tasks || []).filter((t: Task) => !t.isDeleted) : [];
   }, [data]);
@@ -54,13 +55,22 @@ export const useTaskView = (data: AppData | null, projects: AppData[], showAllPr
         if (t.parentId && map.has(t.parentId)) map.get(t.parentId)!.children.push(node);
         else roots.push(node);
       });
-      const sortFn = (a: TaskNode, b: TaskNode) => (a.order ?? 0) - (b.order ?? 0);
+      
+      // ソートロジックを更新
+      const sortFn = (a: TaskNode, b: TaskNode) => {
+        if (sortConfig.type === 'custom') {
+            return (a.order ?? 0) - (b.order ?? 0);
+        } else {
+            return (tempOrderMap[a.id] ?? 0) - (tempOrderMap[b.id] ?? 0);
+        }
+      };
+
       map.forEach(node => node.children.sort(sortFn));
       roots.sort(sortFn);
       return roots;
     };
     return buildTree(data.tasks || []);
-  }, [data]);
+  }, [data, sortConfig, tempOrderMap]);
 
   const projectProgress = useMemo(() => {
     if (!data || activeTasks.length === 0) return 0;
