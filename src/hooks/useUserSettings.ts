@@ -28,7 +28,7 @@ export const useUserSettings = () => {
       theme: 'system',
       weekStartsOn: 0,
       boardLayout: 'horizontal',
-      customBoardLayout: false,
+      customBoardLayout: true, // なぜ: スマホ等でデバイス毎のレイアウト（縦並び）を初期状態から適用するため
       boardLayoutDesktop: 'horizontal',
       boardLayoutTablet: 'horizontal',
       boardLayoutMobile: 'vertical',

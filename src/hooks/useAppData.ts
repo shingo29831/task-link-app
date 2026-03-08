@@ -1,3 +1,4 @@
+// src/hooks/useAppData.ts
 // 役割: アプリケーション全体のデータ管理（ローカル状態、クラウド同期、ストレージ永続化）の統合Facade
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -63,12 +64,16 @@ export const useAppData = () => {
       let initialActiveId = loadedProjects[0].id;
       
       const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const isSharedLink = pathParts.length === 1;
+      const isSharedLink = pathParts.length === 1 || (pathParts.length === 2 && pathParts[1] === 'snapshot');
 
       if (isSharedLink) {
-        // 共有リンクの場合、すでにローカルに同じ shortId を持つプロジェクトがあればそれを開く
-        const existingProj = loadedProjects.find(p => p.shortId === pathParts[0]);
+        const shortId = pathParts[0];
+        const existingProj = loadedProjects.find(p => p.shortId === shortId);
         if (existingProj) {
+          const params = new URLSearchParams(window.location.search);
+          if (params.has('d')) {
+             existingProj.includeDataInLink = true; // なぜ: URLに?d=がある場合は消えないように有効化しておく
+          }
           initialActiveId = existingProj.id;
         }
       } else {
@@ -102,15 +107,19 @@ export const useAppData = () => {
 
   useEffect(() => {
     if (activeData) {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isSharedOrSnapshot = pathParts.length === 1 || (pathParts.length === 2 && pathParts[1] === 'snapshot');
+
       if (initialUrlGuardRef.current) {
-        const pathParts = window.location.pathname.split('/').filter(Boolean);
-        if (pathParts.length === 1) {
+        if (isSharedOrSnapshot) {
           if (activeData.shortId === pathParts[0]) {
-            // アクティブなプロジェクトがURLのshortIdと一致したらガードを解除
+            const params = new URLSearchParams(window.location.search);
+            // なぜ: APIで検証が終わる前にURLの?d=を消してしまわないようにガードを維持する
+            if (params.has('d') && !activeData.includeDataInLink) {
+               return; 
+            }
             initialUrlGuardRef.current = false;
           } else {
-            // アクセス時のshortIdと現在のactiveDataが違う場合（APIの読み込み待ちなど）は
-            // URLを上書きしないようにガードを維持し、処理をスキップする
             return;
           }
         } else {
@@ -118,9 +127,14 @@ export const useAppData = () => {
         }
       }
 
-      const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
+      const isLocal = String(activeData.id).startsWith('local_') || (!activeData.shortId && activeData.isCloudSync === false);
+      const isSnapshot = !!activeData.isSnapshot;
       const includeData = isLocal || !!(activeData as any).includeDataInLink;
-      const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
+      
+      let basePath = '/';
+      if (!isLocal && activeData.shortId) {
+          basePath = isSnapshot ? `/${activeData.shortId}/snapshot/` : `/${activeData.shortId}/`;
+      }
       
       if (!includeData) {
         window.history.replaceState(null, '', `${window.location.origin}${basePath}`);
@@ -149,9 +163,14 @@ export const useAppData = () => {
 
   const getShareUrl = useCallback(() => {
     if (!activeData) return '';
-    const isLocal = String(activeData.id).startsWith('local_') || activeData.isCloudSync === false;
+    const isLocal = String(activeData.id).startsWith('local_') || (!activeData.shortId && activeData.isCloudSync === false);
     const includeData = isLocal || !!(activeData as any).includeDataInLink;
-    const basePath = isLocal || !activeData.shortId ? '/' : `/${activeData.shortId}/`;
+    const isSnapshot = !!activeData.isSnapshot;
+    
+    let basePath = '/';
+    if (!isLocal && activeData.shortId) {
+        basePath = isSnapshot ? `/${activeData.shortId}/snapshot/` : `/${activeData.shortId}/`;
+    }
     
     if (!includeData && activeData.shortId) {
       return `${window.location.origin}${basePath}`;
