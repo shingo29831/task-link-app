@@ -55,7 +55,7 @@ function App() {
     setHasAgreedPolicy(true);
   };
 
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded: isAuthLoaded } = useAuth();
   const { user } = useUser();
   const { t } = useTranslation();
   
@@ -106,13 +106,6 @@ function App() {
   const isCompactSpacing = windowWidth < 1280;
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
-
-  const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
-  
-  const currentUserRole = sharedProjectState?.role || data?.role || 'owner';
-  const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
-  const isViewer = isCloudProject ? !hasEditPermission : false;
-  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
 
   useEffect(() => {
     const updateAppHeight = () => {
@@ -254,10 +247,10 @@ function App() {
     return <SyncLimitModal limitState={syncLimitState} onResolve={resolveSyncLimit} />;
   }
 
-  if (isCheckingShared || isVerifyingProject) {
+  if (!isAuthLoaded || isCheckingShared || isVerifyingProject) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
-        <IconLoader size={48} />
+        <div className="spin"><IconLoader size={48} /></div>
         <p style={{ marginTop: '16px', fontSize: '1.2em' }}>{isVerifyingProject ? t('verifying_project') : t('checking_permissions')}</p>
       </div>
     );
@@ -279,6 +272,40 @@ function App() {
     }
     return <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-primary)' }}>{t('loading')}</div>;
   }
+
+  const isCloudProject = data ? (!String(data.id).startsWith('local_') && data.isCloudSync !== false) : false;
+  
+  let currentUserRole = sharedProjectState?.role || data?.role || 'owner';
+  let hasAccess = true;
+
+  if (!isSignedIn && isCloudProject) {
+    if (data?.isPublic) {
+      currentUserRole = 'viewer';
+    } else {
+      hasAccess = false;
+    }
+  }
+
+  if (!hasAccess) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)' }}>
+        <IconError size={48} />
+        <p style={{ marginTop: '16px', fontSize: '1.2em' }}>{t('no_access_permission') || '閲覧権限がありません。ログインしてください。'}</p>
+        <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
+            <SignInButton mode="modal">
+                <button style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>{t('login')}</button>
+            </SignInButton>
+            {projects.some(p => String(p.id).startsWith('local_')) && (
+                <button onClick={() => switchProject(projects.find(p => String(p.id).startsWith('local_'))?.id || '')} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>{t('switch_to_local_project') || 'ローカルプロジェクトに切り替える'}</button>
+            )}
+        </div>
+      </div>
+    );
+  }
+
+  const hasEditPermission = currentUserRole === 'editor' || currentUserRole === 'admin' || currentUserRole === 'owner';
+  const isViewer = isCloudProject ? !hasEditPermission : false;
+  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
 
   const calculateColumnWidth = (node: TaskNode, depth: number = 0): number => {
     let BASE_WIDTH = 220, INDENT_WIDTH = 24, CHAR_WIDTH_PX = 12, DEADLINE_WIDTH = 80;
@@ -321,7 +348,16 @@ function App() {
         {showProjectMenu && (
             <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '4px', zIndex: 1000, minWidth: '200px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {projects.map((p: any) => <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>{String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}</div>)}
+                    {projects.map((p: any) => {
+                        const pIsCloud = !String(p.id).startsWith('local_') && p.isCloudSync !== false;
+                        const pHasAccess = isSignedIn || !pIsCloud || p.isPublic;
+                        if (!pHasAccess) return null;
+                        return (
+                            <div key={p.id} onClick={() => { switchProject(p.id); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: p.id === activeId ? 'var(--bg-surface-hover)' : 'transparent', borderBottom: '1px solid var(--border-color)', fontSize: '0.9em', color: 'var(--text-primary)' }}>
+                                {String(p.id).startsWith('local_') || p.isCloudSync === false ? '📁' : '☁️'} {p.projectName}
+                            </div>
+                        );
+                    })}
                 </div>
                 <div onClick={() => { addProject(); setShowProjectMenu(false); }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--color-primary)', borderTop: '1px solid var(--border-color)', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '6px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px' }}><IconPlus size={16} /><span>{t('new_project')}</span></div>
             </div>
@@ -369,10 +405,10 @@ function App() {
       />
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <SignedIn>
-          <UserButton>
+          <UserButton appearance={{ elements: { userButtonPopoverActionButton__manageAccount: { display: 'none' } } }}>
             <UserButton.MenuItems>
               <UserButton.Action 
-                label={t('settings')} 
+                label={t('settings') || '設定'} 
                 labelIcon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>} 
                 onClick={() => setShowUserSettingsModal(true)} 
               />
@@ -387,6 +423,7 @@ function App() {
               <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', width: '150px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', zIndex: 1000, overflow: 'hidden' }}>
                 <SignInButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>{t('login')}</button></SignInButton>
                 <SignUpButton mode="modal"><button onClick={() => setIsAuthMenuOpen(false)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>{t('signup')}</button></SignUpButton>
+                <button onClick={() => { setIsAuthMenuOpen(false); setShowUserSettingsModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> {t('settings') || '設定'}</button>
                 <button onClick={() => { setIsAuthMenuOpen(false); setShowHelpModal(true); }} style={{  width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9em', color: 'var(--text-primary)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><IconHelp size={16} /> {t('help')}</button>
               </div>
             )}
