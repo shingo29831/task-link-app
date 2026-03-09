@@ -1,4 +1,7 @@
 // src/components/TaskCalendar.tsx
+// 役割: タスクを月間カレンダー形式で表示し、日付ごとのタスク確認・詳細表示への導線を提供する
+// なぜ: ユーザーが設定した「週の始まり」や「タイムゾーン」に合わせた正確な期限の把握と、直感的なタスク管理を実現するため
+
 import React, { useState } from 'react';
 import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
 import { ja, enUS } from 'date-fns/locale'; 
@@ -24,6 +27,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
   const { t, i18n } = useTranslation(); 
   const { settings } = useUserSettings();
   const timeZone = settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+  const weekStartsOn = (settings?.weekStartsOn === 1 ? 1 : 0) as 0 | 1;
 
   const getZonedDate = (date: Date | number, tz: string) => {
     try {
@@ -37,7 +41,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const startDate = startOfWeek(monthStart, { weekStartsOn });
   const endDate = addDays(startDate, 41);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
@@ -45,9 +49,14 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
   const isEnglish = i18n.language === 'en';
   const dateLocale = isEnglish ? enUS : ja;
   const monthYearFormat = isEnglish ? 'MMMM yyyy' : 'yyyy年 M月';
-  const weekDays = isEnglish 
+  
+  const baseWeekDays = isEnglish 
     ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     : ['日', '月', '火', '水', '木', '金', '土'];
+  
+  const weekDays = weekStartsOn === 1 
+    ? [...baseWeekDays.slice(1), baseWeekDays[0]] 
+    : baseWeekDays;
 
   const getDayTasks = (day: Date) => {
      return tasks.filter(t => {

@@ -1,6 +1,6 @@
 // src/components/UserSettingsModal.tsx
-// 役割: ユーザー設定（言語、テーマ、タイムゾーン、レイアウト等）とアカウント設定への遷移を管理するモーダル
-// なぜ: 言語設定変更時に即座にUIへ反映させつつ、保存は確定時のみ行うため（キャンセル時は元に戻す）
+// 役割: ユーザー設定（言語、テーマ、タイムゾーン、週の始まり、レイアウト等）とアカウント設定への遷移を管理するモーダル
+// なぜ: アプリの表示・動作に関するカスタマイズを一元管理し、ユーザー体験を向上させるため
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
   const [language, setLanguage] = useState(settings.language || 'ja');
   const [theme, setTheme] = useState(settings.theme || 'system');
   const [timezone, setTimezone] = useState(settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo');
+  const [weekStartsOn, setWeekStartsOn] = useState<number>(settings.weekStartsOn !== undefined ? settings.weekStartsOn : 0);
   const [customBoardLayout, setCustomBoardLayout] = useState(!!settings.customBoardLayout);
   const [boardLayoutDesktop, setBoardLayoutDesktop] = useState(settings.boardLayoutDesktop || 'horizontal');
   const [boardLayoutTablet, setBoardLayoutTablet] = useState(settings.boardLayoutTablet || 'horizontal');
@@ -47,6 +48,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       language,
       theme,
       timezone,
+      weekStartsOn,
       customBoardLayout,
       boardLayoutDesktop,
       boardLayoutTablet,
@@ -92,6 +94,14 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
               <option value="Europe/Paris">{t('tz_europe_paris') || 'Europe/Paris (中央ヨーロッパ標準時)'}</option>
               <option value="Asia/Shanghai">{t('tz_asia_shanghai') || 'Asia/Shanghai (中国標準時)'}</option>
               <option value="Australia/Sydney">{t('tz_australia_sydney') || 'Australia/Sydney (オーストラリア東部標準時)'}</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('week_starts_on') || 'カレンダーの週の始まり'}</label>
+            <select value={weekStartsOn} onChange={(e) => setWeekStartsOn(Number(e.target.value))} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+              <option value={0}>{t('sunday') || '日曜日'}</option>
+              <option value={1}>{t('monday') || '月曜日'}</option>
             </select>
           </div>
 
