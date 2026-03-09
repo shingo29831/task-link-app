@@ -1,41 +1,42 @@
 # Meld Task
 
-**URLですべての状態を保存・共有する、サーバーレスなタスク管理アプリ**
+**URLによるDBレスなスナップショット共有と、クラウドによるリアルタイム同期を両立したハイブリッド・タスク管理アプリ**
 
 🔗 **App URL:** [https://meld-task.com](https://meld-task.com)
 
-Meld Taskは、従来のタスク管理アプリとは異なり、データベースを一切使用しません。
-タスクの内容、進捗、プロジェクト名など、**全てのデータは圧縮されてURLの中に保存されます。**
+Meld Taskは、用途に合わせて2つのデータ保存・共有アプローチを選べる新しいタスク管理ツールです。
+「ちょっとしたタスクを今すぐ共有したい」ときはログイン不要の**URL共有**を、「チームで継続的にタスクを管理したい」ときは**クラウド同期**を活用できます。
 
-## 💡 特徴
+## 💡 特徴 (Features)
 
-### 1. データベース不要 (No Database)
-ユーザー登録やログインは必要ありません。サーバー上にあなたのデータが保存されることはないため、プライバシーの面でも安心です。
+### 1. 🔗 ログイン不要！URLで「その瞬間」を共有 (Snapshot Sharing)
+データベースを一切使わず、タスクの全データを圧縮してURLに埋め込むことが可能です。
+URLをコピーしてチャットで送るだけで、**共有した瞬間のタスク状況**を相手にそのまま見せることができます。受け取った側はログインなしですぐに確認でき、手元のデータと「マージ（統合）」することも可能です。
 
-### 2. URLに全てのデータを保存 (Data in URL)
-タスクを追加・編集すると、URLがリアルタイムに更新されます。その長いURLそのものが、あなたのタスクデータの「セーブデータ」です。
+### 2. ☁️ クラウド同期でリアルタイム共有 (Cloud Sync & Realtime Collaboration)
+アカウントを作成してログインすれば、プロジェクトをクラウドに保存できます。
+クラウド上のプロジェクトは、複数端末間で自動同期されるほか、メンバーを招待したり共有URLを発行することで、チームでの**リアルタイムな共同編集**が可能になります。
 
-### 3. 「その瞬間」を共有 (Snapshot Sharing)
-URLをコピーしてチャットアプリやメールで送るだけで、**共有した瞬間のタスク状況**をそのまま相手に見せることができます。
-「現在の進捗はこんな感じです」とURLを貼るだけで、相手はログインなしで同じ画面を確認できます。
+### 3. 🔄 ローカルとクラウドのシームレスな移行
+最初はログインなし（ローカル）で使い始め、本格的に管理したくなったタイミングでワンクリックでクラウドプロジェクトへアップロード（変換）することができます。
 
-### 4. マージ機能 (Merge Tasks)
-共有されたURLやJSONデータを読み込み、自分の手元のプロジェクトに統合（マージ）することができます。
-これにより、チームメンバーから送られてきた最新のタスク状態を取り込み、同じ状態を再現・同期することが可能です。
+### 4. 📂 階層型タスクと直感的な進捗管理
+大きなタスクを細かく分解（ネスト）して管理できます。子タスクの完了状態に応じて、親タスクの進捗ゲージが自動で更新されるため、全体の状況が一目で把握できます。
 
-### 5. JSONバックアップ (JSON Export/Import)
-URLだけでなく、JSON形式でのデータ出力も可能です。
-URLが長くなりすぎる場合の共有や、ローカルへのバックアップとして利用できます。
+### 5. 💾 JSONバックアップとマージ (JSON Export/Import)
+URLが長すぎる場合や、定期的なバックアップを取りたい場合は、JSON形式でのエクスポート/インポートが可能です。差分を比較してローカルのプロジェクトに統合するマージ機能も備えています。
 
-> **⚠️ 重要: プロジェクトとデータの範囲について**
-> 生成されるURLやJSONデータは、**現在選択されているプロジェクト**単位で保存されます。
-> プロジェクトを切り替えると、そのプロジェクトに対応した別のURLやJSONが出力されます。別のプロジェクトのデータが混ざることはありません。
+## 🚀 使い方 (How to Use)
 
-## 🚀 使い方
+### 👤 サクッと使いたい場合（ログイン不要・URLスナップショット）
+1. [meld-task.com](https://meld-task.com) にアクセスしてタスクを作成します。
+2. 画面右上のメニューからリンクをコピーします（URLにデータが圧縮されて付与されます）。
+3. そのURLを相手に送るか、自分のブックマークに保存して後から復元します。
 
-1. **タスクを作成**: [meld-task.com](https://meld-task.com) を開いてタスクを追加・編集します。
-2. **保存**: ブラウザのブックマークに登録するか、JSONとしてダウンロードして保存します。
-3. **共有**: URLをコピーして送るか、JSONファイルを共有します。受け取った相手はそれを読み込むことでタスクを確認・マージできます。
+### 👥 チームで本格的に使いたい場合（クラウド同期）
+1. アカウントを作成してログインします。
+2. ローカルプロジェクトの上部メニューにある「クラウドへ保存（☁️）」アイコンを押して、クラウドプロジェクトに変換します。
+3. プロジェクト設定からメンバーを招待するか、クラウド用の共有リンクを生成してチームで管理を開始します。
 
 ---
 
@@ -43,43 +44,12 @@ URLが長くなりすぎる場合の共有や、ローカルへのバックア�
 
 このプロジェクトは以下の技術で構築されています。
 
-* **React** + **TypeScript**
-* **Vite** (Build tool)
+* **React** + **TypeScript** + **Vite**
+* **Dnd-kit** (Drag and drop interactions)
+* **Clerk** (Authentication)
+* **Cloudflare Pages & D1** (Hosting and serverless database)
 * **LZ-String** & Custom Base185 Encoding (URL compression logic)
 
 ---
 
-# React + TypeScript + Vite (Development Info)
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
-])
+> **Note**: This project was initially bootstrapped with Vite.
