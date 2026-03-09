@@ -1,127 +1,104 @@
 // src/components/UserSettingsModal.tsx
-// 役割: ユーザーの個人設定（言語、タイムゾーン、テーマ、カレンダー等）を変更するモーダルUI
-// なぜ: アカウントに紐づく設定をユーザー自身でカスタマイズし、データベースに保存できるようにするため
+// 役割: ユーザー設定（言語、テーマ、レイアウト等）とアカウント設定への遷移を管理するモーダル
+// なぜ: ログイン状態に関わらずアプリの表示をカスタマイズできるようにし、設定への導線を一元化するため
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth, useClerk } from '@clerk/clerk-react';
 import { useUserSettings } from '../hooks/useUserSettings';
-import type { UserSettings } from '../types';
+import { IconX } from './Icons';
 
-interface Props {
+interface UserSettingsModalProps {
   onClose: () => void;
 }
 
-export const UserSettingsModal: React.FC<Props> = ({ onClose }) => {
+export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose }) => {
   const { t } = useTranslation();
-  const { settings: globalSettings, updateSettings } = useUserSettings();
-  
-  const [settings, setSettings] = useState<UserSettings>(globalSettings);
-  const [isSaving, setIsSaving] = useState(false);
+  const { settings, updateSettings } = useUserSettings();
+  const { isSignedIn } = useAuth();
+  const { openUserProfile } = useClerk();
 
-  useEffect(() => {
-    setSettings(globalSettings);
-  }, [globalSettings]);
+  const [language, setLanguage] = useState(settings.language || 'ja');
+  const [customBoardLayout, setCustomBoardLayout] = useState(!!settings.customBoardLayout);
+  const [boardLayoutDesktop, setBoardLayoutDesktop] = useState(settings.boardLayoutDesktop || 'horizontal');
+  const [boardLayoutTablet, setBoardLayoutTablet] = useState(settings.boardLayoutTablet || 'horizontal');
+  const [boardLayoutMobile, setBoardLayoutMobile] = useState(settings.boardLayoutMobile || 'vertical');
 
   const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      await updateSettings(settings);
-      alert(t('settings_saved'));
-      onClose();
-    } catch (error) {
-      alert(t('settings_failed'));
-    } finally {
-      setIsSaving(false);
-    }
+    await updateSettings({
+      ...settings,
+      language,
+      customBoardLayout,
+      boardLayoutDesktop,
+      boardLayoutTablet,
+      boardLayoutMobile,
+    });
+    onClose();
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }} onClick={onClose}>
-      <div style={{ backgroundColor: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 20px 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>{t('settings')}</h3>
-        
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={onClose}>
+      <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '450px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.2em' }}>{t('settings') || '設定'}</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><IconX size={20} /></button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('language')}</label>
-            <select value={settings.language} onChange={e => setSettings({...settings, language: e.target.value})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('language') || '言語'}</label>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>タイムゾーン</label>
-            <select value={settings.timezone} onChange={e => setSettings({...settings, timezone: e.target.value})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value="Asia/Tokyo">Asia/Tokyo (日本標準時)</option>
-              <option value="UTC">UTC (協定世界時)</option>
-              <option value="America/New_York">America/New_York (東部標準時)</option>
-            </select>
+          <div style={{ paddingTop: '8px' }}>
+             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9em', fontWeight: 'bold', cursor: 'pointer' }}>
+               <input type="checkbox" checked={customBoardLayout} onChange={(e) => setCustomBoardLayout(e.target.checked)} />
+               {t('enable_custom_layout') || 'デバイスごとのレイアウト設定を有効にする'}
+             </label>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('theme')}</label>
-            <select value={settings.theme} onChange={e => setSettings({...settings, theme: e.target.value})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value="system">{t('system_default')}</option>
-              <option value="light">{t('light_mode')}</option>
-              <option value="dark">{t('dark_mode')}</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('week_starts_on')}</label>
-            <select value={settings.weekStartsOn} onChange={e => setSettings({...settings, weekStartsOn: parseInt(e.target.value)})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value={0}>{t('sunday')}</option>
-              <option value={1}>{t('monday')}</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{t('board_layout')}</label>
-            {!settings.customBoardLayout && (
-              <select value={settings.boardLayout || 'horizontal'} onChange={e => setSettings({...settings, boardLayout: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-                <option value="horizontal">{t('layout_horizontal')}</option>
-                <option value="vertical">{t('layout_vertical')}</option>
-              </select>
-            )}
-            
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9em', marginTop: '4px' }}>
-              <input type="checkbox" checked={!!settings.customBoardLayout} onChange={e => setSettings({...settings, customBoardLayout: e.target.checked})} />
-              {t('custom_board_layout')}
-            </label>
-
-            {settings.customBoardLayout && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px', marginTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.9em' }}>{t('layout_desktop')}</span>
-                  <select value={settings.boardLayoutDesktop || 'horizontal'} onChange={e => setSettings({...settings, boardLayoutDesktop: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-                    <option value="horizontal">{t('layout_horizontal')}</option>
-                    <option value="vertical">{t('layout_vertical')}</option>
-                  </select>
+          {customBoardLayout && (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingLeft: '24px' }}>
+                <div>
+                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85em', color: 'var(--text-secondary)' }}>Desktop (&gt; 1024px)</label>
+                   <select value={boardLayoutDesktop} onChange={(e) => setBoardLayoutDesktop(e.target.value as 'horizontal' | 'vertical')} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                     <option value="horizontal">{t('layout_horizontal') || '横並び'}</option>
+                     <option value="vertical">{t('layout_vertical') || '縦並び'}</option>
+                   </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.9em' }}>{t('layout_tablet')}</span>
-                  <select value={settings.boardLayoutTablet || 'horizontal'} onChange={e => setSettings({...settings, boardLayoutTablet: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-                    <option value="horizontal">{t('layout_horizontal')}</option>
-                    <option value="vertical">{t('layout_vertical')}</option>
-                  </select>
+                <div>
+                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85em', color: 'var(--text-secondary)' }}>Tablet (481px - 1024px)</label>
+                   <select value={boardLayoutTablet} onChange={(e) => setBoardLayoutTablet(e.target.value as 'horizontal' | 'vertical')} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                     <option value="horizontal">{t('layout_horizontal') || '横並び'}</option>
+                     <option value="vertical">{t('layout_vertical') || '縦並び'}</option>
+                   </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.9em' }}>{t('layout_mobile')}</span>
-                  <select value={settings.boardLayoutMobile || 'vertical'} onChange={e => setSettings({...settings, boardLayoutMobile: e.target.value as 'horizontal' | 'vertical'})} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-                    <option value="horizontal">{t('layout_horizontal')}</option>
-                    <option value="vertical">{t('layout_vertical')}</option>
-                  </select>
+                <div>
+                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85em', color: 'var(--text-secondary)' }}>Mobile (&lt;= 480px)</label>
+                   <select value={boardLayoutMobile} onChange={(e) => setBoardLayoutMobile(e.target.value as 'horizontal' | 'vertical')} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+                     <option value="horizontal">{t('layout_horizontal') || '横並び'}</option>
+                     <option value="vertical">{t('layout_vertical') || '縦並び'}</option>
+                   </select>
                 </div>
-              </div>
-            )}
-          </div>
+             </div>
+          )}
+
+          {isSignedIn && (
+             <div style={{ marginTop: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+               <button onClick={() => { openUserProfile(); onClose(); }} style={{ padding: '10px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  {t('account_settings') || 'アカウント設定'}
+               </button>
+             </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', borderRadius: '4px', cursor: 'pointer' }}>{t('cancel')}</button>
-          <button onClick={handleSave} disabled={isSaving} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: isSaving ? 'default' : 'pointer', opacity: isSaving ? 0.7 : 1 }}>
-            {isSaving ? t('loading') : t('save')}
-          </button>
+          <button onClick={onClose} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>{t('cancel') || 'キャンセル'}</button>
+          <button onClick={handleSave} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>{t('save') || '保存'}</button>
         </div>
       </div>
     </div>
