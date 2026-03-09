@@ -1,6 +1,8 @@
+// src/components/TaskEditModal.tsx
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { useTranslation } from 'react-i18next'; // ▼ 追加
+import { useTranslation } from 'react-i18next';
+import { useUserSettings } from '../hooks/useUserSettings';
 import type { Task } from '../types';
 
 interface Props {
@@ -22,9 +24,20 @@ export const TaskEditModal: React.FC<Props> = ({
   onMoveUp,
   onMoveDown
 }) => {
-  const { t } = useTranslation(); // ▼ 追加
+  const { t } = useTranslation();
+  const { settings } = useUserSettings();
+  const timeZone = settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+
+  const getZonedDate = (date: Date | number, tz: string) => {
+    try {
+      return new Date(new Date(date).toLocaleString('en-US', { timeZone: tz }));
+    } catch (e) {
+      return new Date(date);
+    }
+  };
+
   const [name, setName] = useState(task.name);
-  const initialDate = task.deadline ? format(new Date(task.deadline), 'yyyy-MM-dd') : '';
+  const initialDate = task.deadline ? format(getZonedDate(task.deadline, timeZone), 'yyyy-MM-dd') : '';
   const [dateStr, setDateStr] = useState(initialDate);
   const [status, setStatus] = useState<0 | 1 | 2 | 3>(task.status as 0 | 1 | 2 | 3);
   

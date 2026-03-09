@@ -158,5 +158,16 @@
   "privacy_policy_desc": "To use this app, you must agree to our Privacy Policy and Terms of Service.",
   "privacy_policy_link": "View Privacy Policy",
   "terms_of_service_link": "View Terms of Service",
-  "agree_and_start": "Agree and Start"
+  "agree_and_start": "Agree and Start",
+  "enable_custom_layout": "Enable custom layout settings for each device",
+  "timezone": "Timezone",
+  "tz_asia_tokyo": "Asia/Tokyo (Japan Standard Time)",
+  "tz_utc": "UTC (Coordinated Universal Time)",
+  "tz_america_new_york": "America/New_York (Eastern Standard Time)",
+  "tz_america_los_angeles": "America/Los_Angeles (Pacific Standard Time)",
+  "tz_europe_london": "Europe/London (Greenwich Mean Time)",
+  "tz_europe_paris": "Europe/Paris (Central European Time)",
+  "tz_asia_shanghai": "Asia/Shanghai (China Standard Time)",
+  "tz_australia_sydney": "Australia/Sydney (Australian Eastern Standard Time)",
+  "account_settings": "Account Settings"
 }

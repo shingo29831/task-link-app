@@ -70,6 +70,16 @@ function App() {
     }
     return settings?.boardLayout || 'horizontal';
   }, [settings, windowWidth]);
+
+  useEffect(() => {
+    if (settings?.theme) {
+      if (settings.theme === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', settings.theme);
+      }
+    }
+  }, [settings?.theme]);
   
   const {
     data, setData, incomingData, setIncomingData, targetLocalData, projects, activeId, activeTasks,

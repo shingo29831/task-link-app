@@ -1,17 +1,19 @@
+// src/components/TaskCalendar.tsx
 import React, { useState } from 'react';
 import { format, addMonths, subMonths, startOfMonth, startOfWeek, addDays, eachDayOfInterval, isSameMonth, isSameDay, differenceInCalendarDays } from 'date-fns';
 import { ja, enUS } from 'date-fns/locale'; 
 import { useTranslation } from 'react-i18next'; 
+import { useResponsive } from '../hooks/useResponsive';
+import { useUserSettings } from '../hooks/useUserSettings';
 import type { Task, AppData } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { IconChevronLeft, IconChevronRight } from './Icons';
-import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   tasks: Task[];
   activeTasks: Task[];
   projects?: AppData[];
-  activeProjectId?: string; // ▼ 追加
+  activeProjectId?: string;
   onStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onParentStatusChange: (id: string, status: 0 | 1 | 2 | 3) => void;
   onAddTask: (name: string, dateStr: string, parentId?: string, projectId?: string) => void; 
@@ -20,7 +22,18 @@ interface Props {
 export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, activeProjectId, onStatusChange, onParentStatusChange, onAddTask }) => {
   const { isMobile } = useResponsive();
   const { t, i18n } = useTranslation(); 
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const { settings } = useUserSettings();
+  const timeZone = settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+
+  const getZonedDate = (date: Date | number, tz: string) => {
+    try {
+      return new Date(new Date(date).toLocaleString('en-US', { timeZone: tz }));
+    } catch (e) {
+      return new Date(date);
+    }
+  };
+
+  const [currentMonth, setCurrentMonth] = useState(() => getZonedDate(new Date(), timeZone));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
@@ -39,13 +52,14 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
   const getDayTasks = (day: Date) => {
      return tasks.filter(t => {
         if (t.isDeleted || t.deadline === undefined) return false;
-        return isSameDay(day, t.deadline);
+        const deadlineZoned = getZonedDate(t.deadline, timeZone);
+        return isSameDay(day, deadlineZoned);
      });
   };
 
   const MAX_DISPLAY_TASKS = 5;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayZoned = getZonedDate(new Date(), timeZone);
+  todayZoned.setHours(0, 0, 0, 0);
 
   return (
     <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', padding: isMobile ? '8px' : '15px', paddingTop: isMobile ? '8px' : '17px', fontSize: '0.8rem', minHeight: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' , border: '1px solid var(--border-color)'}}>
@@ -67,7 +81,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
             {calendarDays.map((day, kq) => {
                 const dayTasks = getDayTasks(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);
-                const isToday = isSameDay(day, new Date());
+                const isToday = isSameDay(day, todayZoned);
                 
                 return (
                     <div 
@@ -89,7 +103,8 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
                         </div>
                         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             {dayTasks.slice(0, MAX_DISPLAY_TASKS).map(t => {
-                                const diffDays = differenceInCalendarDays(t.deadline!, today);
+                                const deadlineZoned = getZonedDate(t.deadline!, timeZone);
+                                const diffDays = differenceInCalendarDays(deadlineZoned, todayZoned);
                                 const isUrgent = t.status !== 2 && diffDays <= 1;
 
                                 let bgColor = 'var(--color-info)'; 
@@ -134,7 +149,7 @@ export const TaskCalendar: React.FC<Props> = ({ tasks, activeTasks, projects, ac
                 tasks={getDayTasks(selectedDate)} 
                 activeTasks={activeTasks}
                 projects={projects}
-                activeProjectId={activeProjectId} // ▼ 追加
+                activeProjectId={activeProjectId}
                 onStatusChange={onStatusChange}
                 onParentStatusChange={onParentStatusChange}
                 onAddTask={onAddTask}
