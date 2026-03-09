@@ -1,6 +1,6 @@
 // src/components/UserSettingsModal.tsx
-// 役割: ユーザー設定（言語、テーマ、レイアウト等）とアカウント設定への遷移を管理するモーダル
-// なぜ: ログイン状態に関わらずアプリの表示をカスタマイズできるようにし、設定への導線を一元化するため
+// 役割: ユーザー設定（言語、テーマ、タイムゾーン、レイアウト等）とアカウント設定への遷移を管理するモーダル
+// なぜ: ログイン状態に関わらずアプリの表示・動作をカスタマイズできるようにし、設定への導線を一元化するため
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
 
   const [language, setLanguage] = useState(settings.language || 'ja');
   const [theme, setTheme] = useState(settings.theme || 'system');
+  const [timezone, setTimezone] = useState(settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo');
   const [customBoardLayout, setCustomBoardLayout] = useState(!!settings.customBoardLayout);
   const [boardLayoutDesktop, setBoardLayoutDesktop] = useState(settings.boardLayoutDesktop || 'horizontal');
   const [boardLayoutTablet, setBoardLayoutTablet] = useState(settings.boardLayoutTablet || 'horizontal');
@@ -30,6 +31,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       ...settings,
       language,
       theme,
+      timezone,
       customBoardLayout,
       boardLayoutDesktop,
       boardLayoutTablet,
@@ -61,6 +63,20 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
               <option value="system">{t('theme_system') || 'システム設定に従う'}</option>
               <option value="light">{t('theme_light') || 'ライト'}</option>
               <option value="dark">{t('theme_dark') || 'ダーク'}</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('timezone') || 'タイムゾーン'}</label>
+            <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+              <option value="Asia/Tokyo">Asia/Tokyo (日本標準時)</option>
+              <option value="UTC">UTC (協定世界時)</option>
+              <option value="America/New_York">America/New_York (東部標準時)</option>
+              <option value="America/Los_Angeles">America/Los_Angeles (太平洋標準時)</option>
+              <option value="Europe/London">Europe/London (グリニッジ標準時)</option>
+              <option value="Europe/Paris">Europe/Paris (中央ヨーロッパ標準時)</option>
+              <option value="Asia/Shanghai">Asia/Shanghai (中国標準時)</option>
+              <option value="Australia/Sydney">Australia/Sydney (オーストラリア東部標準時)</option>
             </select>
           </div>
 

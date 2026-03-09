@@ -1,3 +1,4 @@
+// src/components/TaskItem.tsx
 // 役割: 個別のタスクを表示し、ステータス変更やドラッグ＆ドロップのターゲットとなるUIコンポーネント
 // なぜ: タスクの階層構造を視覚的に表現し、各タスクに対する直接的な操作を提供するため
 
@@ -6,6 +7,7 @@ import { differenceInCalendarDays } from 'date-fns';
 import { useDroppable, useDndContext, useDndMonitor } from '@dnd-kit/core'; 
 import { useTranslation } from 'react-i18next';
 import { useResponsive } from '../hooks/useResponsive';
+import { useUserSettings } from '../hooks/useUserSettings';
 import type { Task } from '../types';
 import { IconChevronDown, IconChevronRight } from './Icons';
 import { FormattedTaskName } from './FormattedTaskName';
@@ -70,10 +72,20 @@ export const TaskItem: React.FC<Props> = ({
   onEditModalOpen
 }) => {
   const { t } = useTranslation(); 
+  const { settings } = useUserSettings();
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [insertPosition, setInsertPosition] = useState<'top' | 'bottom' | null>(null);
 
   const { windowWidth, isMobile } = useResponsive();
+  const timeZone = settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+
+  const getZonedDate = (date: Date | number, tz: string) => {
+    try {
+      return new Date(new Date(date).toLocaleString('en-US', { timeZone: tz }));
+    } catch (e) {
+      return new Date(date);
+    }
+  };
 
   const { fontSize, indentWidth, itemPadding, buttonPadding, buttonFontSize } = useMemo(() => {
     if (windowWidth <= 480) {
@@ -114,19 +126,26 @@ export const TaskItem: React.FC<Props> = ({
     3: { l: t('status_suspend'), c: 'var(--color-suspend)' } 
   }[task.status] as any;
 
-  const daysRemaining = task.deadline !== undefined ? differenceInCalendarDays(task.deadline, new Date()) : null;
+  const daysRemaining = useMemo(() => {
+    if (task.deadline === undefined) return null;
+    const todayZ = getZonedDate(new Date(), timeZone);
+    todayZ.setHours(0, 0, 0, 0);
+    return differenceInCalendarDays(getZonedDate(task.deadline, timeZone), todayZ);
+  }, [task.deadline, timeZone]);
     
   const isUrgent = useMemo(() => {
+    const todayZ = getZonedDate(new Date(), timeZone);
+    todayZ.setHours(0, 0, 0, 0);
     const checkRecursive = (t: Task): boolean => {
         if (t.status !== 2 && t.deadline !== undefined) {
-            const diff = differenceInCalendarDays(t.deadline, new Date());
+            const diff = differenceInCalendarDays(getZonedDate(t.deadline, timeZone), todayZ);
             if (diff <= 1) return true;
         }
         const children = tasks.filter(c => !c.isDeleted && c.parentId === t.id);
         return children.some(checkRecursive);
     };
     return checkRecursive(task);
-  }, [task, tasks]);
+  }, [task, tasks, timeZone]);
 
   const getDeadline = () => {
     if (daysRemaining === null) return null;
