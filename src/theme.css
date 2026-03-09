@@ -40,48 +40,53 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     /* ==========================================
        Light Theme (High Contrast & Distinct)
        ========================================== */
-    
-    /* Darkテーマでの色の関係性を踏襲:
-       - Surface(#2a) と Body(#24) は違う -> Lightでも白とグレーで分ける
-       - Surface(#2a) と Input(#33) は違う -> Lightでも白と薄グレーで分ける
-       - Input(#33) と Button(#1a) は違う -> Lightでも分ける
-    */
-
-    --bg-body: #ffffff;        /* 全体背景: 薄いグレー */
-    --bg-surface: #e0e0e0;     /* カード: 真っ白 (Bodyより明るい) */
+    --bg-body: #ffffff;
+    --bg-surface: #e0e0e0;
     --bg-surface-hover: #f7f7f7;
-    
-    --bg-board: #e0e0e0;       /* ボード: Bodyより少し濃いグレー (DarkではBodyより暗いため) */
+    --bg-board: #e0e0e0;
     --bg-task: #fffff9;
     --bg-modal: #fffff9;
-    
-    --bg-input: #ffffff;       /* 入力欄: Surface(#fff)と区別するためごく薄いグレー */
-    
-    --bg-button: #dedede;      /* ボタン: 明確なグレー (Surfaceより暗く、Inputとも区別) */
-    --bg-button-hover: #dcdcdc; /* ホバー時は少し濃く */
-
-    --bg-calendar-day: #faf5f5;      /* Inputと同じ色 (Darkでの関係性を維持) */
-    --bg-calendar-day-other: #f2f2f2; /* 少し濃いグレー */
-    
+    --bg-input: #ffffff;
+    --bg-button: #dedede;
+    --bg-button-hover: #dcdcdc;
+    --bg-calendar-day: #faf5f5;
+    --bg-calendar-day-other: #f2f2f2;
     --bg-item-hover: rgba(0, 0, 0, 0.05);
-
-    /* テキスト: くっきりと黒に近づける */
     --text-primary: #1a1a1a;
     --text-secondary: #555555;
     --text-placeholder: #777777;
-    /* --text-inverse は白のまま */
-
     --slider-lever: #ffffff;
-
-    /* ボーダー: 要素の区切りをはっきりさせる */
     --border-color: #cccccc;
     --border-light: #dddddd;
-    /* --border-focus は共通 */
-
     --overlay-bg: rgba(0, 0, 0, 0.5);
   }
+}
+
+:root[data-theme="light"] {
+  /* ==========================================
+     Light Theme (Forced via user settings)
+     ========================================== */
+  --bg-body: #ffffff;
+  --bg-surface: #e0e0e0;
+  --bg-surface-hover: #f7f7f7;
+  --bg-board: #e0e0e0;
+  --bg-task: #fffff9;
+  --bg-modal: #fffff9;
+  --bg-input: #ffffff;
+  --bg-button: #dedede;
+  --bg-button-hover: #dcdcdc;
+  --bg-calendar-day: #faf5f5;
+  --bg-calendar-day-other: #f2f2f2;
+  --bg-item-hover: rgba(0, 0, 0, 0.05);
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-placeholder: #777777;
+  --slider-lever: #ffffff;
+  --border-color: #cccccc;
+  --border-light: #dddddd;
+  --overlay-bg: rgba(0, 0, 0, 0.5);
 }

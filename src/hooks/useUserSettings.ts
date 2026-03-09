@@ -14,15 +14,7 @@ export const useUserSettings = () => {
   const { i18n } = useTranslation();
   
   const [settings, setSettings] = useState<UserSettings>(() => {
-    const localData = localStorage.getItem(LOCAL_SETTINGS_KEY);
-    if (localData) {
-      try {
-        return JSON.parse(localData) as UserSettings;
-      } catch (e) {
-        console.error("Failed to parse local user settings", e);
-      }
-    }
-    return {
+    const defaultSettings: UserSettings = {
       language: i18n.language || 'ja',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo',
       theme: 'system',
@@ -34,6 +26,29 @@ export const useUserSettings = () => {
       boardLayoutMobile: 'vertical',
       lastUpdated: 0
     };
+
+    const localData = localStorage.getItem(LOCAL_SETTINGS_KEY);
+    let initialSettings = defaultSettings;
+
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData) as UserSettings;
+        initialSettings = { ...defaultSettings, ...parsed };
+      } catch (e) {
+        console.error("Failed to parse local user settings", e);
+      }
+    }
+
+    // 初回ロード時にドキュメントの属性にテーマを反映
+    if (typeof document !== 'undefined') {
+      if (initialSettings.theme && initialSettings.theme !== 'system') {
+        document.documentElement.setAttribute('data-theme', initialSettings.theme);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    return initialSettings;
   });
 
   const isLoaded = useRef(false);
@@ -45,9 +60,14 @@ export const useUserSettings = () => {
       if (localData) {
         try {
           const parsed = JSON.parse(localData) as UserSettings;
-          setSettings(parsed);
+          setSettings(prev => ({ ...prev, ...parsed }));
           if (parsed.language && parsed.language !== i18n.language) {
             i18n.changeLanguage(parsed.language);
+          }
+          if (parsed.theme && parsed.theme !== 'system') {
+            document.documentElement.setAttribute('data-theme', parsed.theme);
+          } else {
+            document.documentElement.removeAttribute('data-theme');
           }
         } catch (e) {
           console.error(e);

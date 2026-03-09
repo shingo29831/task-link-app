@@ -19,6 +19,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
   const { openUserProfile } = useClerk();
 
   const [language, setLanguage] = useState(settings.language || 'ja');
+  const [theme, setTheme] = useState(settings.theme || 'system');
   const [customBoardLayout, setCustomBoardLayout] = useState(!!settings.customBoardLayout);
   const [boardLayoutDesktop, setBoardLayoutDesktop] = useState(settings.boardLayoutDesktop || 'horizontal');
   const [boardLayoutTablet, setBoardLayoutTablet] = useState(settings.boardLayoutTablet || 'horizontal');
@@ -28,6 +29,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
     await updateSettings({
       ...settings,
       language,
+      theme,
       customBoardLayout,
       boardLayoutDesktop,
       boardLayoutTablet,
@@ -50,6 +52,15 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
             <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
               <option value="ja">日本語</option>
               <option value="en">English</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('theme') || 'テーマ'}</label>
+            <select value={theme} onChange={(e) => setTheme(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+              <option value="system">{t('theme_system') || 'システム設定に従う'}</option>
+              <option value="light">{t('theme_light') || 'ライト'}</option>
+              <option value="dark">{t('theme_dark') || 'ダーク'}</option>
             </select>
           </div>
 
