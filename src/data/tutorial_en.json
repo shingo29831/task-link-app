@@ -1,0 +1,107 @@
+{
+  "id": "local_tutorial_project_id",
+  "projectName": "Welcome to MeldTask!!",
+  "tasks": [
+    {
+      "id": "tut_1",
+      "name": "🎉 MeldTask Features",
+      "status": 0,
+      "order": 1
+    },
+    {
+      "id": "tut_1_1",
+      "name": "Manage tasks hierarchically. Break down large tasks into smaller ones!",
+      "status": 1,
+      "parentId": "tut_1",
+      "order": 1
+    },
+    {
+      "id": "tut_1_2",
+      "name": "Share tasks with your team or friends via cloud sync and shared links.",
+      "status": 1,
+      "parentId": "tut_1",
+      "order": 2
+    },
+    {
+      "id": "tut_2",
+      "name": "📖 Basic Operations: Task Settings",
+      "status": 0,
+      "order": 2
+    },
+    {
+      "id": "tut_2_1",
+      "name": "Double-click a task to open the task settings.",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 1
+    },
+    {
+      "id": "tut_2_2",
+      "name": "In task settings, you can change the name, deadline, status, order, or delete it.",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 2
+    },
+    {
+      "id": "tut_2_3",
+      "name": "All operations are consolidated in the task settings on both PC and mobile.",
+      "status": 0,
+      "parentId": "tut_2",
+      "order": 3
+    },
+    {
+      "id": "tut_3",
+      "name": "📊 Progress Management",
+      "status": 0,
+      "order": 3
+    },
+    {
+      "id": "tut_3_1",
+      "name": "Tasks with subtasks show a progress bar indicating the status ratio.",
+      "status": 0,
+      "parentId": "tut_3",
+      "order": 1
+    },
+    {
+      "id": "tut_3_2",
+      "name": "Open the details from the calendar to batch-change the status of all subtasks.",
+      "status": 1,
+      "parentId": "tut_3",
+      "order": 2
+    },
+    {
+      "id": "tut_3_3",
+      "name": "The overall project progress is shown under Total Progress at the top.",
+      "status": 0,
+      "parentId": "tut_3",
+      "order": 3
+    },
+    {
+      "id": "tut_4",
+      "name": "☁️ Cloud Sync & Sharing",
+      "status": 0,
+      "order": 4
+    },
+    {
+      "id": "tut_4_1",
+      "name": "Log in to save projects to the cloud and sync across devices.",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 1
+    },
+    {
+      "id": "tut_4_2",
+      "name": "Invite other users or generate a shared URL from the project settings.",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 2
+    },
+    {
+      "id": "tut_4_3",
+      "name": "Export or import projects from the menu at the top.",
+      "status": 0,
+      "parentId": "tut_4",
+      "order": 3
+    }
+  ]
+}

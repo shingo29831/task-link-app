@@ -1,12 +1,15 @@
 // src/hooks/useAppData.ts
 // 役割: アプリケーション全体のデータ管理（ローカル状態、クラウド同期、ストレージ永続化）の統合Facade
+// なぜ: データソース（ローカル・クラウド・多言語チュートリアル）の集約と同期の競合を防ぐため
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useProjectState } from './useProjectState';
 import { useCloudSync } from './useCloudSync';
+import { useUserSettings } from './useUserSettings';
 import { compressData, decompressData } from '../utils/compression';
-import tutorialData from '../data/tutorial.json';
+import tutorialDataJa from '../data/tutorial.json';
+import tutorialDataEn from '../data/tutorial_en.json';
 import { calculateHashAsync, generateProjectId, isEffectivelyIdentical, isUUID, createDefaultProject } from '../utils/projectUtils';
 import type { AppData } from '../types';
 
@@ -14,6 +17,8 @@ const STORAGE_KEY = 'progress_app_v2';
 
 export const useAppData = () => {
   const { getToken } = useAuth();
+  const { settings } = useUserSettings();
+  const currentLang = settings?.language || 'ja';
 
   // 1. ローカル状態の管理
   const projectState = useProjectState();
@@ -25,6 +30,19 @@ export const useAppData = () => {
 
   // 2. クラウド同期ロジックの統合
   const cloudSync = useCloudSync(activeData, activeId, projectsRef, setProjects, setActiveId, lastSyncedHashMap);
+
+  const getTutorialProject = useCallback(() => {
+    const now = Date.now();
+    const tData = currentLang === 'en' ? tutorialDataEn : tutorialDataJa;
+    return {
+      id: tData.id, 
+      projectName: tData.projectName,
+      tasks: tData.tasks.map((t: any) => ({ ...t, lastUpdated: now })) as any,
+      lastSynced: now, 
+      isCloudSync: false, 
+      role: 'owner' as const
+    };
+  }, [currentLang]);
 
   // 3. Storageからの初期ロードと URL パラメータの処理
   useEffect(() => {
@@ -46,12 +64,7 @@ export const useAppData = () => {
         } catch (e) { console.error("Failed to parse local storage", e); }
       }
 
-      const now = Date.now();
-      const tutorialProject: AppData = {
-        id: tutorialData.id, projectName: tutorialData.projectName,
-        tasks: tutorialData.tasks.map((t: any) => ({ ...t, lastUpdated: now })) as any,
-        lastSynced: now, isCloudSync: false, role: 'owner'
-      };
+      const tutorialProject = getTutorialProject();
 
       const existingTutorialIdx = loadedProjects.findIndex(p => p.id === tutorialProject.id);
       if (existingTutorialIdx >= 0) loadedProjects[existingTutorialIdx] = tutorialProject;
@@ -98,7 +111,26 @@ export const useAppData = () => {
       setActiveId(initialActiveId);
     };
     load();
-  }, [resetProjects, setIncomingData, setActiveId]);
+  }, [resetProjects, setIncomingData, setActiveId, getTutorialProject]);
+
+  const prevLangRef = useRef(currentLang);
+  useEffect(() => {
+    // なぜ: 言語設定が変更された際にローカルのチュートリアルプロジェクトの中身を動的に入れ替えるため
+    if (prevLangRef.current !== currentLang && isLoaded.current) {
+      prevLangRef.current = currentLang;
+      const newTutorial = getTutorialProject();
+      setProjects(prev => {
+        const next = [...prev];
+        const idx = next.findIndex(p => p.id === newTutorial.id);
+        if (idx >= 0) {
+          next[idx] = newTutorial;
+        } else {
+          next.unshift(newTutorial);
+        }
+        return next;
+      });
+    }
+  }, [currentLang, getTutorialProject, setProjects]);
 
   // 4. StorageとURLへの永続化 (副作用)
   useEffect(() => {
