@@ -158,5 +158,16 @@
   "privacy_policy_desc": "本アプリをご利用いただくには、プライバシーポリシーおよび利用規約への同意が必要です。",
   "privacy_policy_link": "プライバシーポリシーを確認する",
   "terms_of_service_link": "利用規約を確認する",
-  "agree_and_start": "同意してはじめる"
+  "agree_and_start": "同意してはじめる",
+  "enable_custom_layout": "デバイスごとのレイアウト設定を有効にする",
+  "timezone": "タイムゾーン",
+  "tz_asia_tokyo": "Asia/Tokyo (日本標準時)",
+  "tz_utc": "UTC (協定世界時)",
+  "tz_america_new_york": "America/New_York (東部標準時)",
+  "tz_america_los_angeles": "America/Los_Angeles (太平洋標準時)",
+  "tz_europe_london": "Europe/London (グリニッジ標準時)",
+  "tz_europe_paris": "Europe/Paris (中央ヨーロッパ標準時)",
+  "tz_asia_shanghai": "Asia/Shanghai (中国標準時)",
+  "tz_australia_sydney": "Australia/Sydney (オーストラリア東部標準時)",
+  "account_settings": "アカウント設定"
 }

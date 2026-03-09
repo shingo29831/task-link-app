@@ -60,23 +60,23 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('theme') || 'テーマ'}</label>
             <select value={theme} onChange={(e) => setTheme(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value="system">{t('theme_system') || 'システム設定に従う'}</option>
-              <option value="light">{t('theme_light') || 'ライト'}</option>
-              <option value="dark">{t('theme_dark') || 'ダーク'}</option>
+              <option value="system">{t('system_default') || 'システム設定に従う'}</option>
+              <option value="light">{t('light_mode') || 'ライト'}</option>
+              <option value="dark">{t('dark_mode') || 'ダーク'}</option>
             </select>
           </div>
 
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('timezone') || 'タイムゾーン'}</label>
             <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
-              <option value="Asia/Tokyo">Asia/Tokyo (日本標準時)</option>
-              <option value="UTC">UTC (協定世界時)</option>
-              <option value="America/New_York">America/New_York (東部標準時)</option>
-              <option value="America/Los_Angeles">America/Los_Angeles (太平洋標準時)</option>
-              <option value="Europe/London">Europe/London (グリニッジ標準時)</option>
-              <option value="Europe/Paris">Europe/Paris (中央ヨーロッパ標準時)</option>
-              <option value="Asia/Shanghai">Asia/Shanghai (中国標準時)</option>
-              <option value="Australia/Sydney">Australia/Sydney (オーストラリア東部標準時)</option>
+              <option value="Asia/Tokyo">{t('tz_asia_tokyo') || 'Asia/Tokyo (日本標準時)'}</option>
+              <option value="UTC">{t('tz_utc') || 'UTC (協定世界時)'}</option>
+              <option value="America/New_York">{t('tz_america_new_york') || 'America/New_York (東部標準時)'}</option>
+              <option value="America/Los_Angeles">{t('tz_america_los_angeles') || 'America/Los_Angeles (太平洋標準時)'}</option>
+              <option value="Europe/London">{t('tz_europe_london') || 'Europe/London (グリニッジ標準時)'}</option>
+              <option value="Europe/Paris">{t('tz_europe_paris') || 'Europe/Paris (中央ヨーロッパ標準時)'}</option>
+              <option value="Asia/Shanghai">{t('tz_asia_shanghai') || 'Asia/Shanghai (中国標準時)'}</option>
+              <option value="Australia/Sydney">{t('tz_australia_sydney') || 'Australia/Sydney (オーストラリア東部標準時)'}</option>
             </select>
           </div>
 
