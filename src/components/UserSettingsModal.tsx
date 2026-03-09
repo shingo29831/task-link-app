@@ -1,6 +1,6 @@
 // src/components/UserSettingsModal.tsx
 // 役割: ユーザー設定（言語、テーマ、タイムゾーン、レイアウト等）とアカウント設定への遷移を管理するモーダル
-// なぜ: ログイン状態に関わらずアプリの表示・動作をカスタマイズできるようにし、設定への導線を一元化するため
+// なぜ: 言語設定変更時に即座にUIへ反映させつつ、保存は確定時のみ行うため（キャンセル時は元に戻す）
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ interface UserSettingsModalProps {
 }
 
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { settings, updateSettings } = useUserSettings();
   const { isSignedIn } = useAuth();
   const { openUserProfile } = useClerk();
@@ -25,6 +25,21 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
   const [boardLayoutDesktop, setBoardLayoutDesktop] = useState(settings.boardLayoutDesktop || 'horizontal');
   const [boardLayoutTablet, setBoardLayoutTablet] = useState(settings.boardLayoutTablet || 'horizontal');
   const [boardLayoutMobile, setBoardLayoutMobile] = useState(settings.boardLayoutMobile || 'vertical');
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+    i18n.changeLanguage(newLang); // 即時適用（プレビュー用）
+  };
+
+  const handleCancel = () => {
+    // 保存せずにキャンセルした場合は元の言語に戻す
+    const originalLang = settings.language || 'ja';
+    if (language !== originalLang) {
+      i18n.changeLanguage(originalLang);
+    }
+    onClose();
+  };
 
   const handleSave = async () => {
     await updateSettings({
@@ -41,17 +56,17 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleCancel}>
       <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '8px', width: '450px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', color: 'var(--text-primary)', position: 'relative' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, fontSize: '1.2em' }}>{t('settings') || '設定'}</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><IconX size={20} /></button>
+          <button onClick={handleCancel} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><IconX size={20} /></button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9em', fontWeight: 'bold' }}>{t('language') || '言語'}</label>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+            <select value={language} onChange={handleLanguageChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}>
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>
@@ -115,7 +130,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
 
           {isSignedIn && (
              <div style={{ marginTop: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-               <button onClick={() => { openUserProfile(); onClose(); }} style={{ padding: '10px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
+               <button onClick={() => { openUserProfile(); handleCancel(); }} style={{ padding: '10px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                   {t('account_settings') || 'アカウント設定'}
                </button>
@@ -124,7 +139,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>{t('cancel') || 'キャンセル'}</button>
+          <button onClick={handleCancel} style={{ padding: '8px 16px', background: 'var(--bg-button)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}>{t('cancel') || 'キャンセル'}</button>
           <button onClick={handleSave} style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>{t('save') || '保存'}</button>
         </div>
       </div>
