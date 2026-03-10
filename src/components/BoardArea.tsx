@@ -179,10 +179,16 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
   useEffect(() => {
     if (!isDragging || !isMobile) return;
     const updatePointer = (x: number, y: number) => { pointerRef.current = { x, y }; };
-    const handleTouchMove = (e: TouchEvent) => { if (e.touches.length > 0) updatePointer(e.touches[0].clientX, e.touches[0].clientY); };
+    const handleTouchMove = (e: TouchEvent) => { 
+      if (e.touches.length > 0) updatePointer(e.touches[0].clientX, e.touches[0].clientY); 
+      // なぜ: ドラッグ中にネイティブのスワイプ（画面スクロール）が発生するのを防ぐため
+      if (e.cancelable) e.preventDefault();
+    };
     const handlePointerMoveGlobal = (e: PointerEvent) => { updatePointer(e.clientX, e.clientY); };
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('pointermove', handlePointerMoveGlobal);
+    
     let animationFrameId: number;
     const tick = () => {
       if (scrollRef.current) {
@@ -195,7 +201,12 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
       animationFrameId = requestAnimationFrame(tick);
     };
     tick();
-    return () => { window.removeEventListener('touchmove', handleTouchMove); window.removeEventListener('pointermove', handlePointerMoveGlobal); cancelAnimationFrame(animationFrameId); };
+    
+    return () => { 
+      window.removeEventListener('touchmove', handleTouchMove); 
+      window.removeEventListener('pointermove', handlePointerMoveGlobal); 
+      cancelAnimationFrame(animationFrameId); 
+    };
   }, [isDragging, isMobile]);
 
   return (
@@ -213,7 +224,8 @@ export const InteractiveBoardArea = ({ children, activeTasks, onBoardClick, isMo
              paddingLeft: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
              paddingRight: boardLayout === 'horizontal' ? (isMobile ? '24px' : '32px') : (isMobile ? '8px' : '16px'),
              cursor: isPanning ? 'grabbing' : 'grab', 
-             userSelect: isPanning ? 'none' : 'auto' 
+             userSelect: isPanning ? 'none' : 'auto',
+             touchAction: isDragging ? 'none' : 'auto'
            }}>
         
         {activeTasks.length === 0 ? (
