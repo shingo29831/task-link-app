@@ -444,7 +444,7 @@ function App() {
   );
 
   const mainAppContent = (
-    <div style={{ maxWidth: '100%', margin: '0 auto', padding: isMobile ? '2px' : '20px', paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, display: 'flex', flexDirection: 'column', height: 'var(--app-height, 100vh)', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
+    <div style={{ maxWidth: '100%', margin: '0 auto', paddingTop: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-top))`, paddingRight: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-right))`, paddingBottom: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-bottom))`, paddingLeft: `calc(${isMobile ? '5px' : '20px'} + env(safe-area-inset-left))`, display: 'flex', flexDirection: 'column', height: 'var(--app-height, 100vh)', boxSizing: 'border-box', overflow: 'hidden' }} onClick={() => { if (showProjectMenu) setShowProjectMenu(false); }}>
       
       {showUserSettingsModal && (
         <UserSettingsModal onClose={() => setShowUserSettingsModal(false)} />
@@ -516,7 +516,7 @@ function App() {
       
       {showAddModal && <TaskAddModal taskName={inputTaskName} setTaskName={setInputTaskName} dateStr={inputDateStr} setDateStr={setInputDateStr} projects={projects} initialProjectId={activeId} activeTasks={activeTasks} initialParentId={activeParentId} onSubmit={(parentId, projectId) => handleAddTaskWrapper(parentId, projectId)} onClose={() => setShowAddModal(false)} />}
 
-      <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , padding: isMobile ? '10px':'0px' , paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
+      <header style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexShrink: 0, marginBottom: isCompactSpacing ? '5px' : '10px', gap: isMobile ? '10px' : '5px' , paddingTop: isMobile ? '10px' : '0px', paddingRight: isMobile ? '10px' : '0px', paddingLeft: isMobile ? '10px' : '0px', paddingBottom: '0px', width: '100%', boxSizing: 'border-box' }}>
           {isMobile ? (
               <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
